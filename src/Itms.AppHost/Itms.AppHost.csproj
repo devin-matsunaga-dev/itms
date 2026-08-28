@@ -6,4 +6,13 @@
     <UserSecretsId>ae13f3b9-ead2-4b27-aa0a-9316b2001848</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <PackageReference Include="Aspire.Hosting.Redis" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Itms.Web.Host\Itms.Web.Host.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -8,6 +8,7 @@
   <ItemGroup>
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Shouldly" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,6 +19,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Itms.Platform\Itms.Platform.csproj" />
     <ProjectReference Include="..\..\src\Itms.Contracts\Itms.Contracts.csproj" />
+    <!-- The AppHost is referenced so its application model can be built and
+         inspected. IsAspireProjectResource="false" keeps it an ordinary reference
+         rather than something Aspire tries to orchestrate. -->
+    <ProjectReference Include="..\..\src\Itms.AppHost\Itms.AppHost.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
 
 </Project>
