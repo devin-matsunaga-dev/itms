@@ -1,0 +1,41 @@
+<Project>
+
+  <!--
+    Repo-wide build settings. CONVENTIONS.md requires that individual .csproj
+    files stay nearly empty, so everything that is true of every project in the
+    solution lives here and nowhere else.
+  -->
+
+  <PropertyGroup>
+    <!-- ARCHITECTURE.md §10 pins the platform. net8.0/net9.0 are EOL Nov 2026
+         and must never appear in this repo. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Contracts and domain events carry XML docs (CONVENTIONS.md), but a
+         missing doc comment on internal plumbing is not a build break. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Company>ITMS</Company>
+    <Product>Unified IT Management System</Product>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <!-- Test projects opt out of the packability and doc-file defaults. The runner
+       itself is selected in global.json — xUnit v3 is a Microsoft.Testing.Platform
+       runner, and the .NET 10 SDK refuses to drive one through VSTest. -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

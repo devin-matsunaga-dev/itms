@@ -1,0 +1,45 @@
+<Project>
+
+  <!--
+    Central package management. Package versions live here and nowhere else, so
+    two projects can never disagree about a version and a bump is a one-line
+    change. Individual .csproj files carry <PackageReference Include="..." />
+    with no Version attribute.
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!-- Aspire / ServiceDefaults. The AppHost SDK version is pinned in
+       src/Itms.AppHost/Itms.AppHost.csproj; ARCHITECTURE.md §10 requires
+       `aspire update` at every phase gate. -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.8.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+  </ItemGroup>
+
+  <!-- Test stack. xUnit v3 carries its own Microsoft.Testing.Platform runner, so
+       there is no Microsoft.NET.Test.Sdk, no VSTest adapter, and no VSTest-based
+       coverage collector here. -->
+  <ItemGroup>
+    <PackageVersion Include="xunit.v3" Version="4.0.0" />
+    <PackageVersion Include="Shouldly" Version="4.3.0" />
+  </ItemGroup>
+
+  <!-- Declared here so the version is settled once, but deliberately not
+       referenced by any project yet. Each is consumed by the work package
+       named beside it. -->
+  <ItemGroup>
+    <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />          <!-- WP-0.3 architecture rules -->
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" /> <!-- WP-0.4 integration tests -->
+    <PackageVersion Include="Respawn" Version="7.0.0" />                    <!-- WP-0.4 between-test reset -->
+  </ItemGroup>
+
+</Project>
