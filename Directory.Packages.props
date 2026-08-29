@@ -41,6 +41,13 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
   </ItemGroup>
 
+  <!-- Shared kernel. FluentValidation is required by CONVENTIONS.md ("validation
+       with FluentValidation, executed by endpoint filter"); Itms.Platform owns the
+       filter so no module has to write its own. -->
+  <ItemGroup>
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+  </ItemGroup>
+
   <!-- Test stack. xUnit v3 carries its own Microsoft.Testing.Platform runner, so
        there is no Microsoft.NET.Test.Sdk, no VSTest adapter, and no VSTest-based
        coverage collector here. -->
@@ -49,11 +56,16 @@
     <PackageVersion Include="Shouldly" Version="4.3.0" />
   </ItemGroup>
 
+  <!-- Architecture rules. Consumed by tests/Itms.ArchitectureTests, which
+       enforces ARCHITECTURE.md §3 by inspecting assembly references. -->
+  <ItemGroup>
+    <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
+  </ItemGroup>
+
   <!-- Declared here so the version is settled once, but deliberately not
        referenced by any project yet. Each is consumed by the work package
        named beside it. -->
   <ItemGroup>
-    <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />          <!-- WP-0.3 architecture rules -->
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" /> <!-- WP-0.4 integration tests -->
     <PackageVersion Include="Respawn" Version="7.0.0" />                    <!-- WP-0.4 between-test reset -->
   </ItemGroup>

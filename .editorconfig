@@ -27,6 +27,12 @@ trim_trailing_whitespace = false
 indent_size = 4
 
 [*.cs]
+# --- Analyzer rules deliberately off ---
+# CA1716 flags type and member names that are keywords in another .NET language
+# (Error, Next, Handle, Property). This solution is C#-only and exposes no library
+# to VB or F#, so the rule can only push good domain names into worse ones.
+dotnet_diagnostic.CA1716.severity = none
+
 # --- Binding per CONVENTIONS.md ---
 csharp_style_namespace_declarations = file_scoped:error
 dotnet_diagnostic.IDE0161.severity = error

@@ -5,7 +5,14 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
 
+  <!-- The validation filter and the ProblemDetails mapping are ASP.NET types, and
+       both are testable in memory with no server, so their tests live here. -->
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Shouldly" />
   </ItemGroup>

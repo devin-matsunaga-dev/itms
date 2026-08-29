@@ -1,7 +1,7 @@
-// Composition root only (ARCHITECTURE.md §2). Module registration, the shared
-// kernel (WP-0.3), the outbox (WP-0.4), and authentication (WP-0.5) each arrive
-// with their own package. Today this host proves the Aspire-supplied connection
-// strings reach it and that /health reflects the backing services.
+// Composition root only (ARCHITECTURE.md §2). Module registration, the outbox
+// (WP-0.4), and authentication (WP-0.5) each arrive with their own package.
+
+using Itms.Platform;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +14,17 @@ builder.AddServiceDefaults();
 builder.AddNpgsqlDataSource("itms");
 builder.AddRedisClient("redis");
 
+// The shared kernel: the clock, the current-user accessor, and RFC 7807 problem
+// details. Registered before any AddXxxModule, because every module depends on it.
+builder.Services.AddPlatform();
+
 var app = builder.Build();
+
+// ARCHITECTURE.md §6: errors are ProblemDetails, always. These two turn the
+// responses no handler produced — an unhandled exception, a 404 from routing, a 401
+// from the auth middleware — into problem documents as well.
+app.UseExceptionHandler();
+app.UseStatusCodePages();
 
 // /health (all checks) and /alive (liveness only), Development-only by default.
 app.MapDefaultEndpoints();

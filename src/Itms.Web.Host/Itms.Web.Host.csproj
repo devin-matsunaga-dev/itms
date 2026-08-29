@@ -7,6 +7,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Itms.ServiceDefaults\Itms.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Itms.Platform\Itms.Platform.csproj" />
+    <ProjectReference Include="..\Itms.Contracts\Itms.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

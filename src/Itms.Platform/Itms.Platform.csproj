@@ -1,3 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- The shared kernel. It references no module (ARCHITECTURE.md §3 rule 4) and
+       never will; the architecture tests assert it. It does reference the ASP.NET
+       shared framework, because the ProblemDetails mapping and the validation
+       endpoint filter belong here rather than being rewritten in every module. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+  </ItemGroup>
+
 </Project>
