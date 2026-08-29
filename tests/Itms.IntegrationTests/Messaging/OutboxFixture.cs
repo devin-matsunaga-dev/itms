@@ -19,7 +19,8 @@ public sealed class OutboxFixture : IAsyncLifetime
     /// <summary>The schema the test consumers write their observable side effects into.</summary>
     public const string EffectsSchema = "test_effects";
 
-    private readonly PostgresDatabase _database = new();
+    // Shared with every other fixture in this assembly; see SharedPostgres.
+    private readonly PostgresDatabase _database = SharedPostgres.Instance;
 
     /// <summary>The pooled data source every session in a test is built on.</summary>
     public NpgsqlDataSource DataSource => _database.DataSource;
@@ -74,7 +75,11 @@ public sealed class OutboxFixture : IAsyncLifetime
     }
 
     /// <inheritdoc />
-    public async ValueTask DisposeAsync() => await _database.DisposeAsync();
+    /// <remarks>
+    /// The container is shared by the assembly and reaped when the process exits, so
+    /// this fixture does not dispose it out from under the others.
+    /// </remarks>
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private async Task CreateEffectsTableAsync()
     {

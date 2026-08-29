@@ -55,6 +55,15 @@
        in the solution; src/Itms.Messaging owns the first DbContext (the outbox) and
        every module DbContext follows. Design is needed by `dotnet ef migrations`
        and is PrivateAssets-only at the project that references it. -->
+  <!-- ASP.NET Core Identity on EF Core (WP-0.5). Pinned to the same 10.0.3 as the
+       EF Core packages above: transitive pinning is on, so a newer Identity package
+       would pull an EF Core version the solution has pinned lower and turn the
+       restore into an NU1605 downgrade error. -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.4" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageVersion Include="Npgsql" Version="10.0.3" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
@@ -74,6 +83,14 @@
        enforces ARCHITECTURE.md §3 by inspecting assembly references. -->
   <ItemGroup>
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
+  </ItemGroup>
+
+  <!-- In-memory HTTP host for the integration suite. WP-0.5's done-criteria are
+       stated in terms of what the wire carries — a 401 rather than a redirect to an
+       HTML login page, a 403 for the wrong role — and only a real request against the
+       real composition root can show that. STATUS.md had pencilled this in for WP-0.9. -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.3" />
   </ItemGroup>
 
   <!-- Integration-test infrastructure, consumed by tests/Itms.TestSupport. One

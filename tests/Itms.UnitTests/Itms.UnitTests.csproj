@@ -27,6 +27,10 @@
     <ProjectReference Include="..\..\src\Itms.Contracts\Itms.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Itms.Messaging\Itms.Messaging.csproj" />
     <ProjectReference Include="..\Itms.TestSupport\Itms.TestSupport.csproj" />
+    <!-- WP-0.5: the password policy, the cookie settings, and the role policies are
+         configuration, and configuration that nothing asserts is configuration that
+         quietly drifts. None of these tests touches a database. -->
+    <ProjectReference Include="..\..\src\Modules\Itms.Modules.Identity\Itms.Modules.Identity.csproj" />
   </ItemGroup>
 
 </Project>

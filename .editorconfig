@@ -107,3 +107,8 @@ dotnet_diagnostic.CA1707.severity = none
 # migration is never edited after merge — so reformatting one by hand to satisfy a
 # style rule is exactly the edit that must not become a habit.
 dotnet_diagnostic.IDE0161.severity = suggestion
+
+# CA1861 wants a composite index's column list hoisted to a static readonly field. EF
+# generates that list inline, the method runs once, and hand-editing it would break the
+# same rule as above.
+dotnet_diagnostic.CA1861.severity = none

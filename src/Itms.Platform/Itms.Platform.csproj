@@ -10,6 +10,11 @@
 
   <ItemGroup>
     <PackageReference Include="FluentValidation" />
+    <!-- Relational only, and only for IModuleDbSession: the kernel declares the shape
+         of "one connection, one transaction, shared by every context in the scope" so
+         that a module can build its DbContext on it without referencing the bus, which
+         ARCHITECTURE.md §3 forbids. No provider, no DbContext, no query lives here. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
   </ItemGroup>
 
 </Project>

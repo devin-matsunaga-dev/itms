@@ -9,6 +9,7 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,6 +22,10 @@
     <ProjectReference Include="..\..\src\Itms.Contracts\Itms.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Itms.Messaging\Itms.Messaging.csproj" />
     <ProjectReference Include="..\Itms.TestSupport\Itms.TestSupport.csproj" />
+    <!-- WP-0.5: the authentication criteria are about what the wire carries, so the
+         suite boots the real composition root rather than a stand-in. -->
+    <ProjectReference Include="..\..\src\Itms.Web.Host\Itms.Web.Host.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Itms.Modules.Identity\Itms.Modules.Identity.csproj" />
     <!-- The AppHost is referenced so its application model can be built and
          inspected. IsAspireProjectResource="false" keeps it an ordinary reference
          rather than something Aspire tries to orchestrate. -->

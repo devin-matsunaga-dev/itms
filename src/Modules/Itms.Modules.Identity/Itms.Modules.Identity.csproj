@@ -1,3 +1,28 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- The Identity module: users, roles, cookie authentication, and sessions
+       (ARCHITECTURE.md §7). It references the shared framework because it owns
+       endpoints and the cookie handler, and Itms.Contracts because it implements
+       IUserLookup — the only way another module is allowed to read a user. It
+       references no other module, and the architecture tests assert it. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="FluentValidation" />
+    <!-- Design-time only: `dotnet ef migrations` needs it, the shipped app does not. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Itms.Platform\Itms.Platform.csproj" />
+    <ProjectReference Include="..\..\Itms.Contracts\Itms.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>
