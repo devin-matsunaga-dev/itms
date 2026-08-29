@@ -1,11 +1,11 @@
 using Itms.Platform.Time;
 
-namespace Itms.UnitTests.Platform;
+namespace Itms.TestSupport;
 
 /// <summary>
 /// A clock the test moves by hand. CONVENTIONS.md bans <c>Thread.Sleep</c> in tests;
-/// every "wait for the SLA to breach" scenario is written as an <see cref="Advance"/>
-/// instead.
+/// every "wait for the SLA to breach" or "wait out the retry backoff" scenario is
+/// written as an <see cref="Advance"/> instead.
 /// </summary>
 /// <param name="now">The instant the clock starts at.</param>
 public sealed class FakeClock(DateTimeOffset now) : IClock
@@ -23,5 +23,6 @@ public sealed class FakeClock(DateTimeOffset now) : IClock
     public DateTimeOffset UtcNow { get; private set; } = now.ToUniversalTime();
 
     /// <summary>Moves the clock forward.</summary>
+    /// <param name="by">How far forward to move.</param>
     public void Advance(TimeSpan by) => UtcNow = UtcNow.Add(by);
 }

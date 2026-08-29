@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shared test helpers. It exists so Itms.IntegrationTests never has to reference
+       Itms.UnitTests to borrow a fake (STATUS.md, WP-0.3): a test project referencing
+       another test project makes one suite's refactor the other's build break. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Respawn" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Itms.Platform\Itms.Platform.csproj" />
+  </ItemGroup>
+
+</Project>

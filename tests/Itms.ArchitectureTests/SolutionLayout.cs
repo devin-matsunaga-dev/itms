@@ -30,6 +30,9 @@ internal static class SolutionLayout
     /// <summary>The public contracts and domain events assembly.</summary>
     public static Assembly Contracts { get; } = typeof(Itms.Contracts.AssemblyMarker).Assembly;
 
+    /// <summary>The in-process bus and its transactional outbox. Infrastructure, not a module.</summary>
+    public static Assembly Messaging { get; } = typeof(Itms.Messaging.AssemblyMarker).Assembly;
+
     /// <summary>
     /// Every module assembly. Located through its <c>AssemblyMarker</c> type rather than
     /// by name, so dropping or renaming a project breaks the compile here instead of
@@ -50,8 +53,8 @@ internal static class SolutionLayout
         typeof(Itms.Modules.Audit.AssemblyMarker).Assembly,
     ];
 
-    /// <summary>Every source assembly the rules cover: the shared kernel, contracts, and all modules.</summary>
-    public static IReadOnlyList<Assembly> All { get; } = [Platform, Contracts, .. Modules];
+    /// <summary>Every source assembly the rules cover: the shared kernel, contracts, the bus, and all modules.</summary>
+    public static IReadOnlyList<Assembly> All { get; } = [Platform, Contracts, Messaging, .. Modules];
 
     /// <summary>The names of the module assemblies, for reference checks.</summary>
     public static IReadOnlySet<string> ModuleNames { get; } =

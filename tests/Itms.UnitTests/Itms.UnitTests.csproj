@@ -25,6 +25,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Itms.Platform\Itms.Platform.csproj" />
     <ProjectReference Include="..\..\src\Itms.Contracts\Itms.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Itms.Messaging\Itms.Messaging.csproj" />
+    <ProjectReference Include="..\Itms.TestSupport\Itms.TestSupport.csproj" />
   </ItemGroup>
 
 </Project>

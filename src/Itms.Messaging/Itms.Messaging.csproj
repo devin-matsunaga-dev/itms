@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The in-process bus and its transactional outbox (ARCHITECTURE.md §5).
+
+       It is its own project rather than part of Itms.Platform because publishing
+       takes a DomainEvent, which lives in Itms.Contracts, and the shared kernel is
+       deliberately kept clear of Contracts (WP-0.3) so that a cross-module read
+       never has to drag the kernel along. It is not a module: it owns no business
+       data, exposes no endpoints, and no module may reference it directly — modules
+       take IEventPublisher and implement IDomainEventHandler<T>, both of which they see
+       through Itms.Contracts and dependency injection. -->
+  <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!-- Design-time only: `dotnet ef migrations` needs it, the shipped app does not. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Itms.Platform\Itms.Platform.csproj" />
+    <ProjectReference Include="..\Itms.Contracts\Itms.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

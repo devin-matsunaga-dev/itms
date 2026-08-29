@@ -101,3 +101,9 @@ dotnet_naming_style.pascal.capitalization = pascal_case
 [tests/**/*.cs]
 # Test names are sentences, and underscores are how they stay readable.
 dotnet_diagnostic.CA1707.severity = none
+
+[**/Migrations/*.cs]
+# EF Core generates migrations with block namespaces, and ARCHITECTURE.md §4 says a
+# migration is never edited after merge — so reformatting one by hand to satisfy a
+# style rule is exactly the edit that must not become a habit.
+dotnet_diagnostic.IDE0161.severity = suggestion

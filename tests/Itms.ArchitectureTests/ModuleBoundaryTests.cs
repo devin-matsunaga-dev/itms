@@ -77,6 +77,58 @@ public sealed class ModuleBoundaryTests
     }
 
     /// <summary>
+    /// The bus is infrastructure, not a module: it owns no business data and appears in
+    /// no module's project file. A module reaching for it directly would be reaching past
+    /// <c>IEventPublisher</c> into the outbox, which is the coupling the interface exists
+    /// to prevent.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(ModuleNames))]
+    public void Module_does_not_reference_messaging(string moduleName)
+    {
+        var messaging = SolutionLayout.NameOf(SolutionLayout.Messaging);
+
+        SolutionLayout.DeclaredReferences[moduleName].ShouldNotContain(messaging);
+
+        var module = SolutionLayout.Modules.Single(m => SolutionLayout.NameOf(m) == moduleName);
+        SolutionLayout.ReferencedAssemblies(module).ShouldNotContain(messaging);
+    }
+
+    /// <summary>
+    /// The bus sits above the shared kernel and the contracts and below nothing. It must
+    /// reference no module, or the thing every module publishes through would depend on
+    /// what publishes through it.
+    /// </summary>
+    [Fact]
+    public void Messaging_depends_only_on_platform_and_contracts()
+    {
+        string[] allowed =
+        [
+            SolutionLayout.NameOf(SolutionLayout.Platform),
+            SolutionLayout.NameOf(SolutionLayout.Contracts),
+        ];
+
+        var messaging = SolutionLayout.NameOf(SolutionLayout.Messaging);
+
+        SolutionLayout.DeclaredReferences[messaging]
+            .ShouldAllBe(reference => allowed.Contains(reference, StringComparer.Ordinal));
+
+        SolutionLayout.ReferencedAssemblies(SolutionLayout.Messaging)
+            .ShouldNotContain(reference => SolutionLayout.ModuleNames.Contains(reference));
+    }
+
+    /// <summary>
+    /// The shared kernel stays below the bus. Platform reaching for the outbox would put
+    /// a database dependency inside the one project everything else is allowed to depend on.
+    /// </summary>
+    [Fact]
+    public void Platform_does_not_reference_messaging()
+    {
+        SolutionLayout.DeclaredReferences[SolutionLayout.NameOf(SolutionLayout.Platform)]
+            .ShouldNotContain(SolutionLayout.NameOf(SolutionLayout.Messaging));
+    }
+
+    /// <summary>
     /// The rules cover source projects only. <c>Itms.ArchitectureTests</c> references
     /// every module by design — it cannot inspect what it does not reference — so this
     /// guards against a future rule being phrased in a way that would catch it

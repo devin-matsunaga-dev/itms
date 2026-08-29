@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Itms.Platform\Itms.Platform.csproj" />
     <ProjectReference Include="..\..\src\Itms.Contracts\Itms.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Itms.Messaging\Itms.Messaging.csproj" />
     <ProjectReference Include="..\..\src\Modules\Itms.Modules.Alerts\Itms.Modules.Alerts.csproj" />
     <ProjectReference Include="..\..\src\Modules\Itms.Modules.Assets\Itms.Modules.Assets.csproj" />
     <ProjectReference Include="..\..\src\Modules\Itms.Modules.Audit\Itms.Modules.Audit.csproj" />

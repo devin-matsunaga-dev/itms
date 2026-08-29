@@ -1,6 +1,7 @@
-// Composition root only (ARCHITECTURE.md §2). Module registration, the outbox
-// (WP-0.4), and authentication (WP-0.5) each arrive with their own package.
+// Composition root only (ARCHITECTURE.md §2). Module registration and authentication
+// (WP-0.5) each arrive with their own package.
 
+using Itms.Messaging;
 using Itms.Platform;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,7 +19,22 @@ builder.AddRedisClient("redis");
 // details. Registered before any AddXxxModule, because every module depends on it.
 builder.Services.AddPlatform();
 
+// The in-process bus and its transactional outbox (ARCHITECTURE.md §5). Registered
+// before any AddXxxModule, because modules take IEventPublisher from here. The
+// assemblies passed are the ones scanned for IEventConsumer implementations; the bus
+// cannot reference a module, so the composition root is what names them. No module
+// has consumers yet, so the list is empty until Phase 1.
+builder.Services.AddMessaging(builder.Configuration);
+
 var app = builder.Build();
+
+// Development applies its own migrations so `aspire run` is the only setup step.
+// Production applies them as a deliberate deployment action, never on startup.
+if (app.Environment.IsDevelopment())
+{
+    await using var migrationScope = app.Services.CreateAsyncScope();
+    await migrationScope.ServiceProvider.MigrateMessagingAsync();
+}
 
 // ARCHITECTURE.md §6: errors are ProblemDetails, always. These two turn the
 // responses no handler produced — an unhandled exception, a 404 from routing, a 401

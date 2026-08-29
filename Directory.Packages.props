@@ -24,7 +24,10 @@
 
   <!-- Aspire client integrations, used by src/Itms.Web.Host. They bind the
        Aspire-supplied connection strings and contribute the Postgres and Redis
-       health checks that /health reports. -->
+       health checks that /health reports. Aspire.Npgsql — the bare NpgsqlDataSource,
+       not the EF Core integration — is deliberate: every DbContext in this solution is
+       built on the one connection IDbSession hands out, so an Aspire-registered context
+       with a pool of its own would defeat the shared transaction. -->
   <ItemGroup>
     <PackageVersion Include="Aspire.Npgsql" Version="13.5.3" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.5.3" />
@@ -48,6 +51,17 @@
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
   </ItemGroup>
 
+  <!-- EF Core on PostgreSQL. ARCHITECTURE.md §4 makes EF Core the only data access
+       in the solution; src/Itms.Messaging owns the first DbContext (the outbox) and
+       every module DbContext follows. Design is needed by `dotnet ef migrations`
+       and is PrivateAssets-only at the project that references it. -->
+  <ItemGroup>
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.11" />
+  </ItemGroup>
+
   <!-- Test stack. xUnit v3 carries its own Microsoft.Testing.Platform runner, so
        there is no Microsoft.NET.Test.Sdk, no VSTest adapter, and no VSTest-based
        coverage collector here. -->
@@ -62,12 +76,12 @@
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
   </ItemGroup>
 
-  <!-- Declared here so the version is settled once, but deliberately not
-       referenced by any project yet. Each is consumed by the work package
-       named beside it. -->
+  <!-- Integration-test infrastructure, consumed by tests/Itms.TestSupport. One
+       PostgreSQL container per test assembly, reset between tests by truncation
+       rather than by re-running migrations (CONVENTIONS.md). -->
   <ItemGroup>
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" /> <!-- WP-0.4 integration tests -->
-    <PackageVersion Include="Respawn" Version="7.0.0" />                    <!-- WP-0.4 between-test reset -->
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" />
+    <PackageVersion Include="Respawn" Version="7.0.0" />
   </ItemGroup>
 
 </Project>
