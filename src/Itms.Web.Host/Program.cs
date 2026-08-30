@@ -3,6 +3,8 @@
 
 using Itms.Messaging;
 using Itms.Messaging.Abstractions;
+using Itms.Modules.Directory;
+using Itms.Modules.Directory.Seeding;
 using Itms.Modules.Identity;
 using Itms.Modules.Identity.Seeding;
 using Itms.Platform;
@@ -38,6 +40,7 @@ builder.Services.AddScoped<IModuleDbSession, ModuleDbSessionAdapter>();
 
 // Modules. Each contributes exactly one AddXxxModule here and one MapXxxEndpoints below.
 builder.Services.AddIdentityModule();
+builder.Services.AddDirectoryModule();
 
 var app = builder.Build();
 
@@ -49,7 +52,9 @@ if (app.Environment.IsDevelopment())
     await using var startupScope = app.Services.CreateAsyncScope();
     await startupScope.ServiceProvider.MigrateMessagingAsync();
     await startupScope.ServiceProvider.MigrateIdentityAsync();
+    await startupScope.ServiceProvider.MigrateDirectoryAsync();
     await DevelopmentIdentitySeeder.SeedAsync(startupScope.ServiceProvider);
+    await DevelopmentDirectorySeeder.SeedAsync(startupScope.ServiceProvider);
 }
 
 // ARCHITECTURE.md §6: errors are ProblemDetails, always. These two turn the
@@ -73,5 +78,6 @@ app.MapDefaultEndpoints();
 app.MapGet("/", () => Results.Ok(new { service = "Itms.Web.Host", state = "skeleton" }));
 
 app.MapIdentityEndpoints();
+app.MapDirectoryEndpoints();
 
 app.Run();

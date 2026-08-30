@@ -50,9 +50,12 @@ public sealed class IdentityWebFixture : IAsyncLifetime
         {
         }
 
+        // Every module the host registers, not just Identity: the fixture boots the whole
+        // composition root, so a schema left out here would leave one suite's rows behind
+        // for the next one. WP-0.6 added "directory".
         _respawner = await PostgresDatabase.CreateRespawnerAsync(
             _dataSource,
-            ["identity", "messaging"],
+            ["identity", "messaging", "directory"],
             cancellationToken);
     }
 
@@ -78,7 +81,14 @@ public sealed class IdentityWebFixture : IAsyncLifetime
         });
     }
 
-    /// <summary>Empties the identity tables and re-seeds the development accounts.</summary>
+    /// <summary>
+    /// Empties every module's tables and re-seeds the development accounts.
+    /// </summary>
+    /// <remarks>
+    /// The accounts come back because every suite signs in; the development directory
+    /// deliberately does not, so a directory test starts from an empty tree and builds
+    /// exactly the one it is asserting on. The seeder has its own test.
+    /// </remarks>
     public async Task ResetAsync()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

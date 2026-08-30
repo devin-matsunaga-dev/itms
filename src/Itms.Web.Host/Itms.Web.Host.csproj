@@ -11,6 +11,7 @@
     <ProjectReference Include="..\Itms.Messaging\Itms.Messaging.csproj" />
     <ProjectReference Include="..\Itms.Contracts\Itms.Contracts.csproj" />
     <ProjectReference Include="..\Modules\Itms.Modules.Identity\Itms.Modules.Identity.csproj" />
+    <ProjectReference Include="..\Modules\Itms.Modules.Directory\Itms.Modules.Directory.csproj" />
   </ItemGroup>
 
 </Project>

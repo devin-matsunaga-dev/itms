@@ -26,6 +26,9 @@
          suite boots the real composition root rather than a stand-in. -->
     <ProjectReference Include="..\..\src\Itms.Web.Host\Itms.Web.Host.csproj" />
     <ProjectReference Include="..\..\src\Modules\Itms.Modules.Identity\Itms.Modules.Identity.csproj" />
+    <!-- WP-0.6: the tree, the subtree rewrite, and the two lookup contracts are all
+         statements about what the database and the wire actually do. -->
+    <ProjectReference Include="..\..\src\Modules\Itms.Modules.Directory\Itms.Modules.Directory.csproj" />
     <!-- The AppHost is referenced so its application model can be built and
          inspected. IsAspireProjectResource="false" keeps it an ordinary reference
          rather than something Aspire tries to orchestrate. -->
