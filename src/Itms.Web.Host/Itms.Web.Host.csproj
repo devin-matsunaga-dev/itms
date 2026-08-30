@@ -12,6 +12,7 @@
     <ProjectReference Include="..\Itms.Contracts\Itms.Contracts.csproj" />
     <ProjectReference Include="..\Modules\Itms.Modules.Identity\Itms.Modules.Identity.csproj" />
     <ProjectReference Include="..\Modules\Itms.Modules.Directory\Itms.Modules.Directory.csproj" />
+    <ProjectReference Include="..\Modules\Itms.Modules.Audit\Itms.Modules.Audit.csproj" />
   </ItemGroup>
 
 </Project>

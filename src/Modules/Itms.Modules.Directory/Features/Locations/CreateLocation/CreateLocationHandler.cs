@@ -1,3 +1,5 @@
+using Itms.Contracts.Auditing;
+using Itms.Modules.Directory.Auditing;
 using Itms.Modules.Directory.Domain;
 using Itms.Modules.Directory.Persistence;
 using Itms.Platform.Data;
@@ -13,11 +15,13 @@ namespace Itms.Modules.Directory.Features.Locations.CreateLocation;
 /// <param name="session">The ambient unit of work.</param>
 /// <param name="clock">The system clock.</param>
 /// <param name="currentUser">Who is making the request, for the audit columns.</param>
+/// <param name="audit">The audit trail (ARCHITECTURE.md §8).</param>
 internal sealed class CreateLocationHandler(
     DirectoryDbContext database,
     IModuleDbSession session,
     IClock clock,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IAuditWriter audit)
 {
     /// <summary>Creates the location described by <paramref name="request"/>.</summary>
     /// <param name="request">The new node's fields.</param>
@@ -88,6 +92,21 @@ internal sealed class CreateLocationHandler(
 
                 database.Locations.Add(location);
                 await database.SaveChangesAsync(token).ConfigureAwait(false);
+
+                await audit.WriteAsync(
+                    new AuditEntry(
+                        DirectoryAudit.LocationCreated,
+                        DirectoryAudit.LocationEntityType,
+                        location.Id.ToString(),
+                        DirectoryAudit.Changes()
+                            .Set("name", location.Name)
+                            .Set("kind", location.Kind.ToString())
+                            .Set("parentId", location.ParentId?.ToString())
+                            // The display path, so the entry still says where the node was
+                            // put after an ancestor is later renamed or moved.
+                            .Set("fullPath", location.FullPath)
+                            .Set("description", location.Description)),
+                    token).ConfigureAwait(false);
 
                 created = new LocationResponse(
                     location.Id,

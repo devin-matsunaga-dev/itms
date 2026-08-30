@@ -1,6 +1,6 @@
 using Itms.Contracts.Events;
 
-namespace Itms.Messaging.Abstractions;
+namespace Itms.Contracts.Messaging;
 
 /// <summary>
 /// Reacts to a domain event published by another module. Implementations are
@@ -18,6 +18,14 @@ namespace Itms.Messaging.Abstractions;
 /// <para>
 /// Throwing is how a consumer asks to be retried. It will be retried with exponential
 /// backoff, and only that consumer will: siblings that already succeeded are not re-run.
+/// </para>
+/// <para>
+/// This lives in <c>Itms.Contracts</c> rather than beside the outbox that delivers it,
+/// because declaring a reaction is a cross-module integration concern and a module may
+/// not reference <c>Itms.Messaging</c> (ARCHITECTURE.md §3, asserted by
+/// <c>ModuleBoundaryTests</c>). It sits beside the events rather than among them,
+/// because it is not itself a fact about anything, and it names no bus type — so the
+/// contracts assembly still depends on nothing (WP-0.7).
 /// </para>
 /// </remarks>
 /// <typeparam name="TEvent">The event this consumer reacts to.</typeparam>

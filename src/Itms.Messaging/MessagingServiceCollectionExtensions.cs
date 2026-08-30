@@ -1,4 +1,5 @@
 using System.Reflection;
+using Itms.Contracts.Messaging;
 using Itms.Messaging.Abstractions;
 using Itms.Messaging.Outbox;
 using Itms.Messaging.Serialization;

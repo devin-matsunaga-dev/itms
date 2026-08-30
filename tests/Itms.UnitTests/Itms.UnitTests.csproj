@@ -34,6 +34,9 @@
     <!-- WP-0.6: the location tree's path arithmetic, depth, and placement rules are
          pure functions, so they are asserted here without a database. -->
     <ProjectReference Include="..\..\src\Modules\Itms.Modules.Directory\Itms.Modules.Directory.csproj" />
+    <!-- WP-0.7: the event-to-entry mapping, the diff bounds, and the coverage guard that
+         keeps every domain event audited are all pure and need no database. -->
+    <ProjectReference Include="..\..\src\Modules\Itms.Modules.Audit\Itms.Modules.Audit.csproj" />
   </ItemGroup>
 
 </Project>

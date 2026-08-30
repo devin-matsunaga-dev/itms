@@ -3,6 +3,7 @@
 
 using Itms.Messaging;
 using Itms.Messaging.Abstractions;
+using Itms.Modules.Audit;
 using Itms.Modules.Directory;
 using Itms.Modules.Directory.Seeding;
 using Itms.Modules.Identity;
@@ -29,9 +30,12 @@ builder.Services.AddPlatform();
 // The in-process bus and its transactional outbox (ARCHITECTURE.md §5). Registered
 // before any AddXxxModule, because modules take IEventPublisher from here. The
 // assemblies passed are the ones scanned for IEventConsumer implementations; the bus
-// cannot reference a module, so the composition root is what names them. Identity has
-// no consumer yet — the audit spine (WP-0.7) adds the first one.
-builder.Services.AddMessaging(builder.Configuration);
+// cannot reference a module, so the composition root is what names them. A module that
+// adds a consumer and is not named here is a consumer that silently never runs, so
+// every future module joins this list as it gains one.
+builder.Services.AddMessaging(
+    builder.Configuration,
+    typeof(Itms.Modules.Audit.AssemblyMarker).Assembly);
 
 // A module may not reference the bus, but every module context has to be built on the
 // one connection the bus's session owns, or a module write and its outbox event would
@@ -41,6 +45,7 @@ builder.Services.AddScoped<IModuleDbSession, ModuleDbSessionAdapter>();
 // Modules. Each contributes exactly one AddXxxModule here and one MapXxxEndpoints below.
 builder.Services.AddIdentityModule();
 builder.Services.AddDirectoryModule();
+builder.Services.AddAuditModule();
 
 var app = builder.Build();
 
@@ -53,6 +58,7 @@ if (app.Environment.IsDevelopment())
     await startupScope.ServiceProvider.MigrateMessagingAsync();
     await startupScope.ServiceProvider.MigrateIdentityAsync();
     await startupScope.ServiceProvider.MigrateDirectoryAsync();
+    await startupScope.ServiceProvider.MigrateAuditAsync();
     await DevelopmentIdentitySeeder.SeedAsync(startupScope.ServiceProvider);
     await DevelopmentDirectorySeeder.SeedAsync(startupScope.ServiceProvider);
 }
@@ -79,5 +85,8 @@ app.MapGet("/", () => Results.Ok(new { service = "Itms.Web.Host", state = "skele
 
 app.MapIdentityEndpoints();
 app.MapDirectoryEndpoints();
+// Audit maps nothing today; the trail is read by WP-5.9's viewer. The call is here so
+// adding that viewer is an edit inside the module rather than a change to this file.
+app.MapAuditEndpoints();
 
 app.Run();

@@ -32,6 +32,17 @@ public sealed class IdentityWebFixture : IAsyncLifetime
     public IServiceProvider Services =>
         _factory?.Services ?? throw new InvalidOperationException("The fixture has not been initialised.");
 
+    /// <summary>
+    /// The host's database, for assertions that must read past the application.
+    /// </summary>
+    /// <remarks>
+    /// WP-0.7 needs it: an append-only table cannot be shown to be append-only by the
+    /// code that has no way to change it, so the audit tests attack the table with plain
+    /// SQL the way an operator at a psql prompt would.
+    /// </remarks>
+    public NpgsqlDataSource DataSource =>
+        _dataSource ?? throw new InvalidOperationException("The fixture has not been initialised.");
+
     /// <inheritdoc />
     public async ValueTask InitializeAsync()
     {
@@ -52,10 +63,14 @@ public sealed class IdentityWebFixture : IAsyncLifetime
 
         // Every module the host registers, not just Identity: the fixture boots the whole
         // composition root, so a schema left out here would leave one suite's rows behind
-        // for the next one. WP-0.6 added "directory".
+        // for the next one. WP-0.6 added "directory"; WP-0.7 added "audit".
+        //
+        // Respawn truncates, which is why the audit table's append-only trigger does not
+        // block the reset: the trigger covers UPDATE and DELETE, and TRUNCATE needs table
+        // ownership rather than write access.
         _respawner = await PostgresDatabase.CreateRespawnerAsync(
             _dataSource,
-            ["identity", "messaging", "directory"],
+            ["identity", "messaging", "directory", "audit"],
             cancellationToken);
     }
 

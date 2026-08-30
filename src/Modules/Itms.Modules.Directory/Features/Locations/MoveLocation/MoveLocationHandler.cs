@@ -1,3 +1,5 @@
+using Itms.Contracts.Auditing;
+using Itms.Modules.Directory.Auditing;
 using Itms.Modules.Directory.Domain;
 using Itms.Modules.Directory.Persistence;
 using Itms.Platform.Data;
@@ -22,12 +24,14 @@ namespace Itms.Modules.Directory.Features.Locations.MoveLocation;
 /// <param name="session">The ambient unit of work.</param>
 /// <param name="clock">The system clock.</param>
 /// <param name="currentUser">Who is making the request, for the audit columns.</param>
+/// <param name="audit">The audit trail (ARCHITECTURE.md §8).</param>
 /// <param name="logger">Structured log.</param>
 internal sealed class MoveLocationHandler(
     DirectoryDbContext database,
     IModuleDbSession session,
     IClock clock,
     ICurrentUser currentUser,
+    IAuditWriter audit,
     ILogger<MoveLocationHandler> logger)
 {
     /// <summary>Moves the location with <paramref name="locationId"/> under a new parent.</summary>
@@ -109,6 +113,9 @@ internal sealed class MoveLocationHandler(
                     return;
                 }
 
+                var previousParentId = location.ParentId;
+                var previousFullPath = location.FullPath;
+
                 var now = clock.UtcNow;
                 var actor = currentUser.UserId;
 
@@ -121,6 +128,16 @@ internal sealed class MoveLocationHandler(
                 await database.SaveChangesAsync(token).ConfigureAwait(false);
 
                 DirectoryLog.LocationMoved(logger, locationId, parent?.Id, rewritten);
+
+                await audit.WriteAsync(
+                    new AuditEntry(
+                        DirectoryAudit.LocationMoved,
+                        DirectoryAudit.LocationEntityType,
+                        location.Id.ToString(),
+                        DirectoryAudit.Changes()
+                            .Moved("parentId", previousParentId?.ToString(), location.ParentId?.ToString())
+                            .Moved("fullPath", previousFullPath, location.FullPath)),
+                    token).ConfigureAwait(false);
 
                 var childCount = await database.Locations
                     .CountAsync(child => child.ParentId == locationId, token)

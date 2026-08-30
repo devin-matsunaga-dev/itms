@@ -1,5 +1,6 @@
 using System.Reflection;
 using Itms.Contracts.Events;
+using Itms.Contracts.Messaging;
 
 namespace Itms.Messaging.Abstractions;
 

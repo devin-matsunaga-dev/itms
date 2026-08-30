@@ -1,3 +1,5 @@
+using Itms.Contracts.Auditing;
+using Itms.Modules.Directory.Auditing;
 using Itms.Modules.Directory.Domain;
 using Itms.Modules.Directory.Persistence;
 using Itms.Platform.Data;
@@ -20,10 +22,12 @@ namespace Itms.Modules.Directory.Features.Locations.DeleteLocation;
 /// </remarks>
 /// <param name="database">The directory context.</param>
 /// <param name="session">The ambient unit of work.</param>
+/// <param name="audit">The audit trail (ARCHITECTURE.md §8).</param>
 /// <param name="logger">Structured log.</param>
 internal sealed class DeleteLocationHandler(
     DirectoryDbContext database,
     IModuleDbSession session,
+    IAuditWriter audit,
     ILogger<DeleteLocationHandler> logger)
 {
     /// <summary>Deletes the location with <paramref name="locationId"/>.</summary>
@@ -59,10 +63,28 @@ internal sealed class DeleteLocationHandler(
                     return;
                 }
 
+                var name = location.Name;
+                var kind = location.Kind;
+                var fullPath = location.FullPath;
+
                 database.Locations.Remove(location);
                 await database.SaveChangesAsync(token).ConfigureAwait(false);
 
                 DirectoryLog.LocationDeleted(logger, locationId);
+
+                // Value-to-null, because the row is gone: the entry is the only remaining
+                // record of what was there, and the assets and alerts that referenced this
+                // id hold no foreign key that could tell anyone afterwards.
+                await audit.WriteAsync(
+                    new AuditEntry(
+                        DirectoryAudit.LocationDeleted,
+                        DirectoryAudit.LocationEntityType,
+                        locationId.ToString(),
+                        DirectoryAudit.Changes()
+                            .Moved("name", name, null)
+                            .Moved("kind", kind.ToString(), null)
+                            .Moved("fullPath", fullPath, null)),
+                    token).ConfigureAwait(false);
             },
             cancellationToken).ConfigureAwait(false);
 

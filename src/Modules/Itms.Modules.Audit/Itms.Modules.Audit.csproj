@@ -1,3 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- The Audit module: the append-only trail ARCHITECTURE.md §8 requires. It owns no
+       endpoints of its own — WP-5.9 builds the viewer — but it references the shared
+       framework because ICurrentUser reads the ambient request, and Itms.Contracts
+       because it implements IAuditWriter and consumes every domain event. It
+       references no other module, and the architecture tests assert it. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!-- Design-time only: `dotnet ef migrations` needs it, the shipped app does not. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Itms.Platform\Itms.Platform.csproj" />
+    <ProjectReference Include="..\..\Itms.Contracts\Itms.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>

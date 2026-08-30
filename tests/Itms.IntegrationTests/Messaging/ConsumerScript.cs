@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Itms.Contracts.Events;
+using Itms.Contracts.Messaging;
 using Itms.Messaging.Abstractions;
 using Npgsql;
 using NpgsqlTypes;

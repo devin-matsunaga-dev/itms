@@ -1,3 +1,5 @@
+using Itms.Contracts.Auditing;
+using Itms.Modules.Directory.Auditing;
 using Itms.Modules.Directory.Domain;
 using Itms.Modules.Directory.Persistence;
 using Itms.Platform.Data;
@@ -21,11 +23,13 @@ namespace Itms.Modules.Directory.Features.Departments.SetDepartmentStatus;
 /// <param name="session">The ambient unit of work.</param>
 /// <param name="clock">The system clock.</param>
 /// <param name="currentUser">Who is making the request, for the audit columns.</param>
+/// <param name="audit">The audit trail (ARCHITECTURE.md §8).</param>
 internal sealed class SetDepartmentStatusHandler(
     DirectoryDbContext database,
     IModuleDbSession session,
     IClock clock,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IAuditWriter audit)
 {
     /// <summary>Sets whether the department is active.</summary>
     /// <param name="departmentId">The department to change.</param>
@@ -51,6 +55,7 @@ internal sealed class SetDepartmentStatusHandler(
                     return;
                 }
 
+                var wasActive = department.IsActive;
                 var now = clock.UtcNow;
                 var actor = currentUser.UserId;
 
@@ -64,6 +69,24 @@ internal sealed class SetDepartmentStatusHandler(
                 }
 
                 await database.SaveChangesAsync(token).ConfigureAwait(false);
+
+                // Setting the state it already has is a success, not a change. Auditing it
+                // would fill the trail with entries in which nothing moved.
+                if (wasActive != department.IsActive)
+                {
+                    await audit.WriteAsync(
+                        new AuditEntry(
+                            department.IsActive
+                                ? DirectoryAudit.DepartmentReinstated
+                                : DirectoryAudit.DepartmentRetired,
+                            DirectoryAudit.DepartmentEntityType,
+                            department.Id.ToString(),
+                            DirectoryAudit.Changes().Moved(
+                                "isActive",
+                                wasActive ? "true" : "false",
+                                department.IsActive ? "true" : "false")),
+                        token).ConfigureAwait(false);
+                }
             },
             cancellationToken).ConfigureAwait(false);
 

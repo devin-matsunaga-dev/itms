@@ -1,3 +1,5 @@
+using Itms.Contracts.Auditing;
+using Itms.Modules.Directory.Auditing;
 using Itms.Modules.Directory.Domain;
 using Itms.Modules.Directory.Persistence;
 using Itms.Platform.Data;
@@ -13,11 +15,13 @@ namespace Itms.Modules.Directory.Features.Departments.CreateDepartment;
 /// <param name="session">The ambient unit of work.</param>
 /// <param name="clock">The system clock.</param>
 /// <param name="currentUser">Who is making the request, for the audit columns.</param>
+/// <param name="audit">The audit trail (ARCHITECTURE.md §8).</param>
 internal sealed class CreateDepartmentHandler(
     DirectoryDbContext database,
     IModuleDbSession session,
     IClock clock,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IAuditWriter audit)
 {
     /// <summary>Creates the department described by <paramref name="request"/>.</summary>
     /// <param name="request">The new department's fields.</param>
@@ -54,6 +58,19 @@ internal sealed class CreateDepartmentHandler(
 
                 database.Departments.Add(department);
                 await database.SaveChangesAsync(token).ConfigureAwait(false);
+
+                // Inside the transaction, so a create that rolls back leaves no entry
+                // claiming it happened.
+                await audit.WriteAsync(
+                    new AuditEntry(
+                        DirectoryAudit.DepartmentCreated,
+                        DirectoryAudit.DepartmentEntityType,
+                        department.Id.ToString(),
+                        DirectoryAudit.Changes()
+                            .Set("name", department.Name)
+                            .Set("code", department.Code)
+                            .Set("description", department.Description)),
+                    token).ConfigureAwait(false);
             },
             cancellationToken).ConfigureAwait(false);
 

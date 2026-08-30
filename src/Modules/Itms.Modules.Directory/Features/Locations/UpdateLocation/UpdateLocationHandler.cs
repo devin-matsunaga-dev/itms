@@ -1,3 +1,5 @@
+using Itms.Contracts.Auditing;
+using Itms.Modules.Directory.Auditing;
 using Itms.Modules.Directory.Domain;
 using Itms.Modules.Directory.Persistence;
 using Itms.Platform.Data;
@@ -21,12 +23,14 @@ namespace Itms.Modules.Directory.Features.Locations.UpdateLocation;
 /// <param name="session">The ambient unit of work.</param>
 /// <param name="clock">The system clock.</param>
 /// <param name="currentUser">Who is making the request, for the audit columns.</param>
+/// <param name="audit">The audit trail (ARCHITECTURE.md §8).</param>
 /// <param name="logger">Structured log.</param>
 internal sealed class UpdateLocationHandler(
     DirectoryDbContext database,
     IModuleDbSession session,
     IClock clock,
     ICurrentUser currentUser,
+    IAuditWriter audit,
     ILogger<UpdateLocationHandler> logger)
 {
     /// <summary>Applies <paramref name="request"/> to the location with <paramref name="locationId"/>.</summary>
@@ -68,6 +72,11 @@ internal sealed class UpdateLocationHandler(
                         .ConfigureAwait(false)
                     : null;
 
+                // Read before the entity mutates; after Rename there is nothing left to
+                // compare the new values against.
+                var previousName = location.Name;
+                var previousDescription = location.Description;
+
                 var now = clock.UtcNow;
                 var actor = currentUser.UserId;
 
@@ -93,6 +102,16 @@ internal sealed class UpdateLocationHandler(
                 {
                     DirectoryLog.SubtreeRewritten(logger, locationId, rewritten);
                 }
+
+                await audit.WriteAsync(
+                    new AuditEntry(
+                        DirectoryAudit.LocationUpdated,
+                        DirectoryAudit.LocationEntityType,
+                        location.Id.ToString(),
+                        DirectoryAudit.Changes()
+                            .Moved("name", previousName, location.Name)
+                            .Moved("description", previousDescription, location.Description)),
+                    token).ConfigureAwait(false);
 
                 var childCount = await database.Locations
                     .CountAsync(child => child.ParentId == locationId, token)
