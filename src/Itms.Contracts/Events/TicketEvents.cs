@@ -5,7 +5,7 @@ namespace Itms.Contracts.Events;
 /// build from this rather than from Helpdesk calling into them.
 /// </summary>
 /// <param name="TicketId">The new ticket.</param>
-/// <param name="TicketNumber">The human-readable number (<c>INC-####</c>), carried so consumers need no lookup to render it.</param>
+/// <param name="TicketNumber">The human-readable number (<c>TKT-####</c>), carried so consumers need no lookup to render it.</param>
 /// <param name="RequesterId">The user the ticket was raised for.</param>
 /// <param name="CategoryId">The category at creation.</param>
 /// <param name="Priority">The priority at creation.</param>

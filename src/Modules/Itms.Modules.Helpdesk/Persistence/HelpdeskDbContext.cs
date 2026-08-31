@@ -28,6 +28,9 @@ public sealed class HelpdeskDbContext(DbContextOptions<HelpdeskDbContext> option
     /// <summary>How urgent a ticket is, and the targets that urgency promises.</summary>
     public DbSet<TicketPriority> TicketPriorities => Set<TicketPriority>();
 
+    /// <summary>The requests for support themselves.</summary>
+    public DbSet<Ticket> Tickets => Set<Ticket>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,5 +39,10 @@ public sealed class HelpdeskDbContext(DbContextOptions<HelpdeskDbContext> option
         modelBuilder.HasDefaultSchema(SchemaName);
         modelBuilder.ApplyConfiguration(new TicketCategoryConfiguration());
         modelBuilder.ApplyConfiguration(new TicketPriorityConfiguration());
+        modelBuilder.ApplyConfiguration(new TicketConfiguration());
+
+        // No DbSet: the ticket-number counter is reached only by TicketNumberGenerator's
+        // one statement, and applying its configuration directly is what keeps it that way.
+        modelBuilder.ApplyConfiguration(new TicketNumberSequenceConfiguration());
     }
 }

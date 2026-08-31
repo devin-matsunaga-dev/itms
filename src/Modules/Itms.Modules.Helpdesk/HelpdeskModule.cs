@@ -51,6 +51,10 @@ public static class HelpdeskModule
                     HelpdeskDbContext.MigrationsHistoryTable,
                     HelpdeskDbContext.SchemaName)));
 
+        // Scoped, because it claims its number on the scope's own connection inside the
+        // scope's own transaction.
+        services.TryAddScoped<TicketNumberGenerator>();
+
         services.TryAddScoped<ListTicketCategoriesHandler>();
         services.TryAddScoped<GetTicketCategoryHandler>();
         services.TryAddScoped<CreateTicketCategoryHandler>();

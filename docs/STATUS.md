@@ -4,9 +4,9 @@
 
 **Project:** Unified IT Management System (ITMS)
 **Phase:** 1 — Helpdesk (Phase 0 complete, awaiting the gate walkthrough and the `v0.1-phase0` tag)
-**Current WP:** `WP-1.2 — Ticket domain & numbering`
-**Branch:** `feat/wp-1.2-ticket-domain`
-**Last completed:** `WP-1.1 — Reference data: categories & priorities` (2026-08-31)
+**Current WP:** `WP-1.3 — Ticket state machine` `[SENSITIVE]`
+**Branch:** `feat/wp-1.3-ticket-state-machine`
+**Last completed:** `WP-1.2 — Ticket domain & numbering` (2026-08-31)
 **Last updated:** 2026-08-31
 
 ---
@@ -16,7 +16,7 @@
 | Phase | Packages | Done | Tag |
 |---|---|---|---|
 | 0 — Foundation | 0.1 – 0.9 | 9 / 9 | *gate pending* |
-| 1 — Helpdesk | 1.1 – 1.10 | 1 / 10 | — |
+| 1 — Helpdesk | 1.1 – 1.10 | 2 / 10 | — |
 | 2 — Assets & directory | 2.1 – 2.7 | 0 / 7 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
@@ -136,6 +136,22 @@
 - **Helpdesk raises no domain event, so `IEventPublisher` is still stuck in the bus.** WP-0.7 predicted that the first module to publish would hit the wall and have to move `IEventPublisher` into `Itms.Contracts` the way `IEventConsumer<T>` was moved. This package does not publish — ARCHITECTURE.md §5 names no category or priority event and nothing consumes one — so the move is still owed, and `WP-1.2`/`WP-1.3` is where `TicketCreated` first needs it. It is a one-type move plus a `using`.
 - **There is no UI for any of this.** WP-1.1 is not `[UI]`. The categories and priorities are reachable only through the API until `WP-1.10` (the create form's pickers) and `WP-5.8` (the administration screens). The generated client types for all twelve operations are committed and compile, so both packages start from a typed surface.
 - **The client is still one chunk, now a little larger.** The twelve new operations add types only, which carry no runtime weight, but the `React.lazy`-per-route split WP-0.8 and WP-0.9 both recorded is still owed and Phase 1 is where it stops being optional.
+
+### Noticed during WP-1.2
+
+- **The `xmin` concurrency token is mapped by hand, and the migration was hand-edited once.** Npgsql 10 no longer ships `UseXminAsConcurrencyToken()`, so `TicketConfiguration` declares the shadow property itself (`Property<uint>("Version")` → column `xmin`, type `xid`, `ValueGeneratedOnAddOrUpdate`, `IsConcurrencyToken`). The provider also no longer suppresses the column in migrations, so the generated `xmin = table.Column<uint>(...)` line was deleted from `20260831022109_TicketDomain.cs` **before it was ever applied** — PostgreSQL refuses `CREATE TABLE` with a user column called `xmin`. The model snapshot still carries the property, so no later migration will try to add it back, and the file carries a comment saying all of this. `ARCHITECTURE.md` §6's ETag and 409 are still owed: **`WP-1.5` turns the token into a response header and a conflict**, and `WP-1.3` is the first package with a mutation to race against.
+- **Nothing refreshes the cached display names, by design, and that is now a live gap.** `tickets.requester_name`, `department_name`, and `assignee_name` are the id-plus-cached-display-string §3 rule 6 requires. They are written at creation and never again: Directory raises no `DepartmentRenamed` (recorded at WP-0.6) and Identity publishes nothing when a display name changes, so a renamed department or a person who marries goes stale on every ticket already filed. This was a deliberate call at the human's direction — **do not invent those events inside a Helpdesk package**. The module that owns the name publishes the event; Helpdesk then adds an `IEventConsumer<T>` that updates the cached column, and whichever package does that must add `Itms.Modules.Helpdesk` to the composition root's `AddMessaging(...)` call, or the consumer silently never runs.
+- **The forward columns exist, are empty, and have no setters.** `assignee_id`/`assignee_name` (WP-1.6), `due_at` (WP-1.8), `resolution_notes`/`resolved_at`/`closed_at` (WP-1.3), `related_asset_id` (WP-2.5), `related_alert_id` (WP-3.7), and `deleted_at`. Each owning package adds the intent-named method that moves its field — a method, not a migration. `TicketTests.A_new_ticket_is_unassigned_unresolved_unclosed_and_undeleted` fails if one ever arrives pre-filled.
+- **`deleted_at` has a column, a query filter, and no owner.** `ARCHITECTURE.md` §4 makes ticket deletes soft, so `HasQueryFilter(t => t.DeletedAt == null)` is in place already — added now precisely because adding it later would silently change the meaning of every list query written in between. **No work package names a ticket delete path.** Whoever writes one owns the domain method, the audit action, and the question of who may do it; `WP-5.8 — Administration` is the natural home. Until then the filter is inert, and any query that genuinely wants deleted rows must say `IgnoreQueryFilters()`.
+- **Ticket creation serialises on one counter row.** That is the price of "no gaps": `helpdesk.ticket_number_sequences` is claimed with a single upsert inside the caller's transaction, and the row lock is held to commit. At helpdesk volume it is free. If ticket creation ever becomes a throughput problem, the fix is a PostgreSQL sequence and accepting gaps in the numbering — a product decision, not a tuning one.
+- **The counter is self-initialising, unlike the reference data.** The claim statement inserts the row if it is absent, so a first-run production database and a database Respawn has just truncated behave identically. It deliberately does **not** join `HelpdeskReferenceDataSeeder`, which means the deployment gap recorded against `WP-6.6` does not grow: a deployment that forgets the seeder has no priorities and cannot accept a ticket, but it does not also have broken numbering.
+- **`IEventPublisher` is *still* stuck in the bus, and `WP-1.5` is now the package that moves it.** WP-0.7 predicted the first publishing module would hit the wall; WP-1.1 did not publish and neither does this package — there is no create handler here to raise `TicketCreated` from. The move (one type from `Itms.Messaging.Abstractions` into `Itms.Contracts.Messaging`, plus a `using`) lands with the create endpoint.
+- **No ticket audit actions exist yet.** `HelpdeskAudit` still holds only `helpdesk.category_*` and `helpdesk.priority_*`. WP-1.2 writes no audit row because it exposes no handler; the package that adds the create endpoint adds `helpdesk.ticket_created` and the rest, following the `<module>.<entity>_<past-tense verb>` convention that file's doc comment states.
+- **The entity calls it `Subject`; `SPEC.md` §2 calls it the title.** The name follows `TicketCreated.Subject`, which has been frozen in `Itms.Contracts` since WP-0.3, because a boundary type and the entity behind it disagreeing is worse than either name. **A `[UI]` package should still label the field "Title" for the person filling it in** — the mismatch is internal.
+- **The concurrency test bounds its fan-out at 32 writers for 500 tickets.** Five hundred simultaneous scopes would be five hundred connections and would fail on the pool rather than on the numbering. Thirty-two writers racing one counter row is the contention that actually proves anything; the assertion is still all 500 numbers, `TKT-0001` through `TKT-0500`, with nothing missing.
+- **No endpoints, no OpenAPI change, no generated-client change.** `src/Itms.Web.Host/openapi/v1.json` and `src/Itms.Web.Client/src/lib/api/generated.ts` are both untouched by this package, and CI's drift check passes without regenerating anything. The ticket surface appears at `WP-1.5`.
+- **`SignedInAsync` is now hand-copied into nine integration test classes.** WP-1.1 recorded the `ApiClient`/`DirectoryClient` duplication; this is the same shape and the copy count is now high enough to be worth one shared helper. A package already touching those files should hoist it rather than adding a tenth.
+- **The seven ticket indexes are a first guess, not a measured set.** `ux_tickets_number`, the two foreign-key indexes the `RESTRICT` checks need, and four covering the queue shapes `SPEC.md` §2 names. `WP-1.5`'s "under 200ms on 50,000 seeded tickets" is the first real test of them and `WP-6.4` owns the review against the measured query set. Nothing here is indexed for a filter nobody has written yet.
 
 ## Known issues
 

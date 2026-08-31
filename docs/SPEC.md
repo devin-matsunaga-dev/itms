@@ -28,7 +28,7 @@ All figures are permission-scoped: a Technician sees the queue, a User sees only
 
 The strongest V1 module.
 
-**Ticket fields:** ticket number (sequential, human-readable, e.g. `INC-1052`), title, description, requester, department, category, priority, status, assigned technician, created/updated timestamps, due/SLA date, related asset, related alert, related KB articles, attachments, internal notes, user-visible comments, resolution notes, closed timestamp.
+**Ticket fields:** ticket number (sequential, human-readable, e.g. `TKT-1052`), title, description, requester, department, category, priority, status, assigned technician, created/updated timestamps, due/SLA date, related asset, related alert, related KB articles, attachments, internal notes, user-visible comments, resolution notes, closed timestamp.
 
 **Status workflow:** `New → Assigned → In Progress → Waiting → Resolved → Closed`, with optional `Cancelled` from any pre-Resolved state. Reopen from Resolved returns to In Progress; Closed is terminal. Transitions are enforced server-side.
 

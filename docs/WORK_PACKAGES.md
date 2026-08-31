@@ -74,7 +74,7 @@ Configurable ticket categories (seeded per `SPEC.md` §2) and priorities with re
 **Done when:** renaming a category propagates to existing tickets by ID; deleting one in use is blocked.
 
 ### WP-1.2 — Ticket domain & numbering
-Ticket entity with the full field set, sequential human-readable numbering (`INC-####`) generated safely under concurrency, requester/department/category/priority/status required at creation.
+Ticket entity with the full field set, sequential human-readable numbering (`TKT-####`) generated safely under concurrency, requester/department/category/priority/status required at creation.
 **Done when:** 500 concurrent creations produce 500 unique sequential numbers with no gaps or collisions.
 
 ### WP-1.3 — Ticket state machine `[SENSITIVE]`
