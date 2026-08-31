@@ -1,0 +1,1729 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "ITMS API",
+    "description": "Unified IT Management System. Every route is versioned in its path (ARCHITECTURE.md §6), every error is an RFC 7807 problem document, and authentication is the session cookie.",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/v1/auth/csrf": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Issues an antiforgery token for the credential endpoints.",
+        "operationId": "CsrfToken",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CsrfTokenResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Signs in and issues the session cookie.",
+        "operationId": "Login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticatedUserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Revokes the current session and clears the cookie.",
+        "operationId": "Logout",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Returns the signed-in account, its roles, and its directory placement.",
+        "operationId": "CurrentUser",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticatedUserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/auth/change-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Changes the caller's own password and revokes their other sessions.",
+        "operationId": "ChangePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Finds active users by name or email, for a picker.",
+        "operationId": "SearchUsers",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSummary"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/users/{id}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Reads one user's public summary.",
+        "operationId": "GetUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/departments": {
+      "get": {
+        "tags": [
+          "Departments"
+        ],
+        "summary": "Lists departments, filtered by search text and optionally including retired ones.",
+        "operationId": "ListDepartments",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfDepartmentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Departments"
+        ],
+        "summary": "Creates a department.",
+        "operationId": "CreateDepartment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDepartmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/departments/{id}": {
+      "get": {
+        "tags": [
+          "Departments"
+        ],
+        "summary": "Reads one department.",
+        "operationId": "GetDepartment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Departments"
+        ],
+        "summary": "Replaces a department's name, code, and description.",
+        "operationId": "UpdateDepartment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDepartmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/departments/{id}/deactivate": {
+      "post": {
+        "tags": [
+          "Departments"
+        ],
+        "summary": "Retires a department. Existing references keep resolving.",
+        "operationId": "DeactivateDepartment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/departments/{id}/reactivate": {
+      "post": {
+        "tags": [
+          "Departments"
+        ],
+        "summary": "Brings a retired department back into use.",
+        "operationId": "ReactivateDepartment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/locations": {
+      "get": {
+        "tags": [
+          "Locations"
+        ],
+        "summary": "Lists locations in path order, optionally within one parent or one subtree.",
+        "operationId": "ListLocations",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "parentId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "rootId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LocationKind"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfLocationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Locations"
+        ],
+        "summary": "Creates a location under a parent, or a root organisation.",
+        "operationId": "CreateLocation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/locations/{id}": {
+      "get": {
+        "tags": [
+          "Locations"
+        ],
+        "summary": "Reads one location, including its full path.",
+        "operationId": "GetLocation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Locations"
+        ],
+        "summary": "Renames a location and rewrites the paths of everything beneath it.",
+        "operationId": "UpdateLocation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Locations"
+        ],
+        "summary": "Deletes a location that has no children. A location with children is refused with 409.",
+        "operationId": "DeleteLocation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/locations/{id}/move": {
+      "post": {
+        "tags": [
+          "Locations"
+        ],
+        "summary": "Reparents a location, carrying its subtree with it.",
+        "operationId": "MoveLocation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveLocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AuthenticatedUserResponse": {
+        "required": [
+          "id",
+          "userName",
+          "email",
+          "displayName",
+          "roles",
+          "departmentId",
+          "locationId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The user id.",
+            "format": "uuid"
+          },
+          "userName": {
+            "type": "string",
+            "description": "The sign-in name."
+          },
+          "email": {
+            "type": "string",
+            "description": "Their address."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The name shown throughout the product."
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Their roles. The client uses these to hide what a role cannot use; hiding is never the enforcement (ARCHITECTURE.md §7)."
+          },
+          "departmentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Their department, if set.",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Their location, if set.",
+            "format": "uuid"
+          }
+        },
+        "description": "The account the caller is signed in as. Returned by both `/login` and\n`/me`, so the client has one shape to hold for \"who am I\" however it got there."
+      },
+      "ChangePasswordRequest": {
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "The password in force. Proving possession is what stops a borrowed session changing it."
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "The replacement. Checked against the password policy server-side."
+          }
+        },
+        "description": "A password change by the account holder."
+      },
+      "CreateDepartmentRequest": {
+        "required": [
+          "name",
+          "code",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The display name. Unique, case-insensitively."
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "A short code such as `FIN`, or `null`. Unique when present."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Free text, or `null`."
+          }
+        },
+        "description": "The body of `POST /api/v1/departments`."
+      },
+      "CreateLocationRequest": {
+        "required": [
+          "name",
+          "kind",
+          "parentId",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The node's own name. Unique among its siblings, case-insensitively."
+          },
+          "kind": {
+            "description": "Which level of the hierarchy it is.",
+            "$ref": "#/components/schemas/LocationKind"
+          },
+          "parentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The parent node, or `null` to create a root organisation.",
+            "format": "uuid"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Free text, or `null`."
+          }
+        },
+        "description": "The body of `POST /api/v1/locations`."
+      },
+      "CsrfTokenResponse": {
+        "required": [
+          "token",
+          "headerName"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The request token, sent back in HeaderName."
+          },
+          "headerName": {
+            "type": "string",
+            "description": "The header the token belongs in, so the client never hard-codes it."
+          }
+        },
+        "description": "The token the browser needs before it may post to a credential endpoint."
+      },
+      "DepartmentResponse": {
+        "required": [
+          "id",
+          "name",
+          "code",
+          "description",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The department's id.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its display name."
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Its short code, or `null`."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Free text, or `null`."
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "False once retired."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was created (UTC).",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When it was last changed (UTC).",
+            "format": "date-time"
+          }
+        },
+        "description": "A department as the API renders it."
+      },
+      "HttpValidationProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The HTTP status code, repeated in the body as RFC 7807 allows.",
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "code": {
+            "type": "string",
+            "description": "The machine-readable error identifier, e.g. auth.antiforgery_failed. Present on every problem this system produces itself; absent on one produced by the framework."
+          }
+        }
+      },
+      "LocationKind": {
+        "enum": [
+          "Organization",
+          "Site",
+          "Building",
+          "Floor",
+          "Area",
+          "Room"
+        ],
+        "description": "What a node in the location tree represents. The five levels SPEC.md §5 names:\nOrganization → Site → Building → Floor/Area → Room."
+      },
+      "LocationResponse": {
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "parentId",
+          "path",
+          "depth",
+          "description",
+          "childCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The node's id.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its own name — \"Room G-04\", not the whole path."
+          },
+          "kind": {
+            "description": "Which level of the hierarchy it is.",
+            "$ref": "#/components/schemas/LocationKind"
+          },
+          "parentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Its parent, or `null` at the root.",
+            "format": "uuid"
+          },
+          "path": {
+            "type": "string",
+            "description": "The full display path from the root, which is what other modules also receive."
+          },
+          "depth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How far below the root it sits.",
+            "format": "int32"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Free text, or `null`."
+          },
+          "childCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How many nodes sit directly beneath it. Carried so a caller can render the tree and\nknow whether a delete will be refused before it tries.",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was created (UTC).",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When it was last changed (UTC).",
+            "format": "date-time"
+          }
+        },
+        "description": "A location as the API renders it."
+      },
+      "LoginRequest": {
+        "required": [
+          "userName",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "userName": {
+            "type": "string",
+            "description": "The sign-in name or the email address; either is accepted."
+          },
+          "password": {
+            "type": "string",
+            "description": "The password. Never logged, never echoed, never stored outside its hash."
+          }
+        },
+        "description": "Credentials offered at sign-in."
+      },
+      "MoveLocationRequest": {
+        "required": [
+          "parentId"
+        ],
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The new parent, or `null` to move the node to the root — which only\nan Organization may be.",
+            "format": "uuid"
+          }
+        },
+        "description": "The body of `POST /api/v1/locations/{id}/move`."
+      },
+      "PagedResultOfDepartmentResponse": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DepartmentResponse"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
+      },
+      "PagedResultOfLocationResponse": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocationResponse"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The HTTP status code, repeated in the body as RFC 7807 allows.",
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "description": "The machine-readable error identifier, e.g. auth.antiforgery_failed. Present on every problem this system produces itself; absent on one produced by the framework."
+          },
+          "errors": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Per-field validation messages, keyed by camel-cased field name. Present only on a validation failure."
+          }
+        }
+      },
+      "UpdateDepartmentRequest": {
+        "required": [
+          "name",
+          "code",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The display name."
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The short code, or `null` to clear it."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Free text, or `null` to clear it."
+          }
+        },
+        "description": "The body of `PUT /api/v1/departments/{id}`."
+      },
+      "UpdateLocationRequest": {
+        "required": [
+          "name",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The node's own name."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Free text, or `null` to clear it."
+          }
+        },
+        "description": "The body of `PUT /api/v1/locations/{id}`."
+      },
+      "UserSummary": {
+        "required": [
+          "id",
+          "displayName",
+          "email",
+          "departmentId",
+          "locationId",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The user's id.",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The name to show on a ticket, comment, or asset history row."
+          },
+          "email": {
+            "type": "string",
+            "description": "The address notifications go to."
+          },
+          "departmentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Their department, if set.",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Their location, if set.",
+            "format": "uuid"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "False once deactivated. A deactivated user still owns their history (invariant 9)."
+          }
+        },
+        "description": "The fields another module is allowed to know about a user. It carries no\ncredential state of any kind — that never leaves Identity."
+      }
+    },
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "description": "HttpOnly session cookie, issued by POST /api/v1/auth/login and revoked server-side by POST /api/v1/auth/logout. The browser sends it automatically; it cannot be read by script and is never held in browser storage.",
+        "name": "itms.session",
+        "in": "cookie"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Users"
+    },
+    {
+      "name": "Departments"
+    },
+    {
+      "name": "Locations"
+    }
+  ]
+}

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { Topbar } from '@/components/layout/topbar'
 import { formatDate } from '@/lib/datetime'
 import { Roles } from '@/lib/roles'
-import type { AuthenticatedUser } from '@/lib/api/generated-pending'
+import type { AuthenticatedUser } from '@/lib/api/types'
 import { renderWithProviders } from '@/test/render'
 
 const user: AuthenticatedUser = {

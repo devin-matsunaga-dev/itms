@@ -158,7 +158,10 @@ public sealed class DirectoryLookupTests(IdentityWebFixture fixture) : IAsyncLif
 
         var locations = await admin.GetAsync(new Uri("/api/v1/locations?pageSize=200", UriKind.Relative), Token);
         var locationPage = await DirectoryClient.ReadAsync<PageDto<LocationDto>>(locations, Token);
-        locationPage.Total.ShouldBe(16);
+        // Fifteen: the organisation, its three sites, and the eleven nodes beneath them.
+        // The number tracks DevelopmentDirectorySeeder's own list — a node added there
+        // fails here, which is the point.
+        locationPage.Total.ShouldBe(15);
 
         locationPage.Items.Select(item => item.Path)
             .ShouldContain("Northvale Utilities / Head Office / Admin Building / Ground Floor / Server Room G-04");
@@ -174,7 +177,11 @@ public sealed class DirectoryLookupTests(IdentityWebFixture fixture) : IAsyncLif
         }
 
         var after = await admin.GetAsync(new Uri("/api/v1/locations?pageSize=200", UriKind.Relative), Token);
-        (await DirectoryClient.ReadAsync<PageDto<LocationDto>>(after, Token)).Total.ShouldBe(16);
+
+        // Against the first count rather than the literal: what is being asserted is that
+        // the second run added nothing, which stays true whatever the seed list grows to.
+        (await DirectoryClient.ReadAsync<PageDto<LocationDto>>(after, Token))
+            .Total.ShouldBe(locationPage.Total);
     }
 
     private async Task<HttpClient> SignedInAsync(string userName)

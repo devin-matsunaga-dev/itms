@@ -3,10 +3,10 @@
 > Updated by Claude Code at the end of every session. This is the only place that says where the build is.
 
 **Project:** Unified IT Management System (ITMS)
-**Phase:** 0 — Foundation
-**Current WP:** `WP-0.9 — OpenAPI + generated client + CI`
-**Branch:** `feat/wp-0.9-openapi-client-ci`
-**Last completed:** `WP-0.8 — React shell` (2026-08-31)
+**Phase:** 1 — Helpdesk (Phase 0 complete, awaiting the gate walkthrough and the `v0.1-phase0` tag)
+**Current WP:** `WP-1.1 — Reference data: categories & priorities`
+**Branch:** `feat/wp-1.1-reference-data`
+**Last completed:** `WP-0.9 — OpenAPI + generated client + CI` (2026-08-31)
 **Last updated:** 2026-08-31
 
 ---
@@ -15,7 +15,7 @@
 
 | Phase | Packages | Done | Tag |
 |---|---|---|---|
-| 0 — Foundation | 0.1 – 0.9 | 8 / 9 | — |
+| 0 — Foundation | 0.1 – 0.9 | 9 / 9 | *gate pending* |
 | 1 — Helpdesk | 1.1 – 1.10 | 0 / 10 | — |
 | 2 — Assets & directory | 2.1 – 2.7 | 0 / 7 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
@@ -31,8 +31,8 @@
 
 - **No README yet.** `CONVENTIONS.md` requires one covering prerequisites, `aspire run`, seed data, default login, and how to run tests. Everything it needs now exists — the seeded accounts and their password are in *Environment notes* below — so the README is writeable at the Phase 0 gate and nothing else blocks it.
 - **`Itms.ArchitectureTests` references every module project.** That is deliberate — it cannot inspect assemblies it does not reference. WP-0.3 wrote the rules against the source projects only and added `Rules_are_written_against_source_assemblies_only` as the guard; keep it that way.
-- **`dotnet test` reports "Zero tests ran" for every test project.** The assemblies themselves are fine — each runs green under `dotnet run --project <test project>`, and `<exe> --list-tests` enumerates them — but the SDK's Microsoft.Testing.Platform driver and xUnit v3 4.0.0's `mtp-v2` host do not agree, and the run ends in 250 ms with exit code 5. It is not specific to WP-0.5's tests; it happens on the architecture suite too. Until it is resolved the regression command is the three `dotnet run` invocations below, plus `npm test --prefix src/Itms.Web.Client` for the frontend. Fixing it is a package of its own: the likely levers are an SDK patch or moving xUnit off the `mtp-v2` line, and both are repo-wide dependency decisions.
-- **The ProblemDetails middleware has no automated test.** `UseExceptionHandler`/`UseStatusCodePages` are wired in `Program.cs`, and the mapping itself is unit-tested, but nothing asserts that a real 404 from the host comes back as a problem document — that needs `Microsoft.AspNetCore.Mvc.Testing`, which is a new dependency. Deliberately deferred at WP-0.4 (that package's harness is a database harness, not an HTTP one); fold it into WP-0.9.
+- ~~**`dotnet test` reports "Zero tests ran" for every test project.**~~ **Resolved at WP-0.9** by the SDK moving to 10.0.111 — nothing in the repository changed. `dotnet test` now drives all three assemblies (413 tests, ~26 s) and the regression command is the plain one again. The three-`dotnet run` workaround is gone; if the symptom ever returns it is an SDK patch regression, not a repository one.
+- ~~**The ProblemDetails middleware has no automated test.**~~ **Done at WP-0.9.** `tests/Itms.IntegrationTests/Contract/ProblemDetailsResponseTests.cs` asserts a real 404 from routing, a 401 from the cookie handler, a handler-produced failure carrying `code`, and a validation failure carrying camel-cased per-field errors — all against the booted host.
 - **One of the four lookup contracts still has no implementation.** `IUserLookup` is implemented by Identity (WP-0.5); `IDepartmentLookup` and `ILocationLookup` by Directory (WP-0.6). `IAssetLookup` is still an interface only and belongs to Phase 2. The architecture rule "cross-module reads go through Contracts" still cannot be asserted positively until a module actually *reads* across a boundary — nothing consumes any lookup from outside its owning module yet, so it remains enforced negatively, by forbidding the reference.
 - **`ITicketLookup` and `IDeviceLookup` were deliberately not written.** Add them in the package that first needs them rather than speculatively.
 - **`CsvParser` is hand-written** (about 120 lines) rather than taken from CsvHelper. It covers RFC 4180 including quoted newlines and doubled quotes. If import requirements grow past that — encodings, delimiter sniffing, streaming a 50 MB file — swap it for a library rather than growing it.
@@ -109,13 +109,27 @@
 - **The session cookie is `Secure` and the dev server is plain HTTP.** That works only because browsers treat `http://localhost` as a secure context. A developer serving the client from anything but localhost — a WSL IP, a container, a colleague's machine — will find sign-in silently failing to persist, and needs HTTPS on the Vite server.
 - **No end-to-end test exists.** `CONVENTIONS.md` reserves Playwright for a handful of critical paths and every one of them runs through tickets. The first real candidate is the Phase 1 gate walkthrough (log in → create ticket → assign → resolve), which is `WP-1.10`'s territory.
 
+### Noticed during WP-0.9
+
+- **Five integration assertions had never run.** Docker's WSL integration was off when WP-0.6 and WP-0.7 shipped, so their integration tests reported as environment failures and the defects underneath went unseen: audited requests recorded a null source address (the in-memory transport has no socket), `AuditRow`'s record equality compared its diff dictionary by reference, and the directory seeder test expected sixteen locations against a fifteen-entry list. All three are fixed in a commit of their own on this branch. The lesson is worth keeping: a suite that cannot run is not a suite that passes, and the next package that adds an integration test should watch it fail once before trusting it.
+- **The document is generated from endpoint metadata, so an endpoint without metadata is an endpoint the client cannot call.** `.WithName`, `.WithSummary`, `.Produces<T>()`, and `.ProducesProblem(...)` are what every existing endpoint carries and what `OpenApiDocumentTests` enforces — an operation with no `operationId` fails the build. A new module's endpoints inherit that obligation; the Identity and Directory groups are the worked examples.
+- **Both generated artefacts are committed and drift-checked.** `src/Itms.Web.Host/openapi/v1.json` is rewritten by every build of the host, and `src/Itms.Web.Client/src/lib/api/generated.ts` by `npm run generate:api`. CI runs both and fails on a `git diff`. A package that changes a request or response shape must commit both files with the change; forgetting is a red build, not a silent divergence.
+- **`generated-pending.ts` is gone.** Its four shapes are now aliases in `src/lib/api/types.ts` resolving into the generated module. Aliases there are free; *declaring* a shape there is the hand-written API type CONVENTIONS.md forbids, and the file says so.
+- **`openapi-typescript` peer-depends on TypeScript 5 and the client is on 6.** It is pinned through an `overrides` entry in `package.json` scoped to that one package, rather than an `.npmrc` that would turn peer resolution off for everything. It generates correctly on TS 6; when upstream widens the peer range the override should be deleted rather than left to rot.
+- **The document is served only in Development.** `MapOpenApi()` is inside the same environment check the health endpoints use. Whether a production deployment should expose its own contract is the same Phase 6 question as `/health`, and belongs with it.
+- **`ProblemDetails.status` is described by hand.** The framework infers a nullable int32 as `integer-or-string`, which would hand the client a `number | string` to narrow at every use. The schema transformer overrides it to a plain nullable integer, which is what the server actually writes. If a future framework version stops doing that, the override becomes redundant rather than wrong.
+- **The poller CI job exists and is inert.** `.github/workflows/ci.yml` has a `poller` job that looks for `src/itms-poller`, and when it is absent writes "Poller checks inactive — built in WP-3.2" into the run summary and reports green. It turns itself on by the directory appearing; WP-3.2 does not need to touch the workflow, but should confirm `uv sync --locked`, `ruff`, and `mypy` are the right invocations for the layout it builds.
+- **CI has never run.** The workflow is written against what was executed locally, step for step, in Release configuration — but no push has exercised it on a GitHub runner. The first push to this branch is the real test, and the likely wrinkles are the pinned action majors and whether the runner's Docker is fast enough for the integration job's twenty-minute ceiling.
+- **The client is still one 612 kB chunk.** WP-0.8 recorded it and nothing here changed it: the generated types add no runtime weight, and the committed document is imported only by a test, so it stays out of the bundle. `React.lazy` per route remains the fix, and Phase 1 or 2 is where it stops being optional.
+- **Nothing generates a runtime client.** `openapi-typescript` emits types only; `apiFetch` still takes a path as a plain string, so a call to a route the server does not serve type-checks. `contract.test.ts` covers the four auth routes the shell calls today by reading the committed document. A package that adds many endpoints should consider whether that per-route check wants generalising rather than extending by hand.
+
 ## Known issues
 
 - none
 
 ## Environment notes
 
-- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 66 tests, about two seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
+- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 94 tests, about three seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
 - **`aspire run` now also starts `web-client`.** It runs `npm install` first (an Aspire installer resource) and then `npm run dev`, waits for `web-host`, and is published on an external endpoint — the dashboard prints its URL. The Vite dev server proxies `/api` to the host, so the browser sees one origin.
 - **The colour scheme is remembered per browser** under `localStorage["itms.theme"]`, and follows the operating system until the viewer picks a mode. Clearing site data returns it to the system preference. There is no server-side or per-account theme setting, and none is planned.
 - **Node 24 LTS and npm 11 are what the client is built with.** `node -v` should report v24.x; the lockfile is committed and `npm ci` is the reproducible install.
@@ -124,7 +138,10 @@
 - `global.json` pins the SDK to 10.0.x (`rollForward: latestFeature`) **and** selects the `Microsoft.Testing.Platform` test runner. xUnit v3 is an MTP runner and the .NET 10 SDK will not drive one through VSTest, so removing that `test.runner` block breaks `dotnet test` for the whole repo.
 - Aspire templates are pinned at **13.5.3** (`Aspire.AppHost.Sdk/13.5.3` in the AppHost csproj). Run `aspire update` at every phase gate per `ARCHITECTURE.md` §10.
 - Package versions are centrally managed in `Directory.Packages.props`. A `<PackageReference>` with a `Version` attribute is a build error, not a style nit.
-- **Docker Desktop is running but this distro's WSL integration is off.** `/var/run/docker.sock` is absent; the daemon is reachable only through `/mnt/wsl/docker-desktop/shared-sockets/`, which is `root:root 0660`, and there is no passwordless `sudo`. Enable **Settings → Resources → WSL Integration** for this distro and reopen the session. Until then `Itms.IntegrationTests` fails 91 of its 105 tests with `DockerUnavailableException`.
+- ~~**Docker Desktop's WSL integration is off for this distro.**~~ **Resolved before WP-0.9**: `/var/run/docker.sock` is present and Testcontainers connects to it. Turning it on is what first ran the integration suite for real on this machine, and it immediately exposed five assertions that had never executed — see the WP-0.9 notes below.
+- **CI is `.github/workflows/ci.yml`**, on every push to `main` and every pull request. Three parallel jobs: `backend` (restore, Release build, contract drift check, `dotnet test`), `frontend` (`npm ci`, regenerate, types drift check, lint, test, build), and `poller` (inert until `src/itms-poller` exists). A run of the same branch supersedes the one before it, except on `main`.
+- **The API contract is `src/Itms.Web.Host/openapi/v1.json`**, written on every build of the host by `Microsoft.Extensions.ApiDescription.Server` and committed. Regenerate the client's types from it with `npm run generate:api --prefix src/Itms.Web.Client`. Both files are drift-checked in CI, so a shape change means committing three things: the server type, the document, and the generated types.
+- **The document is also served at `/openapi/v1.json`** when the host runs in Development, which is what the integration tests read.
 - **The integration suite needs a running Docker daemon** from WP-0.4 onward (Testcontainers starts one `postgres:17.6` per test assembly). On WSL that means Docker Desktop running with integration enabled for this distro; without it `dotnet test` fails in `Itms.IntegrationTests` with a Docker connection error rather than a test failure. The first run also pays ~25s to pull the image.
 - **EF migrations are added per context**, e.g. `dotnet ef migrations add <Name> --project src/Itms.Messaging/Itms.Messaging.csproj --output-dir Outbox/Migrations`. Each context carries an `IDesignTimeDbContextFactory` pointing at a deliberately unreachable connection string, so scaffolding can never touch a real database.
 - **`IDE0161` (file-scoped namespaces) is a suggestion under `**/Migrations/`**, because EF generates block namespaces and a migration is never edited after merge.

@@ -6,6 +6,8 @@
     "module": "esnext",
     "types": ["vite/client"],
     "allowArbitraryExtensions": true,
+    /* The committed OpenAPI document is imported by the contract test. */
+    "resolveJsonModule": true,
     "skipLibCheck": true,
 
     /* Bundler mode */

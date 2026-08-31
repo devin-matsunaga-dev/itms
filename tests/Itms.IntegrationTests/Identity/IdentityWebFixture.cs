@@ -1,7 +1,11 @@
+using System.Net;
 using Itms.Modules.Identity.Seeding;
 using Itms.TestSupport;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Respawn;
@@ -22,6 +26,19 @@ public sealed class IdentityWebFixture : IAsyncLifetime
 {
     /// <summary>The database the host runs against, separate from the outbox suite's.</summary>
     public const string DatabaseName = "itms_web_tests";
+
+    /// <summary>
+    /// The address every request through this fixture appears to come from.
+    /// </summary>
+    /// <remarks>
+    /// The in-memory transport has no socket, so it leaves
+    /// <c>HttpContext.Connection.RemoteIpAddress</c> null where a real one never would.
+    /// The host is given this address instead (see <c>RemoteAddressFilter</c>), so the
+    /// audit tests can assert that the writer records the address the connection
+    /// reports rather than merely that the column is nullable. It is from TEST-NET-3
+    /// (RFC 5737), which is reserved for documentation and routes nowhere.
+    /// </remarks>
+    public const string RemoteIpAddress = "203.0.113.7";
 
     private readonly PostgresDatabase _container = SharedPostgres.Instance;
     private NpgsqlDataSource? _dataSource;
@@ -151,7 +168,36 @@ public sealed class IdentityWebFixture : IAsyncLifetime
             // The rate limit is real and tested on its own; leaving it at the production
             // default here would make the suite's own volume of sign-ins trip it.
             builder.UseSetting("Identity:RateLimitPermits", "100000");
+
+            // Give the pipeline the one thing the in-memory transport cannot: a peer
+            // address. Registered as a startup filter because the host is a minimal
+            // WebApplication and this has to run ahead of everything it maps.
+            builder.ConfigureTestServices(services =>
+                services.AddSingleton<IStartupFilter>(
+                    new RemoteAddressFilter(IPAddress.Parse(RemoteIpAddress))));
         }
+    }
+
+    /// <summary>
+    /// Stamps a peer address onto every request before the application sees it.
+    /// </summary>
+    /// <remarks>
+    /// Only where there is none: this stands in for the socket the in-memory server does
+    /// not have, and must never overwrite an address a real transport supplied.
+    /// </remarks>
+    private sealed class RemoteAddressFilter(IPAddress address) : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) =>
+            app =>
+            {
+                app.Use(async (context, proceed) =>
+                {
+                    context.Connection.RemoteIpAddress ??= address;
+                    await proceed(context).ConfigureAwait(false);
+                });
+
+                next(app);
+            };
     }
 }
 

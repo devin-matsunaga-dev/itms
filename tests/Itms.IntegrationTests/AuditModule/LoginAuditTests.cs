@@ -40,7 +40,7 @@ public sealed class LoginAuditTests(IdentityWebFixture fixture) : IAsyncLifetime
         row.EntityType.ShouldBe("User");
         row.EntityId.ShouldBe(user.Id.ToString());
         row.Changes["sessionId"].After.ShouldNotBeNullOrWhiteSpace();
-        row.SourceIp.ShouldNotBeNull();
+        row.SourceIp.ShouldBe(IdentityWebFixture.RemoteIpAddress);
     }
 
     /// <summary>
@@ -94,7 +94,10 @@ public sealed class LoginAuditTests(IdentityWebFixture fixture) : IAsyncLifetime
         row.EntityId.ShouldBe("ghost@example.invalid");
         row.Changes["reason"].After.ShouldBe("no such account");
         row.ActorId.ShouldBeNull();
-        row.SourceIp.ShouldNotBeNull();
+
+        // The address is the whole point of a failed-sign-in row: the account it names
+        // may not exist, so where the attempt came from is the only durable fact about it.
+        row.SourceIp.ShouldBe(IdentityWebFixture.RemoteIpAddress);
     }
 
     [Fact]

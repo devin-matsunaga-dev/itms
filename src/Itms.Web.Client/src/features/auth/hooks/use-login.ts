@@ -2,7 +2,7 @@ import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/r
 import { login } from '@/features/auth/api/auth-api'
 import { currentUserKey } from '@/features/auth/hooks/use-current-user'
 import type { ApiError } from '@/lib/api/client'
-import type { AuthenticatedUser, LoginRequest } from '@/lib/api/generated-pending'
+import type { AuthenticatedUser, LoginRequest } from '@/lib/api/types'
 
 /**
  * Signs in and seeds the current-user cache from the response, so the shell renders

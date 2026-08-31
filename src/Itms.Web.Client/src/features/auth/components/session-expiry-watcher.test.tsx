@@ -6,7 +6,7 @@ import { SessionExpiryWatcher } from '@/features/auth/components/session-expiry-
 import { currentUserKey } from '@/features/auth/hooks/use-current-user'
 import { ApiError, apiFetch } from '@/lib/api/client'
 import { Roles } from '@/lib/roles'
-import type { AuthenticatedUser } from '@/lib/api/generated-pending'
+import type { AuthenticatedUser } from '@/lib/api/types'
 import { renderWithProviders } from '@/test/render'
 
 const account: AuthenticatedUser = {

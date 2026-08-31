@@ -11,6 +11,7 @@ using Itms.Modules.Identity.Seeding;
 using Itms.Platform;
 using Itms.Platform.Data;
 using Itms.Web.Host.Data;
+using Itms.Web.Host.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +42,12 @@ builder.Services.AddMessaging(
 // one connection the bus's session owns, or a module write and its outbox event would
 // commit separately. The host is the only place that can see both sides.
 builder.Services.AddScoped<IModuleDbSession, ModuleDbSessionAdapter>();
+
+// The API contract (ARCHITECTURE.md §6). Registered before the modules so the document
+// is in place by the time their endpoints are mapped; the document itself is generated
+// from that endpoint metadata, written to openapi/v1.json at build, and the React
+// client's types are generated from that file.
+builder.Services.AddItmsOpenApi();
 
 // Modules. Each contributes exactly one AddXxxModule here and one MapXxxEndpoints below.
 builder.Services.AddIdentityModule();
@@ -81,7 +88,18 @@ app.UseRateLimiter();
 // /health (all checks) and /alive (liveness only), Development-only by default.
 app.MapDefaultEndpoints();
 
-app.MapGet("/", () => Results.Ok(new { service = "Itms.Web.Host", state = "skeleton" }));
+// Excluded from the document deliberately: the contract describes the API, and the API
+// is everything under /api/v1. A root probe left in it would be the one operation a
+// generated client has no use for.
+app.MapGet("/", () => Results.Ok(new { service = "Itms.Web.Host", state = "skeleton" }))
+    .ExcludeFromDescription();
+
+// The document is served in Development so it can be read against a running host; the
+// committed copy at openapi/v1.json is what tooling and CI use, and is written at build.
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
 
 app.MapIdentityEndpoints();
 app.MapDirectoryEndpoints();

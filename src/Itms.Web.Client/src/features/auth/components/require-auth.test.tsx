@@ -5,7 +5,7 @@ import { Route, Routes, useLocation } from 'react-router'
 import { RequireAuth } from '@/features/auth/components/require-auth'
 import { ApiError } from '@/lib/api/client'
 import { Roles } from '@/lib/roles'
-import type { AuthenticatedUser } from '@/lib/api/generated-pending'
+import type { AuthenticatedUser } from '@/lib/api/types'
 import { renderWithProviders } from '@/test/render'
 
 const fetchCurrentUser = vi.fn<() => Promise<AuthenticatedUser | null>>()

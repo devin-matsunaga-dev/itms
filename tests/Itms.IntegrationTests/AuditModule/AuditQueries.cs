@@ -24,7 +24,34 @@ public sealed record AuditRow(
     string EntityType,
     string EntityId,
     string? SourceIp,
-    IReadOnlyDictionary<string, AuditFieldChange> Changes);
+    IReadOnlyDictionary<string, AuditFieldChange> Changes)
+{
+    /// <summary>Compares two rows column by column, including the diff's contents.</summary>
+    /// <param name="other">The row to compare against.</param>
+    /// <returns><see langword="true"/> when every column matches.</returns>
+    /// <remarks>
+    /// The generated equality would compare <see cref="Changes"/> by reference, because
+    /// a dictionary is not a value type — so two reads of the same unchanged row would
+    /// come back unequal. The append-only test asserts a refused UPDATE left the row
+    /// exactly as it was, and that assertion is worthless if it can only ever fail.
+    /// </remarks>
+    public bool Equals(AuditRow? other) =>
+        other is not null
+        && Id == other.Id
+        && OccurredAt == other.OccurredAt
+        && ActorId == other.ActorId
+        && ActorName == other.ActorName
+        && Action == other.Action
+        && EntityType == other.EntityType
+        && EntityId == other.EntityId
+        && SourceIp == other.SourceIp
+        && Changes.Count == other.Changes.Count
+        && Changes.All(change =>
+            other.Changes.TryGetValue(change.Key, out var theirs) && change.Value == theirs);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Id, OccurredAt, Action, EntityType, EntityId);
+}
 
 /// <summary>
 /// Reads and attacks the audit table with plain SQL rather than through the module.

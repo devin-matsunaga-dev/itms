@@ -38,7 +38,7 @@ public sealed class DirectoryAuditTests(IdentityWebFixture fixture) : IAsyncLife
         row.Action.ShouldBe("directory.department_created");
         row.ActorId.ShouldBe(adminId);
         row.ActorName.ShouldNotBeNullOrWhiteSpace();
-        row.SourceIp.ShouldNotBeNull();
+        row.SourceIp.ShouldBe(IdentityWebFixture.RemoteIpAddress);
         row.Changes["name"].ShouldBe(new(null, "Finance"));
         row.Changes["code"].ShouldBe(new(null, "FIN"));
     }

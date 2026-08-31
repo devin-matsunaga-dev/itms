@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { initials, primaryRole } from '@/lib/roles'
-import type { AuthenticatedUser } from '@/lib/api/generated-pending'
+import type { AuthenticatedUser } from '@/lib/api/types'
 
 interface TopbarProps {
   user: AuthenticatedUser

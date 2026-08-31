@@ -1,8 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <!--
+    The API contract is written to disk on every build of this project, and the copy at
+    openapi/v1.json is committed. That is what lets the React client's types be generated
+    without a running host, and what lets CI notice a contract change as a diff rather
+    than as a runtime surprise (WP-0.9).
+  -->
+  <PropertyGroup>
+    <OpenApiGenerateDocuments>true</OpenApiGenerateDocuments>
+    <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)/openapi</OpenApiDocumentsDirectory>
+    <OpenApiGenerateDocumentsOptions>--file-name v1</OpenApiGenerateDocumentsOptions>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Aspire.Npgsql" />
     <PackageReference Include="Aspire.StackExchange.Redis" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <!-- Build-time only: it contributes the target that writes the document, and nothing
+         it carries should reach the published application. -->
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

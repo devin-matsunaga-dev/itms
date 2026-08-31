@@ -1,5 +1,5 @@
 import { apiFetch, ApiError } from '@/lib/api/client'
-import type { AuthenticatedUser, LoginRequest } from '@/lib/api/generated-pending'
+import type { AuthenticatedUser, LoginRequest } from '@/lib/api/types'
 
 /** The auth endpoints the shell talks to (WP-0.5's `/api/v1/auth` group). */
 

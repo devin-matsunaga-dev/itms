@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { LoginForm } from '@/features/auth/components/login-form'
 import { ApiError } from '@/lib/api/client'
 import { Roles } from '@/lib/roles'
-import type { AuthenticatedUser } from '@/lib/api/generated-pending'
+import type { AuthenticatedUser } from '@/lib/api/types'
 import { renderWithProviders } from '@/test/render'
 
 const login = vi.fn<() => Promise<AuthenticatedUser>>()

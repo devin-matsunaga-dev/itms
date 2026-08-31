@@ -1,4 +1,4 @@
-import type { CsrfTokenResponse, ProblemDetails } from './generated-pending'
+import type { CsrfTokenResponse, ProblemDetails } from './types'
 
 /**
  * The one place a request leaves this application. Everything else calls through here,
@@ -118,7 +118,7 @@ export interface ApiRequest {
 /**
  * Issues a request against the API and returns the parsed body.
  *
- * @typeParam T The response shape, from the generated (today: pending) contract types.
+ * @typeParam T The response shape, named from the generated contract types in `./types`.
  * @param path Path below `/api/v1`, starting with a slash.
  * @throws ApiError when the response is not a success status.
  */

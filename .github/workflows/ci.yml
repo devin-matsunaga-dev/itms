@@ -1,0 +1,156 @@
+# CI for the ITMS monolith (WP-0.9).
+#
+# Three jobs, run in parallel because none of them needs another's output: the
+# contract they share — src/Itms.Web.Host/openapi/v1.json — is committed, so the
+# frontend can be built without building the backend first.
+#
+# The contract-drift steps are what make CONVENTIONS.md's "API types are generated,
+# never hand-written" enforceable rather than aspirational. Building the host rewrites
+# the document, and generating from the document rewrites the client's types; if either
+# output differs from what was committed, the change was made without regenerating and
+# the build fails with the diff in the log.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch supersedes an in-flight run. `main` is excluded so a
+# merge is never cancelled by the one behind it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  backend:
+    name: Backend — build, contract, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          # global.json pins the SDK feature band and selects the
+          # Microsoft.Testing.Platform runner that xUnit v3 needs.
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      # TreatWarningsAsErrors is on repo-wide (Directory.Build.props), so this is also
+      # the analyzer and code-style gate. Building the host writes openapi/v1.json.
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Check the API contract is committed
+        run: |
+          if ! git diff --exit-code -- src/Itms.Web.Host/openapi/v1.json; then
+            echo "::error file=src/Itms.Web.Host/openapi/v1.json::The OpenAPI document changed but was not committed. Run 'dotnet build', then 'npm run generate:api --prefix src/Itms.Web.Client', and commit both."
+            exit 1
+          fi
+
+      # Unit, architecture, and integration suites. The integration assembly starts one
+      # postgres:17.6 container through Testcontainers; the runner's Docker daemon is
+      # what serves it, and the image pull is ~25s on a cold runner.
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+
+  frontend:
+    name: Frontend — generate, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/Itms.Web.Client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          # ARCHITECTURE.md §10 pins Node 24 LTS.
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: src/Itms.Web.Client/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # From the committed document, not from a running host: the generator is a pure
+      # function of the contract, so regenerating here must reproduce what was committed.
+      - name: Generate the API types
+        run: npm run generate:api
+
+      - name: Check the generated types are committed
+        run: |
+          if ! git diff --exit-code -- src/lib/api/generated.ts; then
+            echo "::error file=src/Itms.Web.Client/src/lib/api/generated.ts::The generated API types differ from the committed ones. Run 'npm run generate:api --prefix src/Itms.Web.Client' and commit the result."
+            exit 1
+          fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # `tsc -b` runs first, so a contract change the client cannot absorb fails here —
+      # which is the second half of "a contract change that breaks the client fails the
+      # build". The drift check above catches the types not being regenerated; this
+      # catches them being regenerated into something the client no longer compiles against.
+      - name: Build
+        run: npm run build
+
+  poller:
+    name: Poller — ruff, mypy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # The poller is built in Phase 3 (WP-3.2). Until src/itms-poller exists there is
+      # nothing to lint, and this job reports that in as many words rather than being
+      # left out of the workflow — a missing job looks like an oversight, and a job
+      # skipped by an `if:` looks like a misconfiguration. It turns itself on by the
+      # directory appearing.
+      - name: Look for the poller
+        id: detect
+        run: |
+          if [ -d src/itms-poller ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "### Poller checks inactive" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`src/itms-poller\` does not exist yet — it is built in WP-3.2." >> "$GITHUB_STEP_SUMMARY"
+            echo "\`ruff\` and \`mypy\` run automatically once that directory is committed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Set up uv and Python
+        if: steps.detect.outputs.present == 'true'
+        uses: astral-sh/setup-uv@v10
+        with:
+          # ARCHITECTURE.md §10: 3.13 minimum, 3.14 preferred.
+          python-version: '3.14'
+          enable-cache: true
+          cache-dependency-glob: src/itms-poller/uv.lock
+
+      - name: Install
+        if: steps.detect.outputs.present == 'true'
+        working-directory: src/itms-poller
+        run: uv sync --locked
+
+      - name: Ruff
+        if: steps.detect.outputs.present == 'true'
+        working-directory: src/itms-poller
+        run: uv run ruff check .
+
+      - name: Mypy
+        if: steps.detect.outputs.present == 'true'
+        working-directory: src/itms-poller
+        run: uv run mypy .

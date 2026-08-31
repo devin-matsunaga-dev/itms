@@ -1,6 +1,6 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { fetchCurrentUser } from '@/features/auth/api/auth-api'
-import type { AuthenticatedUser } from '@/lib/api/generated-pending'
+import type { AuthenticatedUser } from '@/lib/api/types'
 
 /** The cache key for "who am I". Exported so sign-in and sign-out can write it. */
 export const currentUserKey = ['auth', 'me'] as const
