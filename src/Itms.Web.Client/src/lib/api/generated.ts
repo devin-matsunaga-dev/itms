@@ -247,6 +247,146 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ticket-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists ticket categories in picker order, optionally including retired ones. */
+        get: operations["ListTicketCategories"];
+        put?: never;
+        /** Creates a ticket category. */
+        post: operations["CreateTicketCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticket-categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reads one ticket category. */
+        get: operations["GetTicketCategory"];
+        /** Replaces a ticket category's name, description, and order. Existing tickets follow the rename. */
+        put: operations["UpdateTicketCategory"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticket-categories/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retires a ticket category. Existing tickets keep resolving it. */
+        post: operations["DeactivateTicketCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticket-categories/{id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Brings a retired ticket category back into use. */
+        post: operations["ReactivateTicketCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticket-priorities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists ticket priorities most urgent first, optionally including retired ones. */
+        get: operations["ListTicketPriorities"];
+        put?: never;
+        /** Creates a ticket priority. The code is chosen here and never changes. */
+        post: operations["CreateTicketPriority"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticket-priorities/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reads one ticket priority. */
+        get: operations["GetTicketPriority"];
+        /** Replaces a ticket priority's name, description, order, and SLA targets. The code is immutable. */
+        put: operations["UpdateTicketPriority"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticket-priorities/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retires a ticket priority. Existing tickets keep resolving it. */
+        post: operations["DeactivateTicketPriority"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticket-priorities/{id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Brings a retired ticket priority back into use. */
+        post: operations["ReactivateTicketPriority"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -309,6 +449,42 @@ export interface components {
             parentId: null | string;
             /** @description Free text, or `null`. */
             description: null | string;
+        };
+        /** @description The body of `POST /api/v1/ticket-categories`. */
+        CreateTicketCategoryRequest: {
+            /** @description The display name. Unique, case-insensitively. */
+            name: string;
+            /** @description What belongs in this category, or `null`. */
+            description: null | string;
+            /**
+             * Format: int32
+             * @description Where it sits in a picker. Ties are broken by name.
+             */
+            sortOrder: number | string;
+        };
+        /** @description The body of `POST /api/v1/ticket-priorities`. */
+        CreateTicketPriorityRequest: {
+            /** @description The stable machine identifier, lower-cased on the way in. Unique and immutable. */
+            code: string;
+            /** @description The display name. Unique, case-insensitively, and editable. */
+            name: string;
+            /** @description What this priority is for, or `null`. */
+            description: null | string;
+            /**
+             * Format: int32
+             * @description Urgency order, lowest first. Ties are broken by name.
+             */
+            rank: number | string;
+            /**
+             * Format: int32
+             * @description Minutes from creation within which a technician should respond.
+             */
+            responseTargetMinutes: number | string;
+            /**
+             * Format: int32
+             * @description Minutes from creation within which the ticket should be resolved.
+             */
+            resolutionTargetMinutes: number | string;
         };
         /** @description The token the browser needs before it may post to a credential endpoint. */
         CsrfTokenResponse: {
@@ -485,6 +661,68 @@ export interface components {
             /** @description True when a further page exists. */
             hasNextPage?: boolean;
         };
+        /**
+         * @description The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as
+         *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
+         *     object so the shape reaches OpenAPI and, from there, the generated client.
+         */
+        PagedResultOfTicketCategoryResponse: {
+            /** @description The items on this page. */
+            items: components["schemas"]["TicketCategoryResponse"][];
+            /**
+             * Format: int32
+             * @description The total number of matching items across all pages.
+             */
+            total: number | string;
+            /**
+             * Format: int32
+             * @description The 1-based page number this envelope represents.
+             */
+            page: number | string;
+            /**
+             * Format: int32
+             * @description The page size that was applied, after clamping.
+             */
+            pageSize: number | string;
+            /**
+             * Format: int32
+             * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
+             */
+            totalPages?: number | string;
+            /** @description True when a further page exists. */
+            hasNextPage?: boolean;
+        };
+        /**
+         * @description The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as
+         *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
+         *     object so the shape reaches OpenAPI and, from there, the generated client.
+         */
+        PagedResultOfTicketPriorityResponse: {
+            /** @description The items on this page. */
+            items: components["schemas"]["TicketPriorityResponse"][];
+            /**
+             * Format: int32
+             * @description The total number of matching items across all pages.
+             */
+            total: number | string;
+            /**
+             * Format: int32
+             * @description The 1-based page number this envelope represents.
+             */
+            page: number | string;
+            /**
+             * Format: int32
+             * @description The page size that was applied, after clamping.
+             */
+            pageSize: number | string;
+            /**
+             * Format: int32
+             * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
+             */
+            totalPages?: number | string;
+            /** @description True when a further page exists. */
+            hasNextPage?: boolean;
+        };
         ProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -502,6 +740,76 @@ export interface components {
                 [key: string]: string[];
             };
         };
+        /** @description A ticket category as the API renders it. */
+        TicketCategoryResponse: {
+            /**
+             * Format: uuid
+             * @description The category's id. What a ticket stores, and what a rename does not change.
+             */
+            id: string;
+            /** @description Its display name. */
+            name: string;
+            /** @description What belongs in it, or `null`. */
+            description: null | string;
+            /**
+             * Format: int32
+             * @description Where it sits in a picker.
+             */
+            sortOrder: number | string;
+            /** @description False once retired. */
+            isActive: boolean;
+            /**
+             * Format: date-time
+             * @description When it was created (UTC).
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description When it was last changed (UTC).
+             */
+            updatedAt: string;
+        };
+        /** @description A ticket priority as the API renders it. */
+        TicketPriorityResponse: {
+            /**
+             * Format: uuid
+             * @description The priority's id. What a ticket stores.
+             */
+            id: string;
+            /** @description The stable machine identifier — `critical`, `high`. Fixed for the life of the row. */
+            code: string;
+            /** @description Its display name. */
+            name: string;
+            /** @description What it is for, or `null`. */
+            description: null | string;
+            /**
+             * Format: int32
+             * @description Urgency order, lowest first.
+             */
+            rank: number | string;
+            /**
+             * Format: int32
+             * @description Minutes from creation within which a technician should respond.
+             */
+            responseTargetMinutes: number | string;
+            /**
+             * Format: int32
+             * @description Minutes from creation within which the ticket should be resolved.
+             */
+            resolutionTargetMinutes: number | string;
+            /** @description False once retired. */
+            isActive: boolean;
+            /**
+             * Format: date-time
+             * @description When it was created (UTC).
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description When it was last changed (UTC).
+             */
+            updatedAt: string;
+        };
         /** @description The body of `PUT /api/v1/departments/{id}`. */
         UpdateDepartmentRequest: {
             /** @description The display name. */
@@ -517,6 +825,40 @@ export interface components {
             name: string;
             /** @description Free text, or `null` to clear it. */
             description: null | string;
+        };
+        /** @description The body of `PUT /api/v1/ticket-categories/{id}`. */
+        UpdateTicketCategoryRequest: {
+            /** @description The display name. Every ticket already filed under this category follows the rename. */
+            name: string;
+            /** @description What belongs in it, or `null` to clear it. */
+            description: null | string;
+            /**
+             * Format: int32
+             * @description Where it sits in a picker.
+             */
+            sortOrder: number | string;
+        };
+        /** @description The body of `PUT /api/v1/ticket-priorities/{id}`. */
+        UpdateTicketPriorityRequest: {
+            /** @description The display name. */
+            name: string;
+            /** @description What this priority is for, or `null` to clear it. */
+            description: null | string;
+            /**
+             * Format: int32
+             * @description Urgency order, lowest first.
+             */
+            rank: number | string;
+            /**
+             * Format: int32
+             * @description Minutes from creation within which a technician should respond.
+             */
+            responseTargetMinutes: number | string;
+            /**
+             * Format: int32
+             * @description Minutes from creation within which the ticket should be resolved.
+             */
+            resolutionTargetMinutes: number | string;
         };
         /**
          * @description The fields another module is allowed to know about a user. It carries no
@@ -1346,6 +1688,528 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListTicketCategories: {
+        parameters: {
+            query?: {
+                includeInactive?: boolean;
+                page?: number | string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfTicketCategoryResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateTicketCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTicketCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketCategoryResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetTicketCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketCategoryResponse"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateTicketCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTicketCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketCategoryResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeactivateTicketCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReactivateTicketCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListTicketPriorities: {
+        parameters: {
+            query?: {
+                includeInactive?: boolean;
+                page?: number | string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfTicketPriorityResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateTicketPriority: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTicketPriorityRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketPriorityResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetTicketPriority: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketPriorityResponse"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateTicketPriority: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTicketPriorityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketPriorityResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeactivateTicketPriority: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReactivateTicketPriority: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

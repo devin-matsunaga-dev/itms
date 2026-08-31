@@ -4,9 +4,9 @@
 
 **Project:** Unified IT Management System (ITMS)
 **Phase:** 1 — Helpdesk (Phase 0 complete, awaiting the gate walkthrough and the `v0.1-phase0` tag)
-**Current WP:** `WP-1.1 — Reference data: categories & priorities`
-**Branch:** `feat/wp-1.1-reference-data`
-**Last completed:** `WP-0.9 — OpenAPI + generated client + CI` (2026-08-31)
+**Current WP:** `WP-1.2 — Ticket domain & numbering`
+**Branch:** `feat/wp-1.2-ticket-domain`
+**Last completed:** `WP-1.1 — Reference data: categories & priorities` (2026-08-31)
 **Last updated:** 2026-08-31
 
 ---
@@ -16,7 +16,7 @@
 | Phase | Packages | Done | Tag |
 |---|---|---|---|
 | 0 — Foundation | 0.1 – 0.9 | 9 / 9 | *gate pending* |
-| 1 — Helpdesk | 1.1 – 1.10 | 0 / 10 | — |
+| 1 — Helpdesk | 1.1 – 1.10 | 1 / 10 | — |
 | 2 — Assets & directory | 2.1 – 2.7 | 0 / 7 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
@@ -123,6 +123,20 @@
 - **The client is still one 612 kB chunk.** WP-0.8 recorded it and nothing here changed it: the generated types add no runtime weight, and the committed document is imported only by a test, so it stays out of the bundle. `React.lazy` per route remains the fix, and Phase 1 or 2 is where it stops being optional.
 - **Nothing generates a runtime client.** `openapi-typescript` emits types only; `apiFetch` still takes a path as a plain string, so a call to a route the server does not serve type-checks. `contract.test.ts` covers the four auth routes the shell calls today by reading the committed document. A package that adds many endpoints should consider whether that per-route check wants generalising rather than extending by hand.
 
+### Noticed during WP-1.1
+
+- **The reference-data seed is a seeder, not the migration WP-1.1's text names, and production has to run it.** `HelpdeskReferenceDataSeeder` is idempotent and keyed on fixed literal ids, and the host calls it in the same Development-only startup block as the other seeders. Two things forced it out of the migration: the integration suite's between-test reset is a Respawn truncate (CONVENTIONS.md fixes that, and rules out re-running migrations per test), which empties a migration-seeded table with nothing able to put the rows back; and seeding on every start — the alternative that would have covered production — runs during build-time OpenAPI generation, which boots the host with no database and fails the build. So **the deployment step that applies migrations in production must also run this seeder**, or that deployment has no ticket priorities and cannot accept a ticket. That is the same gap Identity's roles already have (the seeder claims "every environment", the call site is inside `IsDevelopment()`), and `WP-6.6 — Deployment & runbook`, which owns first-run setup, is where both belong.
+- **Adding a category beyond the seeded eight already works; the screen for it does not.** `POST /api/v1/ticket-categories` and `PUT /api/v1/ticket-categories/{id}` are live and Admin-guarded, so an operator whose need does not match Hardware/Software/Network/Account-Access/Microsoft 365/Printer/Security/Other can add one today through the API. The **administration screen** that makes that reachable without curl is `WP-5.8 — Administration`, which already lists "ticket categories and priorities" among what it manages. Same for priorities. Nothing further is owed by Phase 1; WP-5.8 must not assume this is still to be built server-side.
+- **`ON DELETE RESTRICT` on the ticket foreign key is WP-1.2's half of "deleting one in use is blocked".** WP-1.1 answered that criterion by having no removal path at all — retirement only, on both entities. The database half arrives when `tickets.category_id` and `tickets.priority_id` exist: they are intra-module columns in one schema, so a real foreign key is legal there (§3 rule 6 forbids one only *across* modules) and `Restrict` is what makes the refusal structural rather than a matter of no route being mapped.
+- **Helpdesk is the third module to declare its own audit action strings.** `IdentityAuditActions`, `DirectoryAudit`, and now `HelpdeskAudit`. WP-0.7 recorded that at the third and fourth the *convention* — not the strings — is worth writing into `CONVENTIONS.md`. `HelpdeskAudit`'s doc comment states it as `<module>.<entity>_<past-tense verb>` in lower snake case; that sentence wants promoting to `CONVENTIONS.md` under *Naming* so a later module cannot produce `ticket.priority_changed` and `ticket.prioritychanged` both.
+- **`HelpdeskAudit` also duplicates `DirectoryAudit`'s `Changes()`/`Set()`/`Moved()` helpers verbatim.** The action *strings* have to be duplicated — a module may not reference another module — but these three helpers do not: `AuditFieldChange` lives in `Itms.Contracts.Auditing`, which every module can see, so that is their natural home. It was left duplicated here because collapsing it means editing `DirectoryAudit` too, which is WP-0.6's code. Any package that touches both should do it.
+- **`tests/Itms.IntegrationTests/Api/ApiClient.cs` is new, and `DirectoryClient` still carries its own copy of the same plumbing.** The antiforgery-token-fetching `SendAsync`, the JSON `ReadAsync`, `PageDto<T>`, and `ProblemDto` are module-agnostic and now live in `Itms.IntegrationTests.Api`. `DirectoryClient` was deliberately left alone rather than churn WP-0.6's suite; a package touching those tests should point them at `ApiClient` and delete the duplicates. New module suites should use `ApiClient` from the start.
+- **`sort_order` and `rank` are deliberately not unique.** Reordering a picker is a swap, and a unique constraint turns a swap into a three-step dance that has to pass through a value nobody asked for. Ties are broken by normalised name in every read, so the order is deterministic — there is an integration test that asserts two priorities sharing a rank still come back in the same order twice. If WP-5.8's admin screen wants drag-to-reorder, it can renumber in one transaction without fighting a constraint.
+- **A priority has an immutable `code`; a category does not.** The code exists because `DESIGN.md` §2 fixes a colour per priority and later rules and integrations need a key that an administrator's rename cannot move. A category has no such consumer — nothing keys off "Network" — so it was not given one. If an integration ever needs to name a category stably, adding a code there is a migration plus a nullable column, not a redesign.
+- **Helpdesk raises no domain event, so `IEventPublisher` is still stuck in the bus.** WP-0.7 predicted that the first module to publish would hit the wall and have to move `IEventPublisher` into `Itms.Contracts` the way `IEventConsumer<T>` was moved. This package does not publish — ARCHITECTURE.md §5 names no category or priority event and nothing consumes one — so the move is still owed, and `WP-1.2`/`WP-1.3` is where `TicketCreated` first needs it. It is a one-type move plus a `using`.
+- **There is no UI for any of this.** WP-1.1 is not `[UI]`. The categories and priorities are reachable only through the API until `WP-1.10` (the create form's pickers) and `WP-5.8` (the administration screens). The generated client types for all twelve operations are committed and compile, so both packages start from a typed surface.
+- **The client is still one chunk, now a little larger.** The twelve new operations add types only, which carry no runtime weight, but the `React.lazy`-per-route split WP-0.8 and WP-0.9 both recorded is still owed and Phase 1 is where it stops being optional.
+
 ## Known issues
 
 - none
@@ -152,4 +166,5 @@
 - `aspire run` on WSL warns `PartiallyFailedToTrustTheCertificate` for the ASP.NET dev certificate. The dashboard and the API still work; the browser will show a certificate warning on `https://localhost:7014`. `dotnet dev-certs https --trust` does not fully apply under WSL.
 - **Dev credentials.** `aspire run` seeds three accounts, one per role: `admin` / `tech` / `user` (their addresses are `admin@itms.local`, `tech@itms.local`, `user@itms.local`; either identifier signs in). All three use the password **`Dev!Passw0rd123`**. They are created only when `ASPNETCORE_ENVIRONMENT` is `Development` — the seeder checks and returns after seeding roles otherwise — and they must not exist in a production deployment, which gets its first administrator from the first-run setup in WP-6.6. The roles themselves are seeded in every environment.
 - **The authentication settings are configuration**, bound from the `Identity` section: cookie name, cookie lifetime (8 h sliding), absolute session lifetime (24 h), lockout threshold and duration, minimum password length, and the credential rate limit. Every value has a production-safe default and is validated at startup, so an empty section is a hardened configuration rather than an open one; a value below the floor — a password minimum under 12, a session shorter than the cookie — fails the deployment.
+- **The helpdesk reference data is re-seeded by `ResetAsync`**, alongside the development accounts, because a Respawn truncate empties `helpdesk.ticket_categories` and `helpdesk.ticket_priorities` and every helpdesk test reads them. A suite that adds a module with reference data must do the same or start from an empty table.
 - **The integration suite boots the real host** with `Microsoft.AspNetCore.Mvc.Testing` against its own `itms_web_tests` database inside the shared container. It is a second database rather than a second container because the host runs the outbox dispatcher, which would otherwise claim the messages the outbox tests are asserting on.

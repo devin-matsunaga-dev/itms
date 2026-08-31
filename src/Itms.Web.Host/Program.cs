@@ -6,6 +6,8 @@ using Itms.Messaging.Abstractions;
 using Itms.Modules.Audit;
 using Itms.Modules.Directory;
 using Itms.Modules.Directory.Seeding;
+using Itms.Modules.Helpdesk;
+using Itms.Modules.Helpdesk.Seeding;
 using Itms.Modules.Identity;
 using Itms.Modules.Identity.Seeding;
 using Itms.Platform;
@@ -52,6 +54,7 @@ builder.Services.AddItmsOpenApi();
 // Modules. Each contributes exactly one AddXxxModule here and one MapXxxEndpoints below.
 builder.Services.AddIdentityModule();
 builder.Services.AddDirectoryModule();
+builder.Services.AddHelpdeskModule();
 builder.Services.AddAuditModule();
 
 var app = builder.Build();
@@ -65,9 +68,18 @@ if (app.Environment.IsDevelopment())
     await startupScope.ServiceProvider.MigrateMessagingAsync();
     await startupScope.ServiceProvider.MigrateIdentityAsync();
     await startupScope.ServiceProvider.MigrateDirectoryAsync();
+    await startupScope.ServiceProvider.MigrateHelpdeskAsync();
     await startupScope.ServiceProvider.MigrateAuditAsync();
     await DevelopmentIdentitySeeder.SeedAsync(startupScope.ServiceProvider);
     await DevelopmentDirectorySeeder.SeedAsync(startupScope.ServiceProvider);
+    // Reference data rather than demo data: unlike the development directory this seeder
+    // runs in every environment, and the deployment step that applies migrations must run
+    // it too — a deployment with no ticket priorities could not accept a ticket. It is
+    // idempotent and keyed on fixed ids, so a restart adds nothing and overwrites nothing
+    // an administrator has changed since. It sits inside this block because seeding on
+    // every start would also run during build-time OpenAPI generation, which boots the
+    // host with no database at all.
+    await HelpdeskReferenceDataSeeder.SeedAsync(startupScope.ServiceProvider);
 }
 
 // ARCHITECTURE.md §6: errors are ProblemDetails, always. These two turn the
@@ -103,6 +115,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapIdentityEndpoints();
 app.MapDirectoryEndpoints();
+app.MapHelpdeskEndpoints();
 // Audit maps nothing today; the trail is read by WP-5.9's viewer. The call is here so
 // adding that viewer is an edit inside the module rather than a change to this file.
 app.MapAuditEndpoints();

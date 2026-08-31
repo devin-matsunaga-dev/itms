@@ -1048,6 +1048,682 @@
           { }
         ]
       }
+    },
+    "/api/v1/ticket-categories": {
+      "get": {
+        "tags": [
+          "Ticket categories"
+        ],
+        "summary": "Lists ticket categories in picker order, optionally including retired ones.",
+        "operationId": "ListTicketCategories",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfTicketCategoryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Ticket categories"
+        ],
+        "summary": "Creates a ticket category.",
+        "operationId": "CreateTicketCategory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTicketCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketCategoryResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/ticket-categories/{id}": {
+      "get": {
+        "tags": [
+          "Ticket categories"
+        ],
+        "summary": "Reads one ticket category.",
+        "operationId": "GetTicketCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketCategoryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Ticket categories"
+        ],
+        "summary": "Replaces a ticket category's name, description, and order. Existing tickets follow the rename.",
+        "operationId": "UpdateTicketCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTicketCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketCategoryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/ticket-categories/{id}/deactivate": {
+      "post": {
+        "tags": [
+          "Ticket categories"
+        ],
+        "summary": "Retires a ticket category. Existing tickets keep resolving it.",
+        "operationId": "DeactivateTicketCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/ticket-categories/{id}/reactivate": {
+      "post": {
+        "tags": [
+          "Ticket categories"
+        ],
+        "summary": "Brings a retired ticket category back into use.",
+        "operationId": "ReactivateTicketCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/ticket-priorities": {
+      "get": {
+        "tags": [
+          "Ticket priorities"
+        ],
+        "summary": "Lists ticket priorities most urgent first, optionally including retired ones.",
+        "operationId": "ListTicketPriorities",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfTicketPriorityResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Ticket priorities"
+        ],
+        "summary": "Creates a ticket priority. The code is chosen here and never changes.",
+        "operationId": "CreateTicketPriority",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTicketPriorityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketPriorityResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/ticket-priorities/{id}": {
+      "get": {
+        "tags": [
+          "Ticket priorities"
+        ],
+        "summary": "Reads one ticket priority.",
+        "operationId": "GetTicketPriority",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketPriorityResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Ticket priorities"
+        ],
+        "summary": "Replaces a ticket priority's name, description, order, and SLA targets. The code is immutable.",
+        "operationId": "UpdateTicketPriority",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTicketPriorityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketPriorityResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/ticket-priorities/{id}/deactivate": {
+      "post": {
+        "tags": [
+          "Ticket priorities"
+        ],
+        "summary": "Retires a ticket priority. Existing tickets keep resolving it.",
+        "operationId": "DeactivateTicketPriority",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/ticket-priorities/{id}/reactivate": {
+      "post": {
+        "tags": [
+          "Ticket priorities"
+        ],
+        "summary": "Brings a retired ticket priority back into use.",
+        "operationId": "ReactivateTicketPriority",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
     }
   },
   "components": {
@@ -1188,6 +1864,93 @@
           }
         },
         "description": "The body of `POST /api/v1/locations`."
+      },
+      "CreateTicketCategoryRequest": {
+        "required": [
+          "name",
+          "description",
+          "sortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The display name. Unique, case-insensitively."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What belongs in this category, or `null`."
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Where it sits in a picker. Ties are broken by name.",
+            "format": "int32"
+          }
+        },
+        "description": "The body of `POST /api/v1/ticket-categories`."
+      },
+      "CreateTicketPriorityRequest": {
+        "required": [
+          "code",
+          "name",
+          "description",
+          "rank",
+          "responseTargetMinutes",
+          "resolutionTargetMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The stable machine identifier, lower-cased on the way in. Unique and immutable."
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name. Unique, case-insensitively, and editable."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What this priority is for, or `null`."
+          },
+          "rank": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Urgency order, lowest first. Ties are broken by name.",
+            "format": "int32"
+          },
+          "responseTargetMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Minutes from creation within which a technician should respond.",
+            "format": "int32"
+          },
+          "resolutionTargetMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Minutes from creation within which the ticket should be resolved.",
+            "format": "int32"
+          }
+        },
+        "description": "The body of `POST /api/v1/ticket-priorities`."
       },
       "CsrfTokenResponse": {
         "required": [
@@ -1551,6 +2314,124 @@
         },
         "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
       },
+      "PagedResultOfTicketCategoryResponse": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketCategoryResponse"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
+      },
+      "PagedResultOfTicketPriorityResponse": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketPriorityResponse"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -1605,6 +2486,139 @@
           }
         }
       },
+      "TicketCategoryResponse": {
+        "required": [
+          "id",
+          "name",
+          "description",
+          "sortOrder",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The category's id. What a ticket stores, and what a rename does not change.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its display name."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What belongs in it, or `null`."
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Where it sits in a picker.",
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "False once retired."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was created (UTC).",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When it was last changed (UTC).",
+            "format": "date-time"
+          }
+        },
+        "description": "A ticket category as the API renders it."
+      },
+      "TicketPriorityResponse": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "description",
+          "rank",
+          "responseTargetMinutes",
+          "resolutionTargetMinutes",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The priority's id. What a ticket stores.",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "The stable machine identifier — `critical`, `high`. Fixed for the life of the row."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its display name."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What it is for, or `null`."
+          },
+          "rank": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Urgency order, lowest first.",
+            "format": "int32"
+          },
+          "responseTargetMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Minutes from creation within which a technician should respond.",
+            "format": "int32"
+          },
+          "resolutionTargetMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Minutes from creation within which the ticket should be resolved.",
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "False once retired."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was created (UTC).",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When it was last changed (UTC).",
+            "format": "date-time"
+          }
+        },
+        "description": "A ticket priority as the API renders it."
+      },
       "UpdateDepartmentRequest": {
         "required": [
           "name",
@@ -1654,6 +2668,88 @@
           }
         },
         "description": "The body of `PUT /api/v1/locations/{id}`."
+      },
+      "UpdateTicketCategoryRequest": {
+        "required": [
+          "name",
+          "description",
+          "sortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The display name. Every ticket already filed under this category follows the rename."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What belongs in it, or `null` to clear it."
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Where it sits in a picker.",
+            "format": "int32"
+          }
+        },
+        "description": "The body of `PUT /api/v1/ticket-categories/{id}`."
+      },
+      "UpdateTicketPriorityRequest": {
+        "required": [
+          "name",
+          "description",
+          "rank",
+          "responseTargetMinutes",
+          "resolutionTargetMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The display name."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What this priority is for, or `null` to clear it."
+          },
+          "rank": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Urgency order, lowest first.",
+            "format": "int32"
+          },
+          "responseTargetMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Minutes from creation within which a technician should respond.",
+            "format": "int32"
+          },
+          "resolutionTargetMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Minutes from creation within which the ticket should be resolved.",
+            "format": "int32"
+          }
+        },
+        "description": "The body of `PUT /api/v1/ticket-priorities/{id}`."
       },
       "UserSummary": {
         "required": [
@@ -1724,6 +2820,12 @@
     },
     {
       "name": "Locations"
+    },
+    {
+      "name": "Ticket categories"
+    },
+    {
+      "name": "Ticket priorities"
     }
   ]
 }
