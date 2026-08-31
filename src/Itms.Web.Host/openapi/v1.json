@@ -1725,6 +1725,303 @@
         ]
       }
     },
+    "/api/v1/tickets": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Reads the ticket queue, filtered, sorted, and paged.",
+        "description": "A Technician or an Admin reads every ticket; anybody else reads only the tickets they raised. Defaults to newest first.",
+        "operationId": "ListTickets",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/TicketStatus"
+              }
+            }
+          },
+          {
+            "name": "priorityId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assigneeId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "unassigned",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "departmentId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requesterId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "createdFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "createdTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/TicketSort"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SortDirection"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfTicketListItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Raises a ticket.",
+        "description": "A User may only raise a ticket for themselves and is refused with 403 for naming anybody else. The requester defaults to the caller and the department to the requester's own.",
+        "operationId": "CreateTicket",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTicketRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/tickets/{id}": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Reads one ticket in full, with the head of its timeline.",
+        "description": "Carries an ETag naming the ticket's current version. Send it back as If-Match on a status change to be told the ticket has moved before the change is attempted.",
+        "operationId": "GetTicket",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
     "/api/v1/tickets/{id}/history": {
       "get": {
         "tags": [
@@ -1820,6 +2117,7 @@
           "Tickets"
         ],
         "summary": "Moves a ticket to another status, refusing any transition SPEC.md §2 does not allow.",
+        "description": "Send the ticket's ETag as If-Match to be refused with 412 if it has moved since you read it. Without the header the request proceeds and a lost race is a 409.",
         "operationId": "ChangeTicketStatus",
         "parameters": [
           {
@@ -1895,6 +2193,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2156,6 +2464,52 @@
           }
         },
         "description": "The body of `POST /api/v1/ticket-priorities`."
+      },
+      "CreateTicketRequest": {
+        "required": [
+          "subject",
+          "description",
+          "categoryId",
+          "priorityId"
+        ],
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "description": "The one-line summary. SPEC.md §2 calls this the title, and a form should label it so."
+          },
+          "description": {
+            "type": "string",
+            "description": "What is wrong, in the requester's words."
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "What the ticket is about. Must name a category that has not been retired.",
+            "format": "uuid"
+          },
+          "priorityId": {
+            "type": "string",
+            "description": "How urgent it is. Must name a priority that has not been retired.",
+            "format": "uuid"
+          },
+          "requesterId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who the ticket is for, or `null` for the caller. Only a Technician or\nan Admin may name somebody else.",
+            "format": "uuid"
+          },
+          "departmentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The department to file it against, or `null` to take the requester's\nown.",
+            "format": "uuid"
+          }
+        },
+        "description": "Raises a ticket."
       },
       "CsrfTokenResponse": {
         "required": [
@@ -2637,6 +2991,65 @@
         },
         "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
       },
+      "PagedResultOfTicketListItemResponse": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketListItemResponse"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
+      },
       "PagedResultOfTicketPriorityResponse": {
         "required": [
           "items",
@@ -2750,6 +3163,13 @@
           }
         }
       },
+      "SortDirection": {
+        "enum": [
+          "Ascending",
+          "Descending",
+          null
+        ]
+      },
       "TicketCategoryResponse": {
         "required": [
           "id",
@@ -2812,6 +3232,199 @@
           "Resolution"
         ],
         "description": "Which dimension of a ticket a history entry records having moved."
+      },
+      "TicketDetailResponse": {
+        "required": [
+          "id",
+          "number",
+          "subject",
+          "description",
+          "status",
+          "categoryId",
+          "categoryName",
+          "priorityId",
+          "priorityName",
+          "priorityCode",
+          "priorityRank",
+          "requesterId",
+          "requesterName",
+          "departmentId",
+          "departmentName",
+          "assigneeId",
+          "assigneeName",
+          "resolutionNotes",
+          "resolvedAt",
+          "closedAt",
+          "relatedAssetId",
+          "relatedAlertId",
+          "createdAt",
+          "updatedAt",
+          "dueAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The ticket's id.",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "The human-readable number, `TKT-####`."
+          },
+          "subject": {
+            "type": "string",
+            "description": "The one-line summary."
+          },
+          "description": {
+            "type": "string",
+            "description": "What the requester reported."
+          },
+          "status": {
+            "description": "Where it sits in the workflow.",
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "What it is about.",
+            "format": "uuid"
+          },
+          "categoryName": {
+            "type": "string",
+            "description": "That category's name, as it reads now."
+          },
+          "priorityId": {
+            "type": "string",
+            "description": "How urgent it is.",
+            "format": "uuid"
+          },
+          "priorityName": {
+            "type": "string",
+            "description": "That priority's name, as it reads now."
+          },
+          "priorityCode": {
+            "type": "string",
+            "description": "That priority's stable key, for colour and for rules."
+          },
+          "priorityRank": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Its ordering weight.",
+            "format": "int32"
+          },
+          "requesterId": {
+            "type": "string",
+            "description": "Who the ticket is for.",
+            "format": "uuid"
+          },
+          "requesterName": {
+            "type": "string",
+            "description": "Their display name, cached at creation."
+          },
+          "departmentId": {
+            "type": "string",
+            "description": "The department it is filed against.",
+            "format": "uuid"
+          },
+          "departmentName": {
+            "type": "string",
+            "description": "That department's name, cached at creation."
+          },
+          "assigneeId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The technician responsible, or `null`.",
+            "format": "uuid"
+          },
+          "assigneeName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Their display name, or `null`."
+          },
+          "resolutionNotes": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What was done, once it has been resolved. Kept through a reopen."
+          },
+          "resolvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was resolved (UTC), or `null`.",
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was closed (UTC), or `null`.",
+            "format": "date-time"
+          },
+          "relatedAssetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The asset it concerns, or `null`. WP-2.5 sets it.",
+            "format": "uuid"
+          },
+          "relatedAlertId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The alert it was raised from, or `null`. WP-3.7 sets it.",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was raised (UTC).",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When it last moved (UTC).",
+            "format": "date-time"
+          },
+          "dueAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When resolution is due, or `null` until WP-1.8 computes it.",
+            "format": "date-time"
+          },
+          "allowedNextStatuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketStatus"
+            },
+            "description": "The statuses this ticket may legally move to next, straight from the state\nmachine. Empty once the ticket is terminal."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketHistoryEntryResponse"
+            },
+            "description": "The head of the ticket's timeline, newest first — at most\nint TicketDetailResponse.EmbeddedHistoryCount entries."
+          },
+          "hasMoreHistory": {
+            "type": "boolean",
+            "description": "True when the ticket's timeline is longer than what\nIReadOnlyList&lt;TicketHistoryEntryResponse&gt; TicketDetailResponse.History carries, so a client knows to offer the paged endpoint."
+          }
+        },
+        "description": "One ticket in full, as the detail screen reads it."
       },
       "TicketHistoryEntryResponse": {
         "required": [
@@ -2880,6 +3493,132 @@
           }
         },
         "description": "One line of a ticket's timeline, as the API renders it."
+      },
+      "TicketListItemResponse": {
+        "required": [
+          "id",
+          "number",
+          "subject",
+          "status",
+          "categoryId",
+          "categoryName",
+          "priorityId",
+          "priorityName",
+          "priorityCode",
+          "priorityRank",
+          "requesterId",
+          "requesterName",
+          "departmentId",
+          "departmentName",
+          "assigneeId",
+          "assigneeName",
+          "createdAt",
+          "updatedAt",
+          "dueAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The ticket's id.",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "The human-readable number, `TKT-####`."
+          },
+          "subject": {
+            "type": "string",
+            "description": "The one-line summary. SPEC.md §2 calls this the title, and a UI should label it so."
+          },
+          "status": {
+            "description": "Where it sits in the workflow.",
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "What it is about.",
+            "format": "uuid"
+          },
+          "categoryName": {
+            "type": "string",
+            "description": "That category's name, as it reads now."
+          },
+          "priorityId": {
+            "type": "string",
+            "description": "How urgent it is.",
+            "format": "uuid"
+          },
+          "priorityName": {
+            "type": "string",
+            "description": "That priority's name, as it reads now."
+          },
+          "priorityCode": {
+            "type": "string",
+            "description": "That priority's stable key, for colour and for rules."
+          },
+          "priorityRank": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Its ordering weight, so a client can sort a page it already holds.",
+            "format": "int32"
+          },
+          "requesterId": {
+            "type": "string",
+            "description": "Who the ticket is for.",
+            "format": "uuid"
+          },
+          "requesterName": {
+            "type": "string",
+            "description": "Their display name, cached at creation."
+          },
+          "departmentId": {
+            "type": "string",
+            "description": "The department it is filed against.",
+            "format": "uuid"
+          },
+          "departmentName": {
+            "type": "string",
+            "description": "That department's name, cached at creation."
+          },
+          "assigneeId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The technician responsible, or `null` while unassigned.",
+            "format": "uuid"
+          },
+          "assigneeName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Their display name, or `null`."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was raised (UTC). The queue's \"age\" column is computed from this.",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When it last moved (UTC).",
+            "format": "date-time"
+          },
+          "dueAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When resolution is due, or `null` until WP-1.8 computes it.",
+            "format": "date-time"
+          }
+        },
+        "description": "One row of the ticket queue, as the API renders it."
       },
       "TicketPriorityResponse": {
         "required": [
@@ -2959,6 +3698,16 @@
           }
         },
         "description": "A ticket priority as the API renders it."
+      },
+      "TicketSort": {
+        "enum": [
+          "CreatedAt",
+          "UpdatedAt",
+          "Priority",
+          "Number",
+          "DueAt",
+          null
+        ]
       },
       "TicketStatus": {
         "enum": [

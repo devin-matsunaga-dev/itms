@@ -7,6 +7,16 @@ namespace Itms.Modules.Helpdesk.Persistence.Configurations;
 /// <summary>Maps <see cref="Ticket"/> to <c>helpdesk.tickets</c>.</summary>
 internal sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 {
+    /// <summary>
+    /// The name of the shadow property carrying PostgreSQL's <c>xmin</c> row version.
+    /// </summary>
+    /// <remarks>
+    /// Named here rather than spelled at each use, because WP-1.5 reads it back through
+    /// <c>EF.Property&lt;uint&gt;</c> to build the ETag and a mistyped string would be a
+    /// runtime failure rather than a compile error.
+    /// </remarks>
+    public const string VersionProperty = "Version";
+
     /// <inheritdoc />
     public void Configure(EntityTypeBuilder<Ticket> builder)
     {
@@ -53,12 +63,13 @@ internal sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Property(t => t.DeletedAt).HasColumnName("deleted_at");
 
         // ARCHITECTURE.md §6 wants optimistic concurrency on tickets. xmin is PostgreSQL's
-        // own row version, so this costs no column and no write: WP-1.5 turns it into an
-        // ETag and a 409, and every write between now and then is already protected.
+        // own row version, so this costs no column and no write. WP-1.5 turned it into the
+        // ETag the detail response carries and the If-Match the status change honours;
+        // every write before that was already protected by the token itself.
         // Mapped by hand because Npgsql 10 no longer ships UseXminAsConcurrencyToken();
         // this is what that extension did.
         builder
-            .Property<uint>("Version")
+            .Property<uint>(VersionProperty)
             .HasColumnName("xmin")
             .HasColumnType("xid")
             .ValueGeneratedOnAddOrUpdate()

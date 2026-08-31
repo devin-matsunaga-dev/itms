@@ -1,4 +1,5 @@
 using System.Data.Common;
+using Itms.Contracts.Messaging;
 using Microsoft.EntityFrameworkCore;
 
 namespace Itms.Messaging.Abstractions;

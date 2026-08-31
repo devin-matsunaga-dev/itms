@@ -232,18 +232,26 @@ public sealed class TicketHistoryTests(IdentityWebFixture fixture) : IAsyncLifet
     }
 
     /// <summary>
-    /// A requester cannot read their own ticket's timeline in V1. The row-level question is
-    /// WP-1.5's; until it is answered, the narrow policy is the safe one.
+    /// A User cannot read a timeline belonging to somebody else.
     /// </summary>
+    /// <remarks>
+    /// <b>WP-1.5 answered the row-level question WP-1.4 left open</b>, at the human's
+    /// direction: a requester now reads their own ticket's timeline, scoped exactly as the
+    /// detail endpoint is. So this is a 404 rather than WP-1.4's 403 — the tickets here are
+    /// raised for a random requester id, which makes them somebody else's, and somebody
+    /// else's ticket is indistinguishable from one that does not exist. The positive case —
+    /// a User reading their own timeline — is in <c>TicketAccessTests</c>, alongside the
+    /// rest of the row-level rule.
+    /// </remarks>
     [Fact]
-    public async Task A_user_cannot_read_a_timeline()
+    public async Task A_user_cannot_read_somebody_elses_timeline()
     {
         using var user = await AuthClient.SignedInAsync(fixture, "user", Token);
         var ticket = await ParkedTicket(TicketStatus.New);
 
         var response = await ApiClient.SendAsync(user, HttpMethod.Get, Path(ticket), body: null, Token);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     /// <summary>An anonymous caller gets 401, not a redirect to a sign-in page.</summary>

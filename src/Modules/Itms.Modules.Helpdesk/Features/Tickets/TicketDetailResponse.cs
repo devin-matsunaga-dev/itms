@@ -1,0 +1,169 @@
+using Itms.Modules.Helpdesk.Domain;
+using Itms.Modules.Helpdesk.Features.TicketHistory;
+using Itms.Modules.Helpdesk.Persistence;
+using Itms.Modules.Helpdesk.Persistence.Configurations;
+using Microsoft.EntityFrameworkCore;
+
+namespace Itms.Modules.Helpdesk.Features.Tickets;
+
+/// <summary>One ticket in full, as the detail screen reads it.</summary>
+/// <remarks>
+/// <para>
+/// The queue row's whole shape, plus what only the detail needs: the description, the
+/// resolution, the links, the moves the ticket can still make, and the head of its
+/// timeline. WP-1.10 draws this.
+/// </para>
+/// <para>
+/// <b><see cref="AllowedNextStatuses"/> comes from the server, and a client must not
+/// restate the table.</b> WP-1.3 settled this for the transition response and the reason
+/// applies twice over here: WP-1.10's criterion is that illegal transitions are not
+/// rendered, and a screen that has just loaded a ticket needs to know which buttons to
+/// draw as much as one that has just moved it. It is
+/// <c>TicketStateMachine.DestinationsFrom</c> either way, so the two can never disagree.
+/// </para>
+/// <para>
+/// <b>What is not here yet.</b> Comments and internal notes are WP-1.7's table, and a
+/// User must never receive a note through this shape — see <see cref="TicketScope"/>.
+/// <see cref="RelatedAssetId"/> and <see cref="RelatedAlertId"/> are returned as bare ids
+/// because nothing sets them until WP-2.5 and WP-3.7; when those land, each will want its
+/// display text alongside, the way the requester and department names travel here.
+/// </para>
+/// </remarks>
+/// <param name="Id">The ticket's id.</param>
+/// <param name="Number">The human-readable number, <c>TKT-####</c>.</param>
+/// <param name="Subject">The one-line summary.</param>
+/// <param name="Description">What the requester reported.</param>
+/// <param name="Status">Where it sits in the workflow.</param>
+/// <param name="CategoryId">What it is about.</param>
+/// <param name="CategoryName">That category's name, as it reads now.</param>
+/// <param name="PriorityId">How urgent it is.</param>
+/// <param name="PriorityName">That priority's name, as it reads now.</param>
+/// <param name="PriorityCode">That priority's stable key, for colour and for rules.</param>
+/// <param name="PriorityRank">Its ordering weight.</param>
+/// <param name="RequesterId">Who the ticket is for.</param>
+/// <param name="RequesterName">Their display name, cached at creation.</param>
+/// <param name="DepartmentId">The department it is filed against.</param>
+/// <param name="DepartmentName">That department's name, cached at creation.</param>
+/// <param name="AssigneeId">The technician responsible, or <see langword="null"/>.</param>
+/// <param name="AssigneeName">Their display name, or <see langword="null"/>.</param>
+/// <param name="ResolutionNotes">What was done, once it has been resolved. Kept through a reopen.</param>
+/// <param name="ResolvedAt">When it was resolved (UTC), or <see langword="null"/>.</param>
+/// <param name="ClosedAt">When it was closed (UTC), or <see langword="null"/>.</param>
+/// <param name="RelatedAssetId">The asset it concerns, or <see langword="null"/>. WP-2.5 sets it.</param>
+/// <param name="RelatedAlertId">The alert it was raised from, or <see langword="null"/>. WP-3.7 sets it.</param>
+/// <param name="CreatedAt">When it was raised (UTC).</param>
+/// <param name="UpdatedAt">When it last moved (UTC).</param>
+/// <param name="DueAt">When resolution is due, or <see langword="null"/> until WP-1.8 computes it.</param>
+public sealed record TicketDetailResponse(
+    Guid Id,
+    string Number,
+    string Subject,
+    string Description,
+    TicketStatus Status,
+    Guid CategoryId,
+    string CategoryName,
+    Guid PriorityId,
+    string PriorityName,
+    string PriorityCode,
+    int PriorityRank,
+    Guid RequesterId,
+    string RequesterName,
+    Guid DepartmentId,
+    string DepartmentName,
+    Guid? AssigneeId,
+    string? AssigneeName,
+    string? ResolutionNotes,
+    DateTimeOffset? ResolvedAt,
+    DateTimeOffset? ClosedAt,
+    Guid? RelatedAssetId,
+    Guid? RelatedAlertId,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? DueAt)
+{
+    /// <summary>How many timeline entries the detail carries without being asked.</summary>
+    /// <remarks>
+    /// One page of history, at the human's direction, so the normal detail view is a
+    /// single round trip. A ticket with a longer timeline than this is read on through
+    /// <c>GET /api/v1/tickets/{id}/history</c>, which is paged and carries the total.
+    /// </remarks>
+    public const int EmbeddedHistoryCount = 25;
+
+    /// <summary>
+    /// The statuses this ticket may legally move to next, straight from the state
+    /// machine. Empty once the ticket is terminal.
+    /// </summary>
+    /// <remarks>Set after projection: it is computed from the status, not stored.</remarks>
+    public IReadOnlyCollection<TicketStatus> AllowedNextStatuses { get; init; } = [];
+
+    /// <summary>
+    /// The head of the ticket's timeline, newest first — at most
+    /// <see cref="EmbeddedHistoryCount"/> entries.
+    /// </summary>
+    /// <remarks>
+    /// Entries sharing an <c>occurredAt</c> came from one change and are meant to be
+    /// rendered as one event, not as separate rows with the same timestamp. WP-1.4's
+    /// <c>sequence</c> is what orders them.
+    /// </remarks>
+    public IReadOnlyList<TicketHistoryEntryResponse> History { get; init; } = [];
+
+    /// <summary>
+    /// True when the ticket's timeline is longer than what
+    /// <see cref="History"/> carries, so a client knows to offer the paged endpoint.
+    /// </summary>
+    public bool HasMoreHistory { get; init; }
+
+    /// <summary>
+    /// Projects tickets to detail rows with their row versions.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A join rather than a correlated subquery per name, and an inner join because both
+    /// foreign keys are <c>NOT NULL</c> with <c>ON DELETE RESTRICT</c> — a ticket whose
+    /// category or priority is missing cannot exist. The collection properties are not
+    /// projected: they are filled in by the handler, because neither is a column.
+    /// </para>
+    /// <para>
+    /// The <c>xmin</c> version rides along rather than being read in a second query,
+    /// because the ETag has to describe the row this projection just read. Two reads could
+    /// straddle a write and hand the client a tag for a ticket it was not given.
+    /// </para>
+    /// </remarks>
+    /// <param name="tickets">The ticket query, already scoped.</param>
+    /// <param name="database">The context, for the reference tables.</param>
+    /// <returns>The projected query. Nothing has been executed.</returns>
+    internal static IQueryable<TicketDetail> Project(
+        IQueryable<Ticket> tickets,
+        HelpdeskDbContext database) =>
+        from ticket in tickets
+        join category in database.TicketCategories on ticket.CategoryId equals category.Id
+        join priority in database.TicketPriorities on ticket.PriorityId equals priority.Id
+        select new TicketDetail(
+            new TicketDetailResponse(
+                ticket.Id,
+                ticket.Number,
+                ticket.Subject,
+                ticket.Description,
+                ticket.Status,
+                category.Id,
+                category.Name,
+                priority.Id,
+                priority.Name,
+                priority.Code,
+                priority.Rank,
+                ticket.RequesterId,
+                ticket.RequesterName,
+                ticket.DepartmentId,
+                ticket.DepartmentName,
+                ticket.AssigneeId,
+                ticket.AssigneeName,
+                ticket.ResolutionNotes,
+                ticket.ResolvedAt,
+                ticket.ClosedAt,
+                ticket.RelatedAssetId,
+                ticket.RelatedAlertId,
+                ticket.CreatedAt,
+                ticket.UpdatedAt,
+                ticket.DueAt),
+            EF.Property<uint>(ticket, TicketConfiguration.VersionProperty));
+}

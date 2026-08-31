@@ -31,6 +31,10 @@ public sealed record Error(
     public static Error Conflict(string code, string message) =>
         new(code, message, ErrorKind.Conflict);
 
+    /// <summary>A precondition the caller stated — a stale <c>If-Match</c> — does not hold.</summary>
+    public static Error PreconditionFailed(string code, string message) =>
+        new(code, message, ErrorKind.PreconditionFailed);
+
     /// <summary>The caller is authenticated but not permitted.</summary>
     public static Error Forbidden(string code, string message) =>
         new(code, message, ErrorKind.Forbidden);

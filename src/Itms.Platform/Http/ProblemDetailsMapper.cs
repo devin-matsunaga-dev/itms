@@ -25,6 +25,7 @@ public static class ProblemDetailsMapper
             ErrorKind.Forbidden => StatusCodes.Status403Forbidden,
             ErrorKind.NotFound => StatusCodes.Status404NotFound,
             ErrorKind.Conflict => StatusCodes.Status409Conflict,
+            ErrorKind.PreconditionFailed => StatusCodes.Status412PreconditionFailed,
             _ => StatusCodes.Status500InternalServerError,
         };
     }
@@ -41,6 +42,7 @@ public static class ProblemDetailsMapper
         StatusCodes.Status403Forbidden => "https://datatracker.ietf.org/doc/html/rfc9110#section-15.5.4",
         StatusCodes.Status404NotFound => "https://datatracker.ietf.org/doc/html/rfc9110#section-15.5.5",
         StatusCodes.Status409Conflict => "https://datatracker.ietf.org/doc/html/rfc9110#section-15.5.10",
+        StatusCodes.Status412PreconditionFailed => "https://datatracker.ietf.org/doc/html/rfc9110#section-15.5.13",
         _ => "https://datatracker.ietf.org/doc/html/rfc9110#section-15.6.1",
     };
 
@@ -52,6 +54,7 @@ public static class ProblemDetailsMapper
         StatusCodes.Status403Forbidden => "Forbidden",
         StatusCodes.Status404NotFound => "Not Found",
         StatusCodes.Status409Conflict => "Conflict",
+        StatusCodes.Status412PreconditionFailed => "Precondition Failed",
         _ => "Internal Server Error",
     };
 

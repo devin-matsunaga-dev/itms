@@ -15,6 +15,9 @@ using Itms.Modules.Helpdesk.Features.TicketPriorities.SetTicketPriorityStatus;
 using Itms.Modules.Helpdesk.Features.TicketPriorities.UpdateTicketPriority;
 using Itms.Modules.Helpdesk.Features.Tickets;
 using Itms.Modules.Helpdesk.Features.Tickets.ChangeTicketStatus;
+using Itms.Modules.Helpdesk.Features.Tickets.CreateTicket;
+using Itms.Modules.Helpdesk.Features.Tickets.GetTicket;
+using Itms.Modules.Helpdesk.Features.Tickets.ListTickets;
 using Itms.Modules.Helpdesk.Persistence;
 using Itms.Platform.Data;
 using Microsoft.AspNetCore.Routing;
@@ -34,10 +37,20 @@ public static class HelpdeskModule
     /// Registers persistence and this module's handlers and validators.
     /// </summary>
     /// <remarks>
-    /// No public contract implementation yet, and no event consumer: nothing outside
-    /// Helpdesk reads a category or a priority, and ARCHITECTURE.md §5 names no event
-    /// either of them raises. When tickets arrive and the module starts publishing, the
-    /// composition root's <c>AddMessaging</c> call is what has to learn about it.
+    /// <para>
+    /// No public contract implementation, and no event consumer. This module <em>publishes</em>
+    /// from WP-1.5 — <c>CreateTicketHandler</c> raises <c>TicketCreated</c> — but publishing
+    /// needs nothing registered here: <c>IEventPublisher</c> comes from <c>AddMessaging</c>,
+    /// which the composition root has already run.
+    /// </para>
+    /// <para>
+    /// <b>A consumer would be different.</b> The assembly list passed to <c>AddMessaging</c> is
+    /// what the bus scans for <c>IEventConsumer&lt;T&gt;</c>, and Helpdesk is not on it. The
+    /// first package to add a consumer here — the one that refreshes the cached requester and
+    /// department names when Identity and Directory start announcing renames — must add
+    /// <c>Itms.Modules.Helpdesk</c> to that call, or the consumer silently never runs and no
+    /// test would notice.
+    /// </para>
     /// </remarks>
     /// <param name="services">The container. <c>AddPlatform</c> and <c>AddMessaging</c> must already have run.</param>
     /// <returns>The container, for chaining.</returns>
@@ -65,6 +78,9 @@ public static class HelpdeskModule
         services.TryAddScoped<UpdateTicketCategoryHandler>();
         services.TryAddScoped<SetTicketCategoryStatusHandler>();
 
+        services.TryAddScoped<CreateTicketHandler>();
+        services.TryAddScoped<ListTicketsHandler>();
+        services.TryAddScoped<GetTicketHandler>();
         services.TryAddScoped<ChangeTicketStatusHandler>();
         services.TryAddScoped<ListTicketHistoryHandler>();
 
@@ -83,6 +99,7 @@ public static class HelpdeskModule
         services.TryAddScoped<IValidator<CreateTicketPriorityRequest>, CreateTicketPriorityValidator>();
         services.TryAddScoped<IValidator<UpdateTicketPriorityRequest>, UpdateTicketPriorityValidator>();
         services.TryAddScoped<IValidator<ChangeTicketStatusRequest>, ChangeTicketStatusValidator>();
+        services.TryAddScoped<IValidator<CreateTicketRequest>, CreateTicketValidator>();
 
         return services;
     }

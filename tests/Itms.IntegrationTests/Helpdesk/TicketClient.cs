@@ -1,0 +1,325 @@
+using System.Net.Http.Json;
+using System.Text.Json;
+using Itms.IntegrationTests.Api;
+using Itms.IntegrationTests.DirectoryModule;
+using Itms.IntegrationTests.Identity;
+using Itms.Modules.Helpdesk.Domain;
+
+namespace Itms.IntegrationTests.Helpdesk;
+
+/// <summary>One line of a ticket's timeline, as the suite reads it off the wire.</summary>
+/// <param name="Id">The entry's id.</param>
+/// <param name="Kind">Which dimension moved.</param>
+/// <param name="FromValue">What it read before.</param>
+/// <param name="ToValue">What it reads now.</param>
+/// <param name="OccurredAt">When the change happened.</param>
+/// <param name="Sequence">Where the line sits among the lines one change wrote.</param>
+/// <param name="ActorId">Who made it.</param>
+/// <param name="ActorName">Their display name at the time.</param>
+public sealed record TicketHistoryDto(
+    Guid Id,
+    TicketChangeKind Kind,
+    string? FromValue,
+    string? ToValue,
+    DateTimeOffset OccurredAt,
+    int Sequence,
+    Guid? ActorId,
+    string? ActorName);
+
+/// <summary>A ticket as the detail endpoint renders it.</summary>
+/// <param name="Id">The ticket's id.</param>
+/// <param name="Number">The human-readable number.</param>
+/// <param name="Subject">The one-line summary.</param>
+/// <param name="Description">What was reported.</param>
+/// <param name="Status">Where it sits in the workflow.</param>
+/// <param name="CategoryId">Its category.</param>
+/// <param name="CategoryName">That category's name.</param>
+/// <param name="PriorityId">Its priority.</param>
+/// <param name="PriorityName">That priority's name.</param>
+/// <param name="PriorityCode">That priority's stable key.</param>
+/// <param name="PriorityRank">Its ordering weight.</param>
+/// <param name="RequesterId">Who it is for.</param>
+/// <param name="RequesterName">Their cached display name.</param>
+/// <param name="DepartmentId">The department it is filed against.</param>
+/// <param name="DepartmentName">That department's cached name.</param>
+/// <param name="AssigneeId">The technician holding it, or null.</param>
+/// <param name="AssigneeName">Their cached display name, or null.</param>
+/// <param name="ResolutionNotes">What was done, once resolved.</param>
+/// <param name="ResolvedAt">When it was resolved.</param>
+/// <param name="ClosedAt">When it was closed.</param>
+/// <param name="RelatedAssetId">The asset it concerns. WP-2.5.</param>
+/// <param name="RelatedAlertId">The alert it came from. WP-3.7.</param>
+/// <param name="CreatedAt">When it was raised.</param>
+/// <param name="UpdatedAt">When it last moved.</param>
+/// <param name="DueAt">When resolution is due. WP-1.8.</param>
+/// <param name="AllowedNextStatuses">The moves it may still make.</param>
+/// <param name="History">The head of its timeline, newest first.</param>
+/// <param name="HasMoreHistory">True when the timeline is longer than what is embedded.</param>
+public sealed record TicketDetailDto(
+    Guid Id,
+    string Number,
+    string Subject,
+    string Description,
+    TicketStatus Status,
+    Guid CategoryId,
+    string CategoryName,
+    Guid PriorityId,
+    string PriorityName,
+    string PriorityCode,
+    int PriorityRank,
+    Guid RequesterId,
+    string RequesterName,
+    Guid DepartmentId,
+    string DepartmentName,
+    Guid? AssigneeId,
+    string? AssigneeName,
+    string? ResolutionNotes,
+    DateTimeOffset? ResolvedAt,
+    DateTimeOffset? ClosedAt,
+    Guid? RelatedAssetId,
+    Guid? RelatedAlertId,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? DueAt,
+    IReadOnlyList<TicketStatus> AllowedNextStatuses,
+    IReadOnlyList<TicketHistoryDto> History,
+    bool HasMoreHistory);
+
+/// <summary>One row of the queue, as the list endpoint renders it.</summary>
+/// <param name="Id">The ticket's id.</param>
+/// <param name="Number">The human-readable number.</param>
+/// <param name="Subject">The one-line summary.</param>
+/// <param name="Status">Where it sits in the workflow.</param>
+/// <param name="CategoryId">Its category.</param>
+/// <param name="CategoryName">That category's name.</param>
+/// <param name="PriorityId">Its priority.</param>
+/// <param name="PriorityName">That priority's name.</param>
+/// <param name="PriorityCode">That priority's stable key.</param>
+/// <param name="PriorityRank">Its ordering weight.</param>
+/// <param name="RequesterId">Who it is for.</param>
+/// <param name="RequesterName">Their cached display name.</param>
+/// <param name="DepartmentId">The department it is filed against.</param>
+/// <param name="DepartmentName">That department's cached name.</param>
+/// <param name="AssigneeId">The technician holding it, or null.</param>
+/// <param name="AssigneeName">Their cached display name, or null.</param>
+/// <param name="CreatedAt">When it was raised.</param>
+/// <param name="UpdatedAt">When it last moved.</param>
+/// <param name="DueAt">When resolution is due.</param>
+public sealed record TicketListItemDto(
+    Guid Id,
+    string Number,
+    string Subject,
+    TicketStatus Status,
+    Guid CategoryId,
+    string CategoryName,
+    Guid PriorityId,
+    string PriorityName,
+    string PriorityCode,
+    int PriorityRank,
+    Guid RequesterId,
+    string RequesterName,
+    Guid DepartmentId,
+    string DepartmentName,
+    Guid? AssigneeId,
+    string? AssigneeName,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? DueAt);
+
+/// <summary>
+/// The ticket request shapes every WP-1.5 suite needs, written once.
+/// </summary>
+/// <remarks>
+/// Unlike <c>TicketWriter</c>, everything here goes over the wire through the real
+/// endpoints. <c>TicketWriter</c> stays for the two things HTTP cannot reach — arranging a
+/// starting status before WP-1.6's assignment exists, and failing a transaction from inside.
+/// </remarks>
+internal static class TicketClient
+{
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    /// <summary>The route the ticket endpoints hang off.</summary>
+    public const string Tickets = "/api/v1/tickets";
+
+    /// <summary>
+    /// A department to file tickets against.
+    /// </summary>
+    /// <remarks>
+    /// Created rather than assumed: WP-0.6 deliberately does not re-seed the development
+    /// directory in <c>ResetAsync</c>, so every suite starts from an empty tree and builds
+    /// exactly what it asserts on. The seeded development accounts carry no department
+    /// either — <c>users.department_id</c> exists and nothing populates it yet — so a
+    /// create request has to name one.
+    /// </remarks>
+    /// <param name="admin">An admin client, since department writes are Admin-only.</param>
+    /// <param name="name">The department name.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The created department's id.</returns>
+    public static async Task<Guid> DepartmentAsync(
+        HttpClient admin,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var department = await DirectoryClient.CreateDepartmentAsync(admin, name, code: null, cancellationToken);
+        return department.Id;
+    }
+
+    /// <summary>Raises a ticket and returns it, failing loudly if the call did not succeed.</summary>
+    /// <param name="client">The signed-in client raising it.</param>
+    /// <param name="reference">The category and priority to file against.</param>
+    /// <param name="departmentId">The department to file against.</param>
+    /// <param name="subject">The subject line.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="requesterId">Who it is for, or null for the caller.</param>
+    /// <param name="priorityId">Overrides the priority in <paramref name="reference"/>.</param>
+    /// <returns>The created ticket.</returns>
+    public static async Task<TicketDetailDto> CreateAsync(
+        HttpClient client,
+        TicketWriter.ReferenceData reference,
+        Guid departmentId,
+        string subject,
+        CancellationToken cancellationToken,
+        Guid? requesterId = null,
+        Guid? priorityId = null)
+    {
+        var response = await PostAsync(
+            client,
+            reference,
+            departmentId,
+            subject,
+            cancellationToken,
+            requesterId,
+            priorityId);
+
+        response.EnsureSuccessStatusCode();
+        return await ApiClient.ReadAsync<TicketDetailDto>(response, cancellationToken);
+    }
+
+    /// <summary>Posts a create request and hands back the raw response, so a test can assert on a refusal.</summary>
+    /// <param name="client">The signed-in client raising it.</param>
+    /// <param name="reference">The category and priority to file against.</param>
+    /// <param name="departmentId">The department to file against, or null to omit it.</param>
+    /// <param name="subject">The subject line.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="requesterId">Who it is for, or null to omit it.</param>
+    /// <param name="priorityId">Overrides the priority in <paramref name="reference"/>.</param>
+    /// <param name="categoryId">Overrides the category in <paramref name="reference"/>.</param>
+    /// <returns>The raw response.</returns>
+    public static Task<HttpResponseMessage> PostAsync(
+        HttpClient client,
+        TicketWriter.ReferenceData reference,
+        Guid? departmentId,
+        string subject,
+        CancellationToken cancellationToken,
+        Guid? requesterId = null,
+        Guid? priorityId = null,
+        Guid? categoryId = null) =>
+        ApiClient.SendAsync(
+            client,
+            HttpMethod.Post,
+            Tickets,
+            new
+            {
+                subject,
+                description = "It stops charging at 40% and the light goes amber.",
+                categoryId = categoryId ?? reference.CategoryId,
+                priorityId = priorityId ?? reference.PriorityId,
+                requesterId,
+                departmentId,
+            },
+            cancellationToken);
+
+    /// <summary>Reads one ticket, returning both the body and the ETag the response carried.</summary>
+    /// <param name="client">The signed-in client.</param>
+    /// <param name="ticketId">The ticket to read.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The ticket and its entity tag.</returns>
+    public static async Task<(TicketDetailDto Ticket, string ETag)> GetAsync(
+        HttpClient client,
+        Guid ticketId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+
+        var response = await client.GetAsync(new Uri($"{Tickets}/{ticketId}", UriKind.Relative), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var ticket = await ApiClient.ReadAsync<TicketDetailDto>(response, cancellationToken);
+        return (ticket, response.Headers.ETag?.ToString() ?? string.Empty);
+    }
+
+    /// <summary>Moves a ticket's status, optionally stating an <c>If-Match</c> precondition.</summary>
+    /// <param name="client">A technician or admin client.</param>
+    /// <param name="ticketId">The ticket to move.</param>
+    /// <param name="status">The destination.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="resolutionNotes">The resolution, when resolving.</param>
+    /// <param name="ifMatch">The entity tag to require, or null to state no precondition.</param>
+    /// <returns>The raw response.</returns>
+    public static async Task<HttpResponseMessage> ChangeStatusAsync(
+        HttpClient client,
+        Guid ticketId,
+        TicketStatus status,
+        CancellationToken cancellationToken,
+        string? resolutionNotes = null,
+        string? ifMatch = null)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{Tickets}/{ticketId}/status-changes")
+        {
+            Content = JsonContent.Create(
+                new { status = status.ToString(), resolutionNotes },
+                options: Json),
+        };
+
+        if (ifMatch is not null)
+        {
+            // Added without validation, so a test can send a deliberately malformed tag.
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        var csrf = await client.GetFromJsonAsync<CsrfDto>(
+            new Uri("/api/v1/auth/csrf", UriKind.Relative),
+            Json,
+            cancellationToken)
+            ?? throw new InvalidOperationException("No antiforgery token was issued.");
+
+        request.Headers.Add(csrf.HeaderName, csrf.Token);
+        return await client.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>Reads a page of the queue.</summary>
+    /// <param name="client">The signed-in client.</param>
+    /// <param name="query">The query string, without the leading question mark.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The page envelope.</returns>
+    public static Task<Api.PageDto<TicketListItemDto>> ListAsync(
+        HttpClient client,
+        string query,
+        CancellationToken cancellationToken) =>
+        ApiClient.ListAsync<TicketListItemDto>(
+            client,
+            query.Length == 0 ? Tickets : $"{Tickets}?{query}",
+            cancellationToken);
+
+    /// <summary>The id of one of the seeded development accounts.</summary>
+    /// <param name="fixture">The booted host.</param>
+    /// <param name="userName">The account: <c>admin</c>, <c>tech</c>, or <c>user</c>.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>That account's user id.</returns>
+    public static async Task<Guid> UserIdAsync(
+        IdentityWebFixture fixture,
+        string userName,
+        CancellationToken cancellationToken)
+    {
+        using var client = await AuthClient.SignedInAsync(fixture, userName, cancellationToken);
+        var response = await AuthClient.MeAsync(client, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var me = await AuthClient.ReadUserAsync(response, cancellationToken);
+        return me.Id;
+    }
+
+    private sealed record CsrfDto(string HeaderName, string Token);
+}

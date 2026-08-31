@@ -3,6 +3,7 @@ using Itms.Modules.Helpdesk.Auditing;
 using Itms.Modules.Helpdesk.Domain;
 using Itms.Modules.Helpdesk.Features.TicketHistory;
 using Itms.Modules.Helpdesk.Persistence;
+using Itms.Modules.Helpdesk.Persistence.Configurations;
 using Itms.Platform.Data;
 using Itms.Platform.Identity;
 using Itms.Platform.Results;
@@ -44,11 +45,17 @@ internal sealed class ChangeTicketStatusHandler(
     /// <summary>Applies <paramref name="request"/> to the ticket.</summary>
     /// <param name="ticketId">The ticket to move.</param>
     /// <param name="request">The destination, and the resolution notes if it is Resolved.</param>
+    /// <param name="expectedVersions">
+    /// The row versions the caller's <c>If-Match</c> will accept, or <see langword="null"/>
+    /// when it stated no precondition. WP-1.5 added this; a request without the header
+    /// behaves exactly as it did before.
+    /// </param>
     /// <param name="cancellationToken">Cancels the work and rolls back.</param>
     /// <returns>The transition that happened, or the failure that stopped it.</returns>
     public async Task<Result<TicketStatusChangeResponse>> HandleAsync(
         Guid ticketId,
         ChangeTicketStatusRequest request,
+        IReadOnlySet<uint>? expectedVersions,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -70,6 +77,17 @@ internal sealed class ChangeTicketStatusHandler(
                 if (ticket is null)
                 {
                     failure = HelpdeskErrors.TicketNotFound();
+                    return;
+                }
+
+                // The caller's precondition, checked before anything is attempted. That is
+                // the whole point of the 412: a stale editor finds out here, having typed
+                // nothing, rather than at SaveChanges having typed a resolution. The row is
+                // already loaded and locked by the read, so this cannot itself race.
+                if (expectedVersions is not null
+                    && !expectedVersions.Contains(database.Entry(ticket).Property<uint>(TicketConfiguration.VersionProperty).CurrentValue))
+                {
+                    failure = HelpdeskErrors.TicketPreconditionFailed();
                     return;
                 }
 

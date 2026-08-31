@@ -31,9 +31,141 @@ internal static class HelpdeskErrors
     public static Error DuplicatePriorityCode(string code) =>
         Error.Conflict("helpdesk.duplicate_priority_code", $"A ticket priority with the code '{code}' already exists.");
 
-    /// <summary>The ticket does not exist, or has been soft-deleted.</summary>
+    /// <summary>
+    /// The ticket does not exist, has been soft-deleted, or belongs to somebody else.
+    /// </summary>
+    /// <remarks>
+    /// The third case is deliberate and is the one exception ARCHITECTURE.md §6 allows to
+    /// "forbidden is 403 and never a 404 disguise": a User asking after a ticket they did
+    /// not raise gets the same answer as one asking after a ticket that was never issued,
+    /// because telling them apart would let any account walk the id space and count what
+    /// it cannot see. <see cref="Features.Tickets.TicketScope"/> is what makes the two
+    /// indistinguishable, by never returning the row in the first place.
+    /// </remarks>
     public static Error TicketNotFound() =>
         Error.NotFound("helpdesk.ticket_not_found", "No such ticket.");
+
+    /// <summary>The category exists but has been retired, so no new ticket may be filed against it.</summary>
+    /// <remarks>
+    /// Retired rather than deleted is WP-1.1's call — existing tickets keep pointing at it
+    /// and keep rendering its name. Only creation is refused.
+    /// </remarks>
+    public static Error CategoryRetired() =>
+        Error.Validation(
+            "helpdesk.category_retired",
+            "That ticket category has been retired. Choose another.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["categoryId"] = ["That ticket category has been retired. Choose another."],
+            });
+
+    /// <summary>The priority exists but has been retired.</summary>
+    public static Error PriorityRetired() =>
+        Error.Validation(
+            "helpdesk.priority_retired",
+            "That ticket priority has been retired. Choose another.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["priorityId"] = ["That ticket priority has been retired. Choose another."],
+            });
+
+    /// <summary>No such user, as far as Identity is concerned.</summary>
+    public static Error RequesterNotFound() =>
+        Error.Validation(
+            "helpdesk.requester_not_found",
+            "No such user.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["requesterId"] = ["No such user."],
+            });
+
+    /// <summary>The requester's account has been deactivated.</summary>
+    /// <remarks>
+    /// Invariant 9 keeps a deactivated person's existing tickets; it does not say new ones
+    /// may be raised for them, and a ticket nobody can be contacted about is not worth
+    /// filing.
+    /// </remarks>
+    public static Error RequesterInactive() =>
+        Error.Validation(
+            "helpdesk.requester_inactive",
+            "That account has been deactivated, so a ticket cannot be raised for it.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["requesterId"] = ["That account has been deactivated, so a ticket cannot be raised for it."],
+            });
+
+    /// <summary>
+    /// A User tried to raise a ticket naming somebody else as the requester.
+    /// </summary>
+    /// <remarks>
+    /// A 403 rather than quietly substituting the caller's own id, at the human's
+    /// direction: silent coercion hides both a client bug and an attempt to file under
+    /// another name, and neither should look like success.
+    /// </remarks>
+    public static Error RequesterNotSelf() =>
+        Error.Forbidden(
+            "helpdesk.requester_not_self",
+            "You can only raise a ticket for yourself.");
+
+    /// <summary>No such department, as far as Directory is concerned.</summary>
+    public static Error DepartmentNotFound() =>
+        Error.Validation(
+            "helpdesk.department_not_found",
+            "No such department.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["departmentId"] = ["No such department."],
+            });
+
+    /// <summary>The department exists but has been retired.</summary>
+    public static Error DepartmentRetired() =>
+        Error.Validation(
+            "helpdesk.department_retired",
+            "That department has been retired. Choose another.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["departmentId"] = ["That department has been retired. Choose another."],
+            });
+
+    /// <summary>
+    /// No department was given and the requester has none on their account to fall back
+    /// to.
+    /// </summary>
+    /// <remarks>
+    /// Invariant 1 does not name the department, but the column is <c>NOT NULL</c> and
+    /// SPEC.md §2 lists it among a ticket's fields, so a ticket has to arrive with one.
+    /// The fallback exists so an end user filing their own ticket does not have to answer
+    /// a question their account already answers.
+    /// </remarks>
+    public static Error DepartmentRequired() =>
+        Error.Validation(
+            "helpdesk.department_required",
+            "Choose a department: the requester's account does not name one.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["departmentId"] = ["Choose a department: the requester's account does not name one."],
+            });
+
+    /// <summary>
+    /// The caller's <c>If-Match</c> names a version the ticket has moved past.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A 412, not a 409, and the difference is that <b>nothing was attempted</b>: the
+    /// precondition was checked before the transition, so the caller can reload and retype
+    /// nothing. <see cref="TicketChangedConcurrently"/> is the other one — the write was
+    /// attempted and lost a race.
+    /// </para>
+    /// <para>
+    /// It carries the same code as that conflict on purpose. Both mean "your copy of this
+    /// ticket is stale, reload it", which is the one thing a client does about either; the
+    /// status is what separates them for anybody who cares which happened.
+    /// </para>
+    /// </remarks>
+    public static Error TicketPreconditionFailed() =>
+        Error.PreconditionFailed(
+            "helpdesk.ticket_conflict",
+            "The ticket has changed since you loaded it. Reload it and try again.");
 
     /// <summary>
     /// The move is not one SPEC.md §2 allows. A 409 rather than a 400: the request was

@@ -387,6 +387,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reads the ticket queue, filtered, sorted, and paged.
+         * @description A Technician or an Admin reads every ticket; anybody else reads only the tickets they raised. Defaults to newest first.
+         */
+        get: operations["ListTickets"];
+        put?: never;
+        /**
+         * Raises a ticket.
+         * @description A User may only raise a ticket for themselves and is refused with 403 for naming anybody else. The requester defaults to the caller and the department to the requester's own.
+         */
+        post: operations["CreateTicket"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reads one ticket in full, with the head of its timeline.
+         * @description Carries an ETag naming the ticket's current version. Send it back as If-Match on a status change to be told the ticket has moved before the change is attempted.
+         */
+        get: operations["GetTicket"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{id}/history": {
         parameters: {
             query?: never;
@@ -413,7 +457,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Moves a ticket to another status, refusing any transition SPEC.md §2 does not allow. */
+        /**
+         * Moves a ticket to another status, refusing any transition SPEC.md §2 does not allow.
+         * @description Send the ticket's ETag as If-Match to be refused with 412 if it has moved since you read it. Without the header the request proceeds and a lost race is a 409.
+         */
         post: operations["ChangeTicketStatus"];
         delete?: never;
         options?: never;
@@ -534,6 +581,35 @@ export interface components {
              * @description Minutes from creation within which the ticket should be resolved.
              */
             resolutionTargetMinutes: number | string;
+        };
+        /** @description Raises a ticket. */
+        CreateTicketRequest: {
+            /** @description The one-line summary. SPEC.md §2 calls this the title, and a form should label it so. */
+            subject: string;
+            /** @description What is wrong, in the requester's words. */
+            description: string;
+            /**
+             * Format: uuid
+             * @description What the ticket is about. Must name a category that has not been retired.
+             */
+            categoryId: string;
+            /**
+             * Format: uuid
+             * @description How urgent it is. Must name a priority that has not been retired.
+             */
+            priorityId: string;
+            /**
+             * Format: uuid
+             * @description Who the ticket is for, or `null` for the caller. Only a Technician or
+             *     an Admin may name somebody else.
+             */
+            requesterId?: null | string;
+            /**
+             * Format: uuid
+             * @description The department to file it against, or `null` to take the requester's
+             *     own.
+             */
+            departmentId?: null | string;
         };
         /** @description The token the browser needs before it may post to a credential endpoint. */
         CsrfTokenResponse: {
@@ -777,6 +853,37 @@ export interface components {
          *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
          *     object so the shape reaches OpenAPI and, from there, the generated client.
          */
+        PagedResultOfTicketListItemResponse: {
+            /** @description The items on this page. */
+            items: components["schemas"]["TicketListItemResponse"][];
+            /**
+             * Format: int32
+             * @description The total number of matching items across all pages.
+             */
+            total: number | string;
+            /**
+             * Format: int32
+             * @description The 1-based page number this envelope represents.
+             */
+            page: number | string;
+            /**
+             * Format: int32
+             * @description The page size that was applied, after clamping.
+             */
+            pageSize: number | string;
+            /**
+             * Format: int32
+             * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
+             */
+            totalPages?: number | string;
+            /** @description True when a further page exists. */
+            hasNextPage?: boolean;
+        };
+        /**
+         * @description The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as
+         *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
+         *     object so the shape reaches OpenAPI and, from there, the generated client.
+         */
         PagedResultOfTicketPriorityResponse: {
             /** @description The items on this page. */
             items: components["schemas"]["TicketPriorityResponse"][];
@@ -820,6 +927,8 @@ export interface components {
                 [key: string]: string[];
             };
         };
+        /** @enum {unknown} */
+        SortDirection: "Ascending" | "Descending" | null;
         /** @description A ticket category as the API renders it. */
         TicketCategoryResponse: {
             /**
@@ -854,6 +963,116 @@ export interface components {
          * @enum {unknown}
          */
         TicketChangeKind: "Status" | "Priority" | "Assignment" | "Resolution";
+        /** @description One ticket in full, as the detail screen reads it. */
+        TicketDetailResponse: {
+            /**
+             * Format: uuid
+             * @description The ticket's id.
+             */
+            id: string;
+            /** @description The human-readable number, `TKT-####`. */
+            number: string;
+            /** @description The one-line summary. */
+            subject: string;
+            /** @description What the requester reported. */
+            description: string;
+            /** @description Where it sits in the workflow. */
+            status: components["schemas"]["TicketStatus"];
+            /**
+             * Format: uuid
+             * @description What it is about.
+             */
+            categoryId: string;
+            /** @description That category's name, as it reads now. */
+            categoryName: string;
+            /**
+             * Format: uuid
+             * @description How urgent it is.
+             */
+            priorityId: string;
+            /** @description That priority's name, as it reads now. */
+            priorityName: string;
+            /** @description That priority's stable key, for colour and for rules. */
+            priorityCode: string;
+            /**
+             * Format: int32
+             * @description Its ordering weight.
+             */
+            priorityRank: number | string;
+            /**
+             * Format: uuid
+             * @description Who the ticket is for.
+             */
+            requesterId: string;
+            /** @description Their display name, cached at creation. */
+            requesterName: string;
+            /**
+             * Format: uuid
+             * @description The department it is filed against.
+             */
+            departmentId: string;
+            /** @description That department's name, cached at creation. */
+            departmentName: string;
+            /**
+             * Format: uuid
+             * @description The technician responsible, or `null`.
+             */
+            assigneeId: null | string;
+            /** @description Their display name, or `null`. */
+            assigneeName: null | string;
+            /** @description What was done, once it has been resolved. Kept through a reopen. */
+            resolutionNotes: null | string;
+            /**
+             * Format: date-time
+             * @description When it was resolved (UTC), or `null`.
+             */
+            resolvedAt: null | string;
+            /**
+             * Format: date-time
+             * @description When it was closed (UTC), or `null`.
+             */
+            closedAt: null | string;
+            /**
+             * Format: uuid
+             * @description The asset it concerns, or `null`. WP-2.5 sets it.
+             */
+            relatedAssetId: null | string;
+            /**
+             * Format: uuid
+             * @description The alert it was raised from, or `null`. WP-3.7 sets it.
+             */
+            relatedAlertId: null | string;
+            /**
+             * Format: date-time
+             * @description When it was raised (UTC).
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description When it last moved (UTC).
+             */
+            updatedAt: string;
+            /**
+             * Format: date-time
+             * @description When resolution is due, or `null` until WP-1.8 computes it.
+             */
+            dueAt: null | string;
+            /**
+             * @description The statuses this ticket may legally move to next, straight from the state
+             *     machine. Empty once the ticket is terminal.
+             */
+            allowedNextStatuses?: components["schemas"]["TicketStatus"][];
+            /**
+             * @description The head of the ticket's timeline, newest first — at most
+             *     int TicketDetailResponse.EmbeddedHistoryCount entries.
+             */
+            history?: components["schemas"]["TicketHistoryEntryResponse"][];
+            /**
+             * @description True when the ticket's timeline is longer than what
+             *     IReadOnlyList&lt;TicketHistoryEntryResponse&gt; TicketDetailResponse.History carries, so a client knows to offer the paged endpoint.
+             */
+            hasMoreHistory?: boolean;
+        };
         /** @description One line of a ticket's timeline, as the API renders it. */
         TicketHistoryEntryResponse: {
             /**
@@ -885,6 +1104,77 @@ export interface components {
             actorId: null | string;
             /** @description Their display name at the time, or `null`. */
             actorName: null | string;
+        };
+        /** @description One row of the ticket queue, as the API renders it. */
+        TicketListItemResponse: {
+            /**
+             * Format: uuid
+             * @description The ticket's id.
+             */
+            id: string;
+            /** @description The human-readable number, `TKT-####`. */
+            number: string;
+            /** @description The one-line summary. SPEC.md §2 calls this the title, and a UI should label it so. */
+            subject: string;
+            /** @description Where it sits in the workflow. */
+            status: components["schemas"]["TicketStatus"];
+            /**
+             * Format: uuid
+             * @description What it is about.
+             */
+            categoryId: string;
+            /** @description That category's name, as it reads now. */
+            categoryName: string;
+            /**
+             * Format: uuid
+             * @description How urgent it is.
+             */
+            priorityId: string;
+            /** @description That priority's name, as it reads now. */
+            priorityName: string;
+            /** @description That priority's stable key, for colour and for rules. */
+            priorityCode: string;
+            /**
+             * Format: int32
+             * @description Its ordering weight, so a client can sort a page it already holds.
+             */
+            priorityRank: number | string;
+            /**
+             * Format: uuid
+             * @description Who the ticket is for.
+             */
+            requesterId: string;
+            /** @description Their display name, cached at creation. */
+            requesterName: string;
+            /**
+             * Format: uuid
+             * @description The department it is filed against.
+             */
+            departmentId: string;
+            /** @description That department's name, cached at creation. */
+            departmentName: string;
+            /**
+             * Format: uuid
+             * @description The technician responsible, or `null` while unassigned.
+             */
+            assigneeId: null | string;
+            /** @description Their display name, or `null`. */
+            assigneeName: null | string;
+            /**
+             * Format: date-time
+             * @description When it was raised (UTC). The queue's "age" column is computed from this.
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description When it last moved (UTC).
+             */
+            updatedAt: string;
+            /**
+             * Format: date-time
+             * @description When resolution is due, or `null` until WP-1.8 computes it.
+             */
+            dueAt: null | string;
         };
         /** @description A ticket priority as the API renders it. */
         TicketPriorityResponse: {
@@ -927,6 +1217,8 @@ export interface components {
              */
             updatedAt: string;
         };
+        /** @enum {unknown} */
+        TicketSort: "CreatedAt" | "UpdatedAt" | "Priority" | "Number" | "DueAt" | null;
         /**
          * @description Where a ticket sits in the workflow SPEC.md §2 defines.
          * @enum {unknown}
@@ -2376,6 +2668,167 @@ export interface operations {
             };
         };
     };
+    ListTickets: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["TicketStatus"][];
+                priorityId?: string;
+                categoryId?: string;
+                assigneeId?: string;
+                unassigned?: boolean;
+                departmentId?: string;
+                requesterId?: string;
+                createdFrom?: string;
+                createdTo?: string;
+                sort?: components["schemas"]["TicketSort"];
+                direction?: components["schemas"]["SortDirection"];
+                page?: number | string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfTicketListItemResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateTicket: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTicketRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketDetailResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetTicket: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketDetailResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListTicketHistory: {
         parameters: {
             query?: {
@@ -2490,6 +2943,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
                 headers: {
                     [name: string]: unknown;
                 };

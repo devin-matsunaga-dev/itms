@@ -1,4 +1,5 @@
 using Itms.Contracts.Events;
+using Itms.Contracts.Messaging;
 using Itms.IntegrationTests.Identity;
 using Itms.Messaging.Abstractions;
 using Itms.Messaging.Outbox;
