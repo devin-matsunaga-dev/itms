@@ -35,6 +35,9 @@ public enum TicketSort
     /// <summary>The ticket number, which is also creation order — but reads as a number to a person.</summary>
     Number,
 
-    /// <summary>When resolution is due. Tickets with no due date sort last. WP-1.8 fills the column.</summary>
+    /// <summary>
+    /// When resolution is due — the soonest first by default, because that is the end of
+    /// the queue somebody is triaging. Pauses are already folded into the column.
+    /// </summary>
     DueAt,
 }

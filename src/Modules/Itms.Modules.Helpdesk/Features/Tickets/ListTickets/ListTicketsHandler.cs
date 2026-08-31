@@ -3,6 +3,7 @@ using Itms.Modules.Helpdesk.Persistence;
 using Itms.Platform.Identity;
 using Itms.Platform.Paging;
 using Itms.Platform.Results;
+using Itms.Platform.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace Itms.Modules.Helpdesk.Features.Tickets.ListTickets;
@@ -23,7 +24,8 @@ namespace Itms.Modules.Helpdesk.Features.Tickets.ListTickets;
 /// </remarks>
 /// <param name="database">The helpdesk context.</param>
 /// <param name="currentUser">Who is asking. Decides how much of the queue exists.</param>
-internal sealed class ListTicketsHandler(HelpdeskDbContext database, ICurrentUser currentUser)
+/// <param name="clock">The system clock. Both the SLA filter and the SLA states on the rows are read against it.</param>
+internal sealed class ListTicketsHandler(HelpdeskDbContext database, ICurrentUser currentUser, IClock clock)
 {
     /// <summary>Reads a page of the queue.</summary>
     /// <param name="query">The filters and the ordering.</param>
@@ -37,7 +39,12 @@ internal sealed class ListTicketsHandler(HelpdeskDbContext database, ICurrentUse
 
         var page = PageRequest.Of(query.Page, query.PageSize);
 
-        var tickets = Filter(database.Tickets.AsNoTracking().VisibleTo(currentUser), query);
+        // Read once and used for the filter, the count, and every row's state, so a page
+        // cannot be filtered at one instant and described at another — a ticket that
+        // breached between the two would come back in the overdue view saying it was fine.
+        var now = clock.UtcNow;
+
+        var tickets = Filter(database.Tickets.AsNoTracking().VisibleTo(currentUser), query, now);
 
         var total = await tickets.CountAsync(cancellationToken).ConfigureAwait(false);
 
@@ -96,13 +103,11 @@ internal sealed class ListTicketsHandler(HelpdeskDbContext database, ICurrentUse
                 ? rows.OrderByDescending(r => r.Ticket.Number).ThenByDescending(r => r.Ticket.Id)
                 : rows.OrderBy(r => r.Ticket.Number).ThenBy(r => r.Ticket.Id),
 
-            // Nulls last in both directions: a ticket with no due date is not the most urgent
-            // thing in the queue, and PostgreSQL would sort it first descending.
+            // No nulls to sort around any more: WP-1.8 made due_at required, because every
+            // ticket has a priority and every priority carries a resolution target.
             TicketSort.DueAt => descending
-                ? rows.OrderBy(r => r.Ticket.DueAt == null)
-                      .ThenByDescending(r => r.Ticket.DueAt).ThenByDescending(r => r.Ticket.Id)
-                : rows.OrderBy(r => r.Ticket.DueAt == null)
-                      .ThenBy(r => r.Ticket.DueAt).ThenBy(r => r.Ticket.Id),
+                ? rows.OrderByDescending(r => r.Ticket.DueAt).ThenByDescending(r => r.Ticket.Id)
+                : rows.OrderBy(r => r.Ticket.DueAt).ThenBy(r => r.Ticket.Id),
 
             _ => descending
                 ? rows.OrderByDescending(r => r.Ticket.CreatedAt).ThenByDescending(r => r.Ticket.Id)
@@ -131,11 +136,29 @@ internal sealed class ListTicketsHandler(HelpdeskDbContext database, ICurrentUse
                 r.Ticket.AssigneeName,
                 r.Ticket.CreatedAt,
                 r.Ticket.UpdatedAt,
-                r.Ticket.DueAt))
+                r.Ticket.DueAt,
+                new TicketSlaResponse(
+                    r.Ticket.ResponseTargetMinutes,
+                    r.Ticket.ResponseDueAt,
+                    r.Ticket.ResponseWarnAt,
+                    r.Ticket.RespondedAt,
+                    r.Ticket.ResolutionTargetMinutes,
+                    r.Ticket.DueAt,
+                    r.Ticket.ResolutionWarnAt,
+                    r.Ticket.ResolvedAt,
+                    r.Ticket.SlaPausedAt,
+                    r.Ticket.SlaPausedTotal)))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return PagedResult.From<TicketListItemResponse>(items, total, page);
+        // The states are the one thing the projection could not bring back: they are a
+        // comparison against the clock, not a column. Done here, over the page that was
+        // read, rather than per row inside the query.
+        var assessed = items
+            .Select(item => item with { Sla = item.Sla.Assessed(item.Status, now) })
+            .ToList();
+
+        return PagedResult.From<TicketListItemResponse>(assessed, total, page);
     }
 
     /// <summary>Applies the filters that are actually present.</summary>
@@ -145,7 +168,11 @@ internal sealed class ListTicketsHandler(HelpdeskDbContext database, ICurrentUse
     /// PostgreSQL choose a plan for the parameter it was first given and then keep it for
     /// every other combination.
     /// </remarks>
-    private static IQueryable<Ticket> Filter(IQueryable<Ticket> tickets, ListTicketsQuery query)
+    /// <param name="tickets">The query, already scoped to what the caller may see.</param>
+    /// <param name="query">The filters asked for.</param>
+    /// <param name="now">The instant the SLA filter is read against.</param>
+    /// <returns>The narrowed query.</returns>
+    private static IQueryable<Ticket> Filter(IQueryable<Ticket> tickets, ListTicketsQuery query, DateTimeOffset now)
     {
         if (query.Status is { Length: > 0 } statuses)
         {
@@ -197,6 +224,11 @@ internal sealed class ListTicketsHandler(HelpdeskDbContext database, ICurrentUse
         if (query.CreatedTo is { } to)
         {
             tickets = tickets.Where(ticket => ticket.CreatedAt <= to);
+        }
+
+        if (query.SlaState is { } slaState)
+        {
+            tickets = tickets.WithSlaState(slaState, now);
         }
 
         return tickets;

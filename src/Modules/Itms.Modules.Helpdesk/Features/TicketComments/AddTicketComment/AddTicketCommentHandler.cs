@@ -32,6 +32,13 @@ namespace Itms.Modules.Helpdesk.Features.TicketComments.AddTicketComment;
 /// invented. The thread stays open when the workflow does not.
 /// </para>
 /// <para>
+/// <b>A public comment from anybody but the requester stops the SLA response clock.</b>
+/// That is WP-1.8's rule and it is applied here because this is where the fact arrives —
+/// see <see cref="Ticket.RecordResponse"/> for why an internal note and a requester's own
+/// reply do not count. The stamp is written in the same transaction as the comment, so a
+/// post that rolls back cannot leave the ticket claiming somebody answered it.
+/// </para>
+/// <para>
 /// <b>No domain event, deliberately.</b> ARCHITECTURE.md §5 names no comment event and
 /// nothing consumes one, so §8's <c>IAuditWriter</c> is what records this — a mutation that
 /// does not warrant an event. <b>WP-4.4 is expected to publish <c>TicketCommented</c></b>
@@ -109,6 +116,9 @@ internal sealed class AddTicketCommentHandler(
                 await session.EnlistAsync(database, token).ConfigureAwait(false);
 
                 database.TicketComments.Add(comment);
+
+                await StopResponseClockAsync(comment, token).ConfigureAwait(false);
+
                 await database.SaveChangesAsync(token).ConfigureAwait(false);
 
                 // Inside the transaction, so a post that rolls back leaves no entry saying
@@ -141,5 +151,47 @@ internal sealed class AddTicketCommentHandler(
             comment.AuthorId,
             comment.AuthorName,
             comment.CreatedAt));
+    }
+
+    /// <summary>
+    /// Records this comment as the ticket's first response, if that is what it is.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The ticket is loaded only when the comment could possibly count</b> — a public
+    /// one — and it is written only when it is the first. An internal note costs nothing,
+    /// and neither does the second reply on a busy thread: EF issues no <c>UPDATE</c> for
+    /// an entity nothing changed on.
+    /// </para>
+    /// <para>
+    /// <b>Tracked, which brings the <c>xmin</c> token with it.</b> A ticket moved by
+    /// somebody else between this read and the save makes the whole post fail with the
+    /// module's concurrency error rather than silently losing the stamp. The window is one
+    /// comment wide — the first public reply, and no other — which is why that trade is
+    /// worth making rather than reaching for a blind update that would write the column
+    /// from outside the entity.
+    /// </para>
+    /// </remarks>
+    /// <param name="comment">The comment being posted.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    private async Task StopResponseClockAsync(TicketComment comment, CancellationToken cancellationToken)
+    {
+        if (comment.IsInternal)
+        {
+            return;
+        }
+
+        var ticket = await database.Tickets
+            .FirstOrDefaultAsync(candidate => candidate.Id == comment.TicketId, cancellationToken)
+            .ConfigureAwait(false);
+
+        // Null only if the ticket was deleted between the visibility check and here; the
+        // comment insert would then fail on its own foreign key, which is the right failure.
+        if (ticket is null || ticket.RequesterId == comment.AuthorId)
+        {
+            return;
+        }
+
+        ticket.RecordResponse(comment.CreatedAt);
     }
 }

@@ -431,7 +431,14 @@ public sealed class TicketTransitionTests
             Guid.CreateVersion7(),
             "Water Operations",
             Guid.CreateVersion7(),
-            Guid.CreateVersion7()),
+            Guid.CreateVersion7(),
+            Targets),
         _clock.UtcNow,
         Author);
+
+    /// <summary>
+    /// The seeded Medium priority's targets — thirty minutes to respond, four hours to
+    /// resolve. Every ticket needs a pair; these tests are not about which.
+    /// </summary>
+    private static SlaTargets Targets => new(30, 240);
 }

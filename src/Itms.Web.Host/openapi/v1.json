@@ -1808,6 +1808,13 @@
             }
           },
           {
+            "name": "slaState",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SlaState"
+            }
+          },
+          {
             "name": "sort",
             "in": "query",
             "schema": {
@@ -3883,6 +3890,16 @@
           }
         }
       },
+      "SlaState": {
+        "enum": [
+          "Pending",
+          "Approaching",
+          "Breached",
+          "Met",
+          "Stopped"
+        ],
+        "description": "Where one of a ticket's two SLA clocks stands: SPEC.md §2's \"approaching (80%\nconsumed) and breached\", plus the three states those two flags only make sense\nagainst."
+      },
       "SortDirection": {
         "enum": [
           "Ascending",
@@ -4165,7 +4182,8 @@
           "relatedAlertId",
           "createdAt",
           "updatedAt",
-          "dueAt"
+          "dueAt",
+          "sla"
         ],
         "type": "object",
         "properties": {
@@ -4304,12 +4322,13 @@
             "format": "date-time"
           },
           "dueAt": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "When resolution is due, or `null` until WP-1.8 computes it.",
+            "type": "string",
+            "description": "When resolution is due, pauses included. The same instant as `sla.resolutionDueAt`,\nkept at the top level because the queue sorts on it and the wire has carried it since\nWP-1.5.",
             "format": "date-time"
+          },
+          "sla": {
+            "description": "Both SLA clocks, and where each stands right now.",
+            "$ref": "#/components/schemas/TicketSlaResponse"
           },
           "allowedNextStatuses": {
             "type": "array",
@@ -4442,7 +4461,8 @@
           "assigneeName",
           "createdAt",
           "updatedAt",
-          "dueAt"
+          "dueAt",
+          "sla"
         ],
         "type": "object",
         "properties": {
@@ -4538,12 +4558,13 @@
             "format": "date-time"
           },
           "dueAt": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "When resolution is due, or `null` until WP-1.8 computes it.",
+            "type": "string",
+            "description": "When resolution is due, pauses included. The same instant as `sla.resolutionDueAt`,\nkept at the top level because the queue sorts on it.",
             "format": "date-time"
+          },
+          "sla": {
+            "description": "Both SLA clocks, and where each stands right now.",
+            "$ref": "#/components/schemas/TicketSlaResponse"
           }
         },
         "description": "One row of the ticket queue, as the API renders it."
@@ -4626,6 +4647,106 @@
           }
         },
         "description": "A ticket priority as the API renders it."
+      },
+      "TicketSlaResponse": {
+        "required": [
+          "responseTargetMinutes",
+          "responseDueAt",
+          "responseWarnAt",
+          "respondedAt",
+          "resolutionTargetMinutes",
+          "resolutionDueAt",
+          "resolutionWarnAt",
+          "resolvedAt",
+          "pausedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "responseTargetMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Minutes the priority allowed for a response when the ticket was filed.",
+            "format": "int32"
+          },
+          "responseDueAt": {
+            "type": "string",
+            "description": "When the response target expires. A pause never moves it.",
+            "format": "date-time"
+          },
+          "responseWarnAt": {
+            "type": "string",
+            "description": "When 80% of the response target is consumed.",
+            "format": "date-time"
+          },
+          "respondedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When somebody first answered — the first public comment from anybody but the requester,\nor the resolution — or `null` while nobody has.",
+            "format": "date-time"
+          },
+          "resolutionTargetMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Minutes the priority allowed for a resolution when the ticket was filed.",
+            "format": "int32"
+          },
+          "resolutionDueAt": {
+            "type": "string",
+            "description": "When the resolution target expires, every pause so far included. The same instant the\nticket's own `dueAt` carries; it is repeated here so the SLA object reads on its\nown.",
+            "format": "date-time"
+          },
+          "resolutionWarnAt": {
+            "type": "string",
+            "description": "When 80% of the resolution target is consumed.",
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the resolution clock stopped, or `null` while it runs. The ticket's\nown resolution instant, seen from the SLA's side.",
+            "format": "date-time"
+          },
+          "pausedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the ticket entered Waiting, or `null` when the clock is running.",
+            "format": "date-time"
+          },
+          "responseState": {
+            "description": "Where the response clock stands. Filled by TicketSlaResponse TicketSlaResponse.Assessed(TicketStatus status, DateTimeOffset now).",
+            "$ref": "#/components/schemas/SlaState"
+          },
+          "resolutionState": {
+            "description": "Where the resolution clock stands. Filled by TicketSlaResponse TicketSlaResponse.Assessed(TicketStatus status, DateTimeOffset now).",
+            "$ref": "#/components/schemas/SlaState"
+          },
+          "isPaused": {
+            "type": "boolean",
+            "description": "Whether the resolution clock is parked because the ticket is Waiting."
+          },
+          "pausedSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How long the ticket has spent Waiting in total, in whole seconds.",
+            "format": "int64"
+          }
+        },
+        "description": "A ticket's two SLA clocks as the API renders them: what was promised, when each\ndeadline falls, and where each clock stands right now."
       },
       "TicketSort": {
         "enum": [

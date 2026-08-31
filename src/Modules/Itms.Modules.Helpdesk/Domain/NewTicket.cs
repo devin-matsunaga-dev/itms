@@ -19,6 +19,12 @@ namespace Itms.Modules.Helpdesk.Domain;
 /// Helpdesk's own rows, so they are ids alone and a rename reaches every ticket without
 /// anything being copied.
 /// </para>
+/// <para>
+/// <b>The priority is the one exception, and it is copied on purpose.</b> Its
+/// <see cref="SlaTargets"/> travel alongside its id because a target is editable and a
+/// ticket has to keep the promise made when it was filed — see <see cref="SlaTargets"/>.
+/// A rename still reaches the ticket; a retargeting does not.
+/// </para>
 /// </remarks>
 /// <param name="Subject">The one-line summary. SPEC.md §2 calls this the title; the domain event settled on subject.</param>
 /// <param name="Description">What the requester reported.</param>
@@ -28,6 +34,9 @@ namespace Itms.Modules.Helpdesk.Domain;
 /// <param name="DepartmentName">That department's name at creation, cached per §3 rule 6.</param>
 /// <param name="CategoryId">The category, a row in this module's own table.</param>
 /// <param name="PriorityId">The priority, a row in this module's own table.</param>
+/// <param name="Targets">
+/// The response and resolution targets that priority promises, read off the same row.
+/// </param>
 public sealed record NewTicket(
     string Subject,
     string Description,
@@ -36,4 +45,5 @@ public sealed record NewTicket(
     Guid DepartmentId,
     string DepartmentName,
     Guid CategoryId,
-    Guid PriorityId);
+    Guid PriorityId,
+    SlaTargets Targets);

@@ -1101,6 +1101,13 @@ export interface components {
                 [key: string]: string[];
             };
         };
+        /**
+         * @description Where one of a ticket's two SLA clocks stands: SPEC.md §2's "approaching (80%
+         *     consumed) and breached", plus the three states those two flags only make sense
+         *     against.
+         * @enum {unknown}
+         */
+        SlaState: "Pending" | "Approaching" | "Breached" | "Met" | "Stopped";
         /** @enum {unknown} */
         SortDirection: "Ascending" | "Descending" | null;
         /** @description What a ticket looks like immediately after its assignee changed. */
@@ -1336,9 +1343,13 @@ export interface components {
             updatedAt: string;
             /**
              * Format: date-time
-             * @description When resolution is due, or `null` until WP-1.8 computes it.
+             * @description When resolution is due, pauses included. The same instant as `sla.resolutionDueAt`,
+             *     kept at the top level because the queue sorts on it and the wire has carried it since
+             *     WP-1.5.
              */
-            dueAt: null | string;
+            dueAt: string;
+            /** @description Both SLA clocks, and where each stands right now. */
+            sla: components["schemas"]["TicketSlaResponse"];
             /**
              * @description The statuses this ticket may legally move to next, straight from the state
              *     machine. Empty once the ticket is terminal.
@@ -1475,9 +1486,12 @@ export interface components {
             updatedAt: string;
             /**
              * Format: date-time
-             * @description When resolution is due, or `null` until WP-1.8 computes it.
+             * @description When resolution is due, pauses included. The same instant as `sla.resolutionDueAt`,
+             *     kept at the top level because the queue sorts on it.
              */
-            dueAt: null | string;
+            dueAt: string;
+            /** @description Both SLA clocks, and where each stands right now. */
+            sla: components["schemas"]["TicketSlaResponse"];
         };
         /** @description A ticket priority as the API renders it. */
         TicketPriorityResponse: {
@@ -1519,6 +1533,72 @@ export interface components {
              * @description When it was last changed (UTC).
              */
             updatedAt: string;
+        };
+        /**
+         * @description A ticket's two SLA clocks as the API renders them: what was promised, when each
+         *     deadline falls, and where each clock stands right now.
+         */
+        TicketSlaResponse: {
+            /**
+             * Format: int32
+             * @description Minutes the priority allowed for a response when the ticket was filed.
+             */
+            responseTargetMinutes: number | string;
+            /**
+             * Format: date-time
+             * @description When the response target expires. A pause never moves it.
+             */
+            responseDueAt: string;
+            /**
+             * Format: date-time
+             * @description When 80% of the response target is consumed.
+             */
+            responseWarnAt: string;
+            /**
+             * Format: date-time
+             * @description When somebody first answered — the first public comment from anybody but the requester,
+             *     or the resolution — or `null` while nobody has.
+             */
+            respondedAt: null | string;
+            /**
+             * Format: int32
+             * @description Minutes the priority allowed for a resolution when the ticket was filed.
+             */
+            resolutionTargetMinutes: number | string;
+            /**
+             * Format: date-time
+             * @description When the resolution target expires, every pause so far included. The same instant the
+             *     ticket's own `dueAt` carries; it is repeated here so the SLA object reads on its
+             *     own.
+             */
+            resolutionDueAt: string;
+            /**
+             * Format: date-time
+             * @description When 80% of the resolution target is consumed.
+             */
+            resolutionWarnAt: string;
+            /**
+             * Format: date-time
+             * @description When the resolution clock stopped, or `null` while it runs. The ticket's
+             *     own resolution instant, seen from the SLA's side.
+             */
+            resolvedAt: null | string;
+            /**
+             * Format: date-time
+             * @description When the ticket entered Waiting, or `null` when the clock is running.
+             */
+            pausedAt: null | string;
+            /** @description Where the response clock stands. Filled by TicketSlaResponse TicketSlaResponse.Assessed(TicketStatus status, DateTimeOffset now). */
+            responseState?: components["schemas"]["SlaState"];
+            /** @description Where the resolution clock stands. Filled by TicketSlaResponse TicketSlaResponse.Assessed(TicketStatus status, DateTimeOffset now). */
+            resolutionState?: components["schemas"]["SlaState"];
+            /** @description Whether the resolution clock is parked because the ticket is Waiting. */
+            isPaused?: boolean;
+            /**
+             * Format: int64
+             * @description How long the ticket has spent Waiting in total, in whole seconds.
+             */
+            pausedSeconds?: number | string;
         };
         /** @enum {unknown} */
         TicketSort: "CreatedAt" | "UpdatedAt" | "Priority" | "Number" | "DueAt" | null;
@@ -2992,6 +3072,7 @@ export interface operations {
                 requesterId?: string;
                 createdFrom?: string;
                 createdTo?: string;
+                slaState?: components["schemas"]["SlaState"];
                 sort?: components["schemas"]["TicketSort"];
                 direction?: components["schemas"]["SortDirection"];
                 page?: number | string;

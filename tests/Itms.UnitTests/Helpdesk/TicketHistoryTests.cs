@@ -330,7 +330,8 @@ public sealed class TicketHistoryTests
             Guid.CreateVersion7(),
             "Water Operations",
             Guid.CreateVersion7(),
-            Medium);
+            Medium,
+            new SlaTargets(30, 240));
 
         var ticket = Ticket.Create("TKT-0001", draft, Now, Dana);
 

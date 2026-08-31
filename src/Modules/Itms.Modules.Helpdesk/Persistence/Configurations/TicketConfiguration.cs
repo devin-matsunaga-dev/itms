@@ -49,7 +49,21 @@ internal sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 
         builder.Property(t => t.AssigneeId).HasColumnName("assignee_id");
         builder.Property(t => t.AssigneeName).HasColumnName("assignee_name").HasMaxLength(Ticket.DisplayNameMaxLength);
-        builder.Property(t => t.DueAt).HasColumnName("due_at");
+        // The SLA columns. Every one of them is an instant or a span, never a flag: the
+        // state a screen shows is computed from these against IClock on each read, so
+        // nothing has to sweep the table to keep a boolean true. `due_at` is the resolution
+        // clock's deadline and keeps the name WP-1.2 gave it — the queue already sorts on
+        // it and the wire already carries it.
+        builder.Property(t => t.DueAt).HasColumnName("due_at").IsRequired();
+        builder.Property(t => t.ResponseTargetMinutes).HasColumnName("sla_response_target_minutes").IsRequired();
+        builder.Property(t => t.ResolutionTargetMinutes).HasColumnName("sla_resolution_target_minutes").IsRequired();
+        builder.Property(t => t.ResponseDueAt).HasColumnName("sla_response_due_at").IsRequired();
+        builder.Property(t => t.ResponseWarnAt).HasColumnName("sla_response_warn_at").IsRequired();
+        builder.Property(t => t.ResolutionWarnAt).HasColumnName("sla_resolution_warn_at").IsRequired();
+        builder.Property(t => t.RespondedAt).HasColumnName("sla_responded_at");
+        builder.Property(t => t.SlaPausedAt).HasColumnName("sla_paused_at");
+        builder.Property(t => t.SlaPausedTotal).HasColumnName("sla_paused_total").IsRequired();
+
         builder.Property(t => t.RelatedAssetId).HasColumnName("related_asset_id");
         builder.Property(t => t.RelatedAlertId).HasColumnName("related_alert_id");
         builder.Property(t => t.ResolutionNotes).HasColumnName("resolution_notes").HasMaxLength(Ticket.ResolutionNotesMaxLength);
@@ -119,5 +133,11 @@ internal sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.HasIndex(t => new { t.AssigneeId, t.Status }).HasDatabaseName("ix_tickets_assignee_status");
         builder.HasIndex(t => new { t.RequesterId, t.Status }).HasDatabaseName("ix_tickets_requester_status");
         builder.HasIndex(t => t.DepartmentId).HasDatabaseName("ix_tickets_department_id");
+
+        // The queue's due-date sort and the overdue filter both range over this column,
+        // and both are wanted with the ticket still open — which is why the status leads.
+        // Like the three above, it is a considered guess rather than a measurement;
+        // WP-6.4 owns the review against the query set that actually runs.
+        builder.HasIndex(t => new { t.Status, t.DueAt }).HasDatabaseName("ix_tickets_status_due_at");
     }
 }

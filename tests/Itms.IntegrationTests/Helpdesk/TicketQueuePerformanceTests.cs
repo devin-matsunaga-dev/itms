@@ -69,6 +69,12 @@ public sealed class TicketQueuePerformanceTests(IdentityWebFixture fixture) : IA
             "sort=DueAt",
             "sort=Number&direction=Ascending",
             "page=200&pageSize=100",
+
+            // WP-1.8's shape: the "Overdue" view WP-1.9 will draw. It is the one filter
+            // that compares two columns against the request's own instant rather than
+            // against a constant, so it is the one worth measuring at volume.
+            $"slaState={SlaState.Breached}",
+            $"slaState={SlaState.Pending}",
         ];
 
         var slow = new List<string>();
@@ -164,7 +170,9 @@ public sealed class TicketQueuePerformanceTests(IdentityWebFixture fixture) : IA
                 id, number, subject, description,
                 requester_id, requester_name, department_id, department_name,
                 category_id, priority_id, status,
-                created_at, created_by, updated_at, updated_by)
+                created_at, created_by, updated_at, updated_by,
+                due_at, sla_response_due_at, sla_response_warn_at, sla_resolution_warn_at,
+                sla_response_target_minutes, sla_resolution_target_minutes, sla_paused_total)
             FROM STDIN (FORMAT BINARY)
             """,
             Token))
@@ -197,6 +205,19 @@ public sealed class TicketQueuePerformanceTests(IdentityWebFixture fixture) : IA
                 await writer.WriteAsync(DBNull.Value, Token);
                 await writer.WriteAsync(createdAt, NpgsqlTypes.NpgsqlDbType.TimestampTz, Token);
                 await writer.WriteAsync(DBNull.Value, Token);
+
+                // WP-1.8's clocks, computed the way the entity computes them. Because the
+                // creation instants are spread backwards a minute at a time, most of these
+                // fifty thousand are already past their four-hour target — which is what
+                // gives the overdue filter a realistic amount of work to do.
+                var sla = TicketSla.Start(reference.Targets, createdAt);
+                await writer.WriteAsync(sla.ResolutionDueAt, NpgsqlTypes.NpgsqlDbType.TimestampTz, Token);
+                await writer.WriteAsync(sla.ResponseDueAt, NpgsqlTypes.NpgsqlDbType.TimestampTz, Token);
+                await writer.WriteAsync(sla.ResponseWarnAt, NpgsqlTypes.NpgsqlDbType.TimestampTz, Token);
+                await writer.WriteAsync(sla.ResolutionWarnAt, NpgsqlTypes.NpgsqlDbType.TimestampTz, Token);
+                await writer.WriteAsync(sla.Targets.ResponseMinutes, NpgsqlTypes.NpgsqlDbType.Integer, Token);
+                await writer.WriteAsync(sla.Targets.ResolutionMinutes, NpgsqlTypes.NpgsqlDbType.Integer, Token);
+                await writer.WriteAsync(sla.PausedTotal, NpgsqlTypes.NpgsqlDbType.Interval, Token);
             }
 
             await writer.CompleteAsync(Token);

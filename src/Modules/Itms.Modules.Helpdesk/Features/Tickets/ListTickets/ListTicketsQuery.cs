@@ -82,6 +82,25 @@ public sealed class ListTicketsQuery
     [FromQuery(Name = "createdTo")]
     public DateTimeOffset? CreatedTo { get; init; }
 
+    /// <summary>
+    /// Only tickets whose <em>resolution</em> clock reads this state. The "Overdue" view
+    /// WP-1.9 names is <c>?slaState=Breached</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The state is computed, not stored, so this is a comparison against the server's
+    /// clock at the moment of the request — see <c>TicketSlaFilter</c>. A ticket parked in
+    /// Waiting is judged at the instant it was parked, which is what stops it drifting into
+    /// the overdue view while nobody can work on it.
+    /// </para>
+    /// <para>
+    /// Single rather than repeatable, unlike <see cref="Status"/>: the five states are
+    /// mutually exclusive and no view has yet wanted two of them at once.
+    /// </para>
+    /// </remarks>
+    [FromQuery(Name = "slaState")]
+    public SlaState? SlaState { get; init; }
+
     /// <summary>What to order by. Defaults to <see cref="TicketSort.CreatedAt"/>.</summary>
     [FromQuery(Name = "sort")]
     public TicketSort? Sort { get; init; }

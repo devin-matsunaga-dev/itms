@@ -60,7 +60,12 @@ namespace Itms.Modules.Helpdesk.Features.Tickets;
 /// <param name="RelatedAlertId">The alert it was raised from, or <see langword="null"/>. WP-3.7 sets it.</param>
 /// <param name="CreatedAt">When it was raised (UTC).</param>
 /// <param name="UpdatedAt">When it last moved (UTC).</param>
-/// <param name="DueAt">When resolution is due, or <see langword="null"/> until WP-1.8 computes it.</param>
+/// <param name="DueAt">
+/// When resolution is due, pauses included. The same instant as <c>sla.resolutionDueAt</c>,
+/// kept at the top level because the queue sorts on it and the wire has carried it since
+/// WP-1.5.
+/// </param>
+/// <param name="Sla">Both SLA clocks, and where each stands right now.</param>
 public sealed record TicketDetailResponse(
     Guid Id,
     string Number,
@@ -86,7 +91,8 @@ public sealed record TicketDetailResponse(
     Guid? RelatedAlertId,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? DueAt)
+    DateTimeOffset DueAt,
+    TicketSlaResponse Sla)
 {
     /// <summary>
     /// How many comments and attachments the detail carries without being asked.
@@ -161,6 +167,20 @@ public sealed record TicketDetailResponse(
     public bool HasMoreAttachments { get; init; }
 
     /// <summary>
+    /// The same ticket with its SLA states filled in for <paramref name="now"/>.
+    /// </summary>
+    /// <remarks>
+    /// Every route that returns a detail — the read, and the create that reads itself back
+    /// through the same projection — calls this, because <see cref="Project"/> can only
+    /// bring back the stored instants: the states are a comparison against <c>IClock</c>
+    /// and the database is not the thing holding the clock.
+    /// </remarks>
+    /// <param name="now">The current instant, from <c>IClock</c>.</param>
+    /// <returns>The detail, with <see cref="Sla"/> assessed.</returns>
+    public TicketDetailResponse Assessed(DateTimeOffset now) =>
+        this with { Sla = Sla.Assessed(Status, now) };
+
+    /// <summary>
     /// Projects tickets to detail rows with their row versions.
     /// </summary>
     /// <remarks>
@@ -211,6 +231,17 @@ public sealed record TicketDetailResponse(
                 ticket.RelatedAlertId,
                 ticket.CreatedAt,
                 ticket.UpdatedAt,
-                ticket.DueAt),
+                ticket.DueAt,
+                new TicketSlaResponse(
+                    ticket.ResponseTargetMinutes,
+                    ticket.ResponseDueAt,
+                    ticket.ResponseWarnAt,
+                    ticket.RespondedAt,
+                    ticket.ResolutionTargetMinutes,
+                    ticket.DueAt,
+                    ticket.ResolutionWarnAt,
+                    ticket.ResolvedAt,
+                    ticket.SlaPausedAt,
+                    ticket.SlaPausedTotal)),
             EF.Property<uint>(ticket, TicketConfiguration.VersionProperty));
 }

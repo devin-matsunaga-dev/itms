@@ -44,7 +44,11 @@ public sealed class TicketCreateEndpointTests(IdentityWebFixture fixture) : IAsy
         ticket.AssigneeId.ShouldBeNull();
         ticket.ResolvedAt.ShouldBeNull();
         ticket.ClosedAt.ShouldBeNull();
-        ticket.DueAt.ShouldBeNull();
+
+        // WP-1.8: a ticket arrives with both clocks already running, so the due date is
+        // the priority's resolution target away from the creation instant rather than
+        // empty as it was through WP-1.7.
+        ticket.DueAt.ShouldBe(ticket.CreatedAt.AddMinutes(reference.Targets.ResolutionMinutes));
         ticket.History.ShouldBeEmpty();
         ticket.HasMoreHistory.ShouldBeFalse();
     }

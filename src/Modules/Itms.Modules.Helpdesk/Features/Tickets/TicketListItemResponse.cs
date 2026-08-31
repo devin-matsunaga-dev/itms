@@ -37,7 +37,11 @@ namespace Itms.Modules.Helpdesk.Features.Tickets;
 /// <param name="AssigneeName">Their display name, or <see langword="null"/>.</param>
 /// <param name="CreatedAt">When it was raised (UTC). The queue's "age" column is computed from this.</param>
 /// <param name="UpdatedAt">When it last moved (UTC).</param>
-/// <param name="DueAt">When resolution is due, or <see langword="null"/> until WP-1.8 computes it.</param>
+/// <param name="DueAt">
+/// When resolution is due, pauses included. The same instant as <c>sla.resolutionDueAt</c>,
+/// kept at the top level because the queue sorts on it.
+/// </param>
+/// <param name="Sla">Both SLA clocks, and where each stands right now.</param>
 public sealed record TicketListItemResponse(
     Guid Id,
     string Number,
@@ -57,7 +61,8 @@ public sealed record TicketListItemResponse(
     string? AssigneeName,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? DueAt)
+    DateTimeOffset DueAt,
+    TicketSlaResponse Sla)
 {
     // No projection expression here, deliberately. A list has to be ordered before it is
     // projected — EF cannot translate an OrderBy written over a constructed record, and the

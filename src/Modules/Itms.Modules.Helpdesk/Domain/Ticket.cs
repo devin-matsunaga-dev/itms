@@ -14,13 +14,15 @@ namespace Itms.Modules.Helpdesk.Domain;
 /// are written. <b>Who holds it</b> is WP-1.6's: <see cref="Assign"/> and
 /// <see cref="Unassign"/> are the only way <see cref="AssigneeId"/> ever changes, and each
 /// moves the status in the same call rather than leaving the two to be set separately.
+/// <b>What it owes and by when</b> is WP-1.8's: the SLA clocks are started by
+/// <see cref="Create"/>, paused and resumed by the status move itself, and read through
+/// <see cref="Sla"/>. Nothing outside this class writes them.
 /// </para>
 /// <para>
-/// <b>Why the forward fields are here and empty.</b> <see cref="AssigneeId"/>,
-/// <see cref="DueAt"/>, <see cref="RelatedAssetId"/>, <see cref="RelatedAlertId"/>,
-/// <see cref="ResolutionNotes"/>, <see cref="ResolvedAt"/>, <see cref="ClosedAt"/>, and
+/// <b>Why the forward fields are here and empty.</b> <see cref="RelatedAssetId"/>,
+/// <see cref="RelatedAlertId"/>, and
 /// <see cref="DeletedAt"/> are the rest of SPEC.md §2's field set. Their meaning is
-/// already fixed by the spec, so declaring them now costs nothing and lets WP-1.3 through
+/// already fixed by the spec, so declaring them now costs nothing and lets WP-2.5 and
 /// WP-3.7 add a method rather than a migration each. None of them has a setter yet: the
 /// package that owns the behaviour writes the method that moves the field.
 /// </para>
@@ -114,11 +116,65 @@ public sealed class Ticket
     public string? AssigneeName { get; private set; }
 
     /// <summary>
-    /// When resolution is due under the priority's target, or <see langword="null"/>
-    /// until WP-1.8 computes it. That package owns every clock question, this one holds
-    /// the column.
+    /// When resolution is due, pauses included. Always set — every ticket has a priority,
+    /// and every priority carries a resolution target.
     /// </summary>
-    public DateTimeOffset? DueAt { get; private set; }
+    /// <remarks>
+    /// The resolution clock's deadline, and the column the queue orders and filters on.
+    /// While the ticket is parked in Waiting it reads as the deadline stood when the clock
+    /// stopped; leaving Waiting pushes it forward by the length of the pause. Read it
+    /// through <see cref="Sla"/> rather than alone if what you want is a judgement — a
+    /// bare comparison against <c>now</c> is wrong for a paused ticket.
+    /// </remarks>
+    public DateTimeOffset DueAt { get; private set; }
+
+    /// <summary>Minutes the priority allowed for a response, as it read when the ticket was filed.</summary>
+    public int ResponseTargetMinutes { get; private set; }
+
+    /// <summary>Minutes the priority allowed for a resolution, as it read when the ticket was filed.</summary>
+    public int ResolutionTargetMinutes { get; private set; }
+
+    /// <summary>When the response target expires. Creation plus the target; a pause never moves it.</summary>
+    public DateTimeOffset ResponseDueAt { get; private set; }
+
+    /// <summary>When 80% of the response target is consumed.</summary>
+    public DateTimeOffset ResponseWarnAt { get; private set; }
+
+    /// <summary>When 80% of the resolution target is consumed. Moved by a pause exactly as <see cref="DueAt"/> is.</summary>
+    public DateTimeOffset ResolutionWarnAt { get; private set; }
+
+    /// <summary>
+    /// When somebody first answered, or <see langword="null"/> while nobody has. Write-once
+    /// — see <see cref="RecordResponse"/>.
+    /// </summary>
+    public DateTimeOffset? RespondedAt { get; private set; }
+
+    /// <summary>When the ticket entered Waiting, or <see langword="null"/> when the resolution clock is running.</summary>
+    public DateTimeOffset? SlaPausedAt { get; private set; }
+
+    /// <summary>How long the ticket has spent Waiting across every visit, excluding one in progress.</summary>
+    public TimeSpan SlaPausedTotal { get; private set; }
+
+    /// <summary>
+    /// Both SLA clocks, as one value.
+    /// </summary>
+    /// <remarks>
+    /// Composed from the columns above rather than stored: <see cref="TicketSla"/> is the
+    /// shape the arithmetic works against, and this is the ticket's own state read into it.
+    /// <see cref="TicketSla.ResolvedAt"/> is filled from <see cref="ResolvedAt"/> — the
+    /// resolution clock's stop instant is the ticket's own field, not a second copy of it,
+    /// and <see cref="WriteSla"/> never writes it back.
+    /// </remarks>
+    public TicketSla Sla => new(
+        new SlaTargets(ResponseTargetMinutes, ResolutionTargetMinutes),
+        ResponseDueAt,
+        ResponseWarnAt,
+        RespondedAt,
+        DueAt,
+        ResolutionWarnAt,
+        ResolvedAt,
+        SlaPausedAt,
+        SlaPausedTotal);
 
     /// <summary>The asset the ticket concerns, or <see langword="null"/>. WP-2.5 links it.</summary>
     public Guid? RelatedAssetId { get; private set; }
@@ -183,7 +239,7 @@ public sealed class Ticket
                 nameof(number));
         }
 
-        return new Ticket
+        var created = new Ticket
         {
             // v7 so the primary key is time-ordered and its index does not fragment.
             Id = Guid.CreateVersion7(),
@@ -202,6 +258,13 @@ public sealed class Ticket
             UpdatedAt = now,
             UpdatedBy = actor,
         };
+
+        // Both clocks start at creation, which is what SPEC.md §2 means by targets
+        // "measured against ticket creation". Started here rather than by the handler so
+        // there is no moment, and no code path, at which a ticket exists without an SLA.
+        created.WriteSla(TicketSla.Start(ticket.Targets, now));
+
+        return created;
     }
 
     /// <summary>
@@ -334,8 +397,9 @@ public sealed class Ticket
             case TicketStatus.Waiting:
             case TicketStatus.Cancelled:
                 // Neither writes a field of its own. Waiting's effect on the SLA clock is
-                // WP-1.8's, computed from the history rather than stored here, and there
-                // is no CancelledAt column: UpdatedAt and WP-1.4's history say when.
+                // handled below, with every other clock move; there is no CancelledAt
+                // column, and a cancelled ticket's SLA stops with no outcome rather than
+                // being frozen against UpdatedAt, which moves for unrelated reasons.
                 break;
 
             case TicketStatus.Assigned:
@@ -354,6 +418,34 @@ public sealed class Ticket
                 // already have failed CanTransition above.
                 return HelpdeskErrors.IllegalTransition(Status, target);
         }
+
+        // The SLA clocks move with the transition, here, rather than in the handler that
+        // asked for it. SPEC.md §2's "Waiting status pauses the resolution clock" is an
+        // invariant of the ticket, and a handler that had to remember to pause is one that
+        // can be written, reviewed, and merged having forgotten — WP-1.4 made the same
+        // call for the history entries, and for the same reason.
+        var sla = Sla;
+
+        // Leaving Waiting for anywhere at all, including Cancelled: the books close on the
+        // pause either way. Waiting → Waiting is not a legal move, so this cannot double.
+        if (Status == TicketStatus.Waiting)
+        {
+            sla = sla.Resume(now);
+        }
+
+        if (target == TicketStatus.Waiting)
+        {
+            sla = sla.Pause(now);
+        }
+
+        // Resolving stops the response clock too, if nothing else already has: a ticket
+        // that has been fixed cannot also be one nobody has answered.
+        if (target == TicketStatus.Resolved)
+        {
+            sla = sla.Respond(now);
+        }
+
+        WriteSla(sla);
 
         Status = target;
         UpdatedAt = now;
@@ -526,6 +618,95 @@ public sealed class Ticket
         UpdatedBy = actor;
 
         return Result.Success();
+    }
+
+    /// <summary>
+    /// Re-cuts both SLA clocks against <paramref name="targets"/>, keeping every pause the
+    /// ticket has already accrued.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is the SLA half of a priority change, and it has no caller in production
+    /// yet.</b> Nothing in the system moves a ticket's priority — STATUS.md has recorded
+    /// that path as unowned since WP-1.4, and WP-1.8 does not claim it, because an endpoint
+    /// for it needs an audit decision and possibly a domain event that
+    /// ARCHITECTURE.md §5 does not list. <b>Whichever package adds that path must call this
+    /// in the same transaction as the priority write</b>, taking the new priority's targets
+    /// through <see cref="SlaTargets.Of"/>; a priority change that left the old deadlines
+    /// standing would mean a Critical ticket still due under a Low target.
+    /// </para>
+    /// <para>
+    /// Deadlines are recomputed from creation, not from now — see
+    /// <see cref="TicketSla.Retarget"/> for why, and for what that means for a ticket
+    /// promoted after it has been open a long time.
+    /// </para>
+    /// </remarks>
+    /// <param name="targets">The new priority's targets.</param>
+    /// <param name="now">The current instant, from <c>IClock</c>.</param>
+    /// <param name="actor">Who is making the change.</param>
+    /// <exception cref="ArgumentOutOfRangeException">A target is out of range, or resolution is shorter than response.</exception>
+    public void RetargetSla(SlaTargets targets, DateTimeOffset now, Guid? actor)
+    {
+        WriteSla(Sla.Retarget(targets, CreatedAt));
+        UpdatedAt = now;
+        UpdatedBy = actor;
+    }
+
+    /// <summary>
+    /// Stops the response clock at <paramref name="respondedAt"/>, if it is still running.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>What counts as a response was settled at the human's direction:</b> the first
+    /// public comment from anybody but the requester, or the resolution — whichever comes
+    /// first. Assignment does not count. Being handed a ticket is not answering the person
+    /// who raised it, and SPEC.md §13 lists "technician response" among the things a
+    /// requester is notified about, which only makes sense of a communication.
+    /// </para>
+    /// <para>
+    /// <b>Write-once, and it does not touch <see cref="UpdatedAt"/>.</b> A second response
+    /// is ignored rather than refused, because the two callers — a comment being posted and
+    /// a ticket being resolved — must not fail because the other happened first. The
+    /// timestamp is left alone because bumping it on the first public comment and on no
+    /// other would make "last updated" mean two different things in one column.
+    /// </para>
+    /// </remarks>
+    /// <param name="respondedAt">When the response was made, from <c>IClock</c>.</param>
+    /// <returns><see langword="true"/> when this call is what recorded the response.</returns>
+    public bool RecordResponse(DateTimeOffset respondedAt)
+    {
+        if (RespondedAt is not null)
+        {
+            return false;
+        }
+
+        WriteSla(Sla.Respond(respondedAt));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Writes <paramref name="sla"/> back to the columns it was read from.
+    /// </summary>
+    /// <remarks>
+    /// The only writer of the SLA columns, and private, so every move of a clock goes
+    /// through one of the intent-named methods above.
+    /// <see cref="TicketSla.ResolvedAt"/> is deliberately not written back: the resolution
+    /// clock's stop instant is <see cref="ResolvedAt"/>, which <see cref="Move"/> owns, and
+    /// a second copy of it here would be a field that could disagree with the status.
+    /// </remarks>
+    /// <param name="sla">The clocks to store.</param>
+    private void WriteSla(TicketSla sla)
+    {
+        ResponseTargetMinutes = sla.Targets.ResponseMinutes;
+        ResolutionTargetMinutes = sla.Targets.ResolutionMinutes;
+        ResponseDueAt = sla.ResponseDueAt;
+        ResponseWarnAt = sla.ResponseWarnAt;
+        RespondedAt = sla.RespondedAt;
+        DueAt = sla.ResolutionDueAt;
+        ResolutionWarnAt = sla.ResolutionWarnAt;
+        SlaPausedAt = sla.PausedAt;
+        SlaPausedTotal = sla.PausedTotal;
     }
 
     private static Guid Required(Guid value, string field, string parameterName) =>

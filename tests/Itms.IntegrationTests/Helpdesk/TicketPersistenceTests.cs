@@ -85,10 +85,14 @@ public sealed class TicketPersistenceTests(IdentityWebFixture fixture) : IAsyncL
                 INSERT INTO helpdesk.tickets
                     (id, number, subject, description, requester_id, requester_name,
                      department_id, department_name, category_id, priority_id, status,
-                     created_at, updated_at)
+                     created_at, updated_at, due_at, sla_response_due_at, sla_response_warn_at,
+                     sla_resolution_warn_at, sla_response_target_minutes,
+                     sla_resolution_target_minutes, sla_paused_total)
                 SELECT gen_random_uuid(), number, subject, description, requester_id, requester_name,
                        department_id, department_name, category_id, priority_id, status,
-                       created_at, updated_at
+                       created_at, updated_at, due_at, sla_response_due_at, sla_response_warn_at,
+                       sla_resolution_warn_at, sla_response_target_minutes,
+                       sla_resolution_target_minutes, sla_paused_total
                 FROM helpdesk.tickets WHERE id = @id
                 """,
                 ("id", created.Id)));

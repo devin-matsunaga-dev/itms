@@ -120,6 +120,7 @@ internal sealed class CreateTicketHandler(
         }
 
         var priorityName = reference.Value.PriorityName;
+        var targets = reference.Value.Targets;
 
         TicketDetail? created = null;
 
@@ -142,7 +143,8 @@ internal sealed class CreateTicketHandler(
                         department.Id,
                         department.Name,
                         request.CategoryId,
-                        request.PriorityId),
+                        request.PriorityId,
+                        targets),
                     clock.UtcNow,
                     currentUser.UserId);
 
@@ -187,7 +189,7 @@ internal sealed class CreateTicketHandler(
 
         return Result.Success(detail with
         {
-            Response = detail.Response with
+            Response = detail.Response.Assessed(clock.UtcNow) with
             {
                 // A ticket nothing has happened to yet: an empty timeline, and the moves it
                 // can make read off the state machine like everywhere else.
@@ -267,7 +269,7 @@ internal sealed class CreateTicketHandler(
         var priority = await database.TicketPriorities
             .AsNoTracking()
             .Where(p => p.Id == request.PriorityId)
-            .Select(p => new { p.Name, p.IsActive })
+            .Select(p => new { p.Name, p.IsActive, p.ResponseTargetMinutes, p.ResolutionTargetMinutes })
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -277,11 +279,18 @@ internal sealed class CreateTicketHandler(
         }
 
         return priority.IsActive
-            ? Result.Success(new TicketReferenceData(priority.Name))
+            ? Result.Success(new TicketReferenceData(
+                priority.Name,
+                new SlaTargets(priority.ResponseTargetMinutes, priority.ResolutionTargetMinutes)))
             : Result.Failure<TicketReferenceData>(HelpdeskErrors.PriorityRetired());
     }
 
     /// <summary>What the reference-data check found that creation still needs afterwards.</summary>
     /// <param name="PriorityName">The priority's name, carried on <see cref="TicketCreated"/>.</param>
-    private sealed record TicketReferenceData(string PriorityName);
+    /// <param name="Targets">
+    /// The targets that priority promises right now, copied onto the ticket so a later edit
+    /// to them does not move a deadline already given (see <see cref="SlaTargets"/>). Read
+    /// in the same query as the name rather than in one of its own.
+    /// </param>
+    private sealed record TicketReferenceData(string PriorityName, SlaTargets Targets);
 }

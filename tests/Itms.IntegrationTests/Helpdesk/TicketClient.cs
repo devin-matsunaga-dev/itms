@@ -26,6 +26,35 @@ public sealed record TicketHistoryDto(
     Guid? ActorId,
     string? ActorName);
 
+/// <summary>A ticket's SLA clocks, as the API renders them.</summary>
+/// <param name="ResponseTargetMinutes">Minutes allowed for a response.</param>
+/// <param name="ResponseDueAt">When the response target expires.</param>
+/// <param name="ResponseWarnAt">When 80% of the response target is consumed.</param>
+/// <param name="RespondedAt">When somebody first answered, or null.</param>
+/// <param name="ResolutionTargetMinutes">Minutes allowed for a resolution.</param>
+/// <param name="ResolutionDueAt">When the resolution target expires, pauses included.</param>
+/// <param name="ResolutionWarnAt">When 80% of the resolution target is consumed.</param>
+/// <param name="ResolvedAt">When the resolution clock stopped, or null.</param>
+/// <param name="PausedAt">When the ticket entered Waiting, or null.</param>
+/// <param name="ResponseState">Where the response clock stands.</param>
+/// <param name="ResolutionState">Where the resolution clock stands.</param>
+/// <param name="IsPaused">Whether the resolution clock is parked.</param>
+/// <param name="PausedSeconds">How long the ticket has spent Waiting in total.</param>
+public sealed record TicketSlaDto(
+    int ResponseTargetMinutes,
+    DateTimeOffset ResponseDueAt,
+    DateTimeOffset ResponseWarnAt,
+    DateTimeOffset? RespondedAt,
+    int ResolutionTargetMinutes,
+    DateTimeOffset ResolutionDueAt,
+    DateTimeOffset ResolutionWarnAt,
+    DateTimeOffset? ResolvedAt,
+    DateTimeOffset? PausedAt,
+    SlaState ResponseState,
+    SlaState ResolutionState,
+    bool IsPaused,
+    long PausedSeconds);
+
 /// <summary>A ticket as the detail endpoint renders it.</summary>
 /// <param name="Id">The ticket's id.</param>
 /// <param name="Number">The human-readable number.</param>
@@ -51,7 +80,8 @@ public sealed record TicketHistoryDto(
 /// <param name="RelatedAlertId">The alert it came from. WP-3.7.</param>
 /// <param name="CreatedAt">When it was raised.</param>
 /// <param name="UpdatedAt">When it last moved.</param>
-/// <param name="DueAt">When resolution is due. WP-1.8.</param>
+/// <param name="DueAt">When resolution is due, pauses included.</param>
+/// <param name="Sla">Both SLA clocks and where each stands.</param>
 /// <param name="AllowedNextStatuses">The moves it may still make.</param>
 /// <param name="History">The head of its timeline, newest first.</param>
 /// <param name="HasMoreHistory">True when the timeline is longer than what is embedded.</param>
@@ -84,7 +114,8 @@ public sealed record TicketDetailDto(
     Guid? RelatedAlertId,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? DueAt,
+    DateTimeOffset DueAt,
+    TicketSlaDto Sla,
     IReadOnlyList<TicketStatus> AllowedNextStatuses,
     IReadOnlyList<TicketHistoryDto> History,
     bool HasMoreHistory,
@@ -112,7 +143,8 @@ public sealed record TicketDetailDto(
 /// <param name="AssigneeName">Their cached display name, or null.</param>
 /// <param name="CreatedAt">When it was raised.</param>
 /// <param name="UpdatedAt">When it last moved.</param>
-/// <param name="DueAt">When resolution is due.</param>
+/// <param name="DueAt">When resolution is due, pauses included.</param>
+/// <param name="Sla">Both SLA clocks and where each stands.</param>
 public sealed record TicketListItemDto(
     Guid Id,
     string Number,
@@ -132,7 +164,8 @@ public sealed record TicketListItemDto(
     string? AssigneeName,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? DueAt);
+    DateTimeOffset DueAt,
+    TicketSlaDto Sla);
 
 /// <summary>
 /// The ticket request shapes every WP-1.5 suite needs, written once.

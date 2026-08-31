@@ -24,7 +24,12 @@ internal static class TicketWriter
     /// <summary>The category and priority a test files its tickets against.</summary>
     /// <param name="CategoryId">A seeded category.</param>
     /// <param name="PriorityId">A seeded priority.</param>
-    public readonly record struct ReferenceData(Guid CategoryId, Guid PriorityId);
+    /// <param name="Targets">
+    /// That priority's SLA targets, read off the same row. WP-1.8 made them part of a
+    /// draft, and taking them from the seeded priority rather than inventing a pair means
+    /// the tickets these tests write carry the deadlines a real one would.
+    /// </param>
+    public readonly record struct ReferenceData(Guid CategoryId, Guid PriorityId, SlaTargets Targets);
 
     /// <summary>Reads a seeded category and priority to file tickets against.</summary>
     /// <param name="services">The host's provider.</param>
@@ -44,14 +49,17 @@ internal static class TicketWriter
             .Select(c => c.Id)
             .FirstAsync(cancellationToken);
 
-        var priorityId = await database.TicketPriorities
+        var priority = await database.TicketPriorities
             .AsNoTracking()
             .Where(p => p.IsActive)
             .OrderBy(p => p.Rank)
-            .Select(p => p.Id)
+            .Select(p => new { p.Id, p.ResponseTargetMinutes, p.ResolutionTargetMinutes })
             .FirstAsync(cancellationToken);
 
-        return new ReferenceData(categoryId, priorityId);
+        return new ReferenceData(
+            categoryId,
+            priority.Id,
+            new SlaTargets(priority.ResponseTargetMinutes, priority.ResolutionTargetMinutes));
     }
 
     /// <summary>A draft ticket for <paramref name="reference"/>, with a distinguishable subject.</summary>
@@ -66,7 +74,8 @@ internal static class TicketWriter
         Guid.CreateVersion7(),
         "Water Operations",
         reference.CategoryId,
-        reference.PriorityId);
+        reference.PriorityId,
+        reference.Targets);
 
     /// <summary>
     /// Raises one ticket in its own scope and transaction.

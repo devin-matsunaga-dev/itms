@@ -5,6 +5,7 @@ using Itms.Modules.Helpdesk.Features.TicketHistory;
 using Itms.Modules.Helpdesk.Persistence;
 using Itms.Platform.Identity;
 using Itms.Platform.Results;
+using Itms.Platform.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace Itms.Modules.Helpdesk.Features.Tickets.GetTicket;
@@ -34,7 +35,8 @@ namespace Itms.Modules.Helpdesk.Features.Tickets.GetTicket;
 /// </remarks>
 /// <param name="database">The helpdesk context.</param>
 /// <param name="currentUser">Who is asking. Decides whether this ticket exists for them at all.</param>
-internal sealed class GetTicketHandler(HelpdeskDbContext database, ICurrentUser currentUser)
+/// <param name="clock">The system clock, for the SLA states. The stored instants come from the row; where they stand comes from here.</param>
+internal sealed class GetTicketHandler(HelpdeskDbContext database, ICurrentUser currentUser, IClock clock)
 {
     /// <summary>Reads the ticket.</summary>
     /// <param name="ticketId">The ticket wanted.</param>
@@ -110,7 +112,9 @@ internal sealed class GetTicketHandler(HelpdeskDbContext database, ICurrentUser 
 
         return Result.Success(detail with
         {
-            Response = detail.Response with
+            // Assessed first, so the `with` below cannot drop it: the SLA states are the
+            // one part of this response the projection could not bring back.
+            Response = detail.Response.Assessed(clock.UtcNow) with
             {
                 // From the state machine, never restated by the client: WP-1.10's buttons
                 // come from here, so they cannot drift from what the server will accept.

@@ -19,6 +19,12 @@ public sealed class TicketTests
     private static readonly Guid Category = Guid.CreateVersion7();
     private static readonly Guid Priority = Guid.CreateVersion7();
 
+    /// <summary>
+    /// The seeded Medium priority's targets — thirty minutes to respond, four hours to
+    /// resolve. WP-1.8 made a pair of them part of every draft.
+    /// </summary>
+    private static readonly SlaTargets Targets = new(30, 240);
+
     private readonly FakeClock _clock = new(new DateTimeOffset(2026, 8, 31, 9, 0, 0, TimeSpan.Zero));
 
     [Fact]
@@ -59,6 +65,11 @@ public sealed class TicketTests
     /// packages that own them add a method rather than a migration; a new ticket must not
     /// arrive with any of them already set.
     /// </summary>
+    /// <remarks>
+    /// <c>DueAt</c> left this list at WP-1.8, which is the package that owns it: a ticket
+    /// now arrives with both SLA clocks already running, and an empty due date would mean a
+    /// ticket nobody had promised anything about.
+    /// </remarks>
     [Fact]
     public void A_new_ticket_is_unassigned_unresolved_unclosed_and_undeleted()
     {
@@ -66,7 +77,6 @@ public sealed class TicketTests
 
         ticket.AssigneeId.ShouldBeNull();
         ticket.AssigneeName.ShouldBeNull();
-        ticket.DueAt.ShouldBeNull();
         ticket.RelatedAssetId.ShouldBeNull();
         ticket.RelatedAlertId.ShouldBeNull();
         ticket.ResolutionNotes.ShouldBeNull();
@@ -192,5 +202,6 @@ public sealed class TicketTests
         Department,
         "Water Operations",
         Category,
-        Priority);
+        Priority,
+        Targets);
 }
