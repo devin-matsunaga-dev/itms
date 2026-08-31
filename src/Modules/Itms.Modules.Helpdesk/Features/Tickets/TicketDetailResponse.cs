@@ -1,4 +1,6 @@
 using Itms.Modules.Helpdesk.Domain;
+using Itms.Modules.Helpdesk.Features.TicketAttachments;
+using Itms.Modules.Helpdesk.Features.TicketComments;
 using Itms.Modules.Helpdesk.Features.TicketHistory;
 using Itms.Modules.Helpdesk.Persistence;
 using Itms.Modules.Helpdesk.Persistence.Configurations;
@@ -22,8 +24,13 @@ namespace Itms.Modules.Helpdesk.Features.Tickets;
 /// <c>TicketStateMachine.DestinationsFrom</c> either way, so the two can never disagree.
 /// </para>
 /// <para>
-/// <b>What is not here yet.</b> Comments and internal notes are WP-1.7's table, and a
-/// User must never receive a note through this shape — see <see cref="TicketScope"/>.
+/// <b>The conversation and the files arrived at WP-1.7</b>, embedded the way the timeline
+/// is and filtered by <see cref="TicketVisibility"/> before they get here: a payload a
+/// requester receives contains no internal note and no internal attachment, and no count
+/// or flag that would tell them one exists.
+/// </para>
+/// <para>
+/// <b>What is not here yet.</b>
 /// <see cref="RelatedAssetId"/> and <see cref="RelatedAlertId"/> are returned as bare ids
 /// because nothing sets them until WP-2.5 and WP-3.7; when those land, each will want its
 /// display text alongside, the way the requester and department names travel here.
@@ -81,6 +88,17 @@ public sealed record TicketDetailResponse(
     DateTimeOffset UpdatedAt,
     DateTimeOffset? DueAt)
 {
+    /// <summary>
+    /// How many comments and attachments the detail carries without being asked.
+    /// </summary>
+    /// <remarks>
+    /// The same number as the timeline and for the same reason: the normal detail view is
+    /// one round trip, and anything longer is paged through the list endpoint. It is counted
+    /// <em>after</em> the visibility filter, so a requester's page is filled with lines they
+    /// can actually read rather than being padded out by notes that were then removed.
+    /// </remarks>
+    public const int EmbeddedThreadCount = 25;
+
     /// <summary>How many timeline entries the detail carries without being asked.</summary>
     /// <remarks>
     /// One page of history, at the human's direction, so the normal detail view is a
@@ -112,6 +130,35 @@ public sealed record TicketDetailResponse(
     /// <see cref="History"/> carries, so a client knows to offer the paged endpoint.
     /// </summary>
     public bool HasMoreHistory { get; init; }
+
+    /// <summary>
+    /// The head of the ticket's conversation, newest first — at most
+    /// <see cref="EmbeddedThreadCount"/> comments the caller is allowed to read.
+    /// </summary>
+    /// <remarks>
+    /// A requester never sees an internal note here. That is enforced by the query, not by
+    /// this shape: see <see cref="TicketVisibility"/>.
+    /// </remarks>
+    public IReadOnlyList<TicketCommentResponse> Comments { get; init; } = [];
+
+    /// <summary>
+    /// True when there are more comments the caller may read than
+    /// <see cref="Comments"/> carries.
+    /// </summary>
+    public bool HasMoreComments { get; init; }
+
+    /// <summary>
+    /// The ticket's attachments, newest first — at most <see cref="EmbeddedThreadCount"/>
+    /// of the ones the caller is allowed to see. Metadata only; the bytes come from the
+    /// download route.
+    /// </summary>
+    public IReadOnlyList<TicketAttachmentResponse> Attachments { get; init; } = [];
+
+    /// <summary>
+    /// True when there are more attachments the caller may see than
+    /// <see cref="Attachments"/> carries.
+    /// </summary>
+    public bool HasMoreAttachments { get; init; }
 
     /// <summary>
     /// Projects tickets to detail rows with their row versions.

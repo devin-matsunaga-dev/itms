@@ -34,6 +34,12 @@ public sealed class HelpdeskDbContext(DbContextOptions<HelpdeskDbContext> option
     /// <summary>Every ticket's timeline: what moved, when, and at whose hand.</summary>
     public DbSet<TicketHistoryEntry> TicketHistory => Set<TicketHistoryEntry>();
 
+    /// <summary>What was said about a ticket, publicly or inside the queue.</summary>
+    public DbSet<TicketComment> TicketComments => Set<TicketComment>();
+
+    /// <summary>The files attached to a ticket. The rows only; the bytes live on disk.</summary>
+    public DbSet<TicketAttachment> TicketAttachments => Set<TicketAttachment>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +50,8 @@ public sealed class HelpdeskDbContext(DbContextOptions<HelpdeskDbContext> option
         modelBuilder.ApplyConfiguration(new TicketPriorityConfiguration());
         modelBuilder.ApplyConfiguration(new TicketConfiguration());
         modelBuilder.ApplyConfiguration(new TicketHistoryEntryConfiguration());
+        modelBuilder.ApplyConfiguration(new TicketCommentConfiguration());
+        modelBuilder.ApplyConfiguration(new TicketAttachmentConfiguration());
 
         // No DbSet: the ticket-number counter is reached only by TicketNumberGenerator's
         // one statement, and applying its configuration directly is what keeps it that way.

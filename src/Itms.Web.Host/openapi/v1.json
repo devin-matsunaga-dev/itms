@@ -2322,10 +2322,482 @@
           { }
         ]
       }
+    },
+    "/api/v1/tickets/{ticketId}/comments": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Reads a ticket's comments, newest first.",
+        "description": "A Technician or an Admin sees internal notes alongside public comments; the requester sees only the public ones, and the total counts only what they can see.",
+        "operationId": "ListTicketComments",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfTicketCommentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Posts a comment, or an internal note, on a ticket.",
+        "description": "Set isInternal to keep the comment inside the queue. Only a Technician or an Admin may do that; a requester attempting it is refused with 403 rather than having their note quietly published. Any status accepts a comment, including a closed ticket.",
+        "operationId": "AddTicketComment",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTicketCommentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketCommentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticketId}/attachments": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Reads a ticket's attachments, newest first.",
+        "description": "Metadata only. Internal attachments are absent for anybody but a Technician or an Admin, and the total counts only what the caller can see.",
+        "operationId": "ListTicketAttachments",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfTicketAttachmentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Attaches a file to a ticket.",
+        "description": "Multipart form with a 'file' part and an optional 'isInternal' field. The extension must be on the allowlist and the file's leading bytes must agree with it; the declared media type is ignored. Only a Technician or an Admin may attach an internal file.",
+        "operationId": "UploadTicketAttachment",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "allOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "file": {
+                        "$ref": "#/components/schemas/IFormFile"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "isInternal": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketAttachmentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticketId}/attachments/{attachmentId}": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Fetches an attachment's contents.",
+        "description": "Re-checks the ticket and the audience on every request: an attachment on a ticket the caller cannot read, or an internal one they are not staff for, is 404 either way. Always served as a download, never inline.",
+        "operationId": "DownloadTicketAttachment",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/IResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "AddTicketCommentRequest": {
+        "required": [
+          "body"
+        ],
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "What is being said."
+          },
+          "isInternal": {
+            "type": "boolean",
+            "description": "True to write a note only the queue can read. A User sending this is refused with 403\nrather than quietly downgraded — see `HelpdeskErrors.InternalCommentForbidden`.",
+            "default": false
+          }
+        },
+        "description": "The body of `POST /api/v1/tickets/{id}/comments`."
+      },
       "AssignTicketRequest": {
         "required": [
           "assigneeId"
@@ -2754,6 +3226,13 @@
           }
         }
       },
+      "IFormFile": {
+        "type": "string",
+        "format": "binary"
+      },
+      "IResult": {
+        "type": "object"
+      },
       "LocationKind": {
         "enum": [
           "Organization",
@@ -2996,6 +3475,65 @@
         },
         "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
       },
+      "PagedResultOfTicketAttachmentResponse": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketAttachmentResponse"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
+      },
       "PagedResultOfTicketCategoryResponse": {
         "required": [
           "items",
@@ -3009,6 +3547,65 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TicketCategoryResponse"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
+      },
+      "PagedResultOfTicketCommentResponse": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketCommentResponse"
             },
             "description": "The items on this page."
           },
@@ -3370,6 +3967,68 @@
         },
         "description": "What a ticket looks like immediately after its assignee changed."
       },
+      "TicketAttachmentResponse": {
+        "required": [
+          "id",
+          "ticketId",
+          "fileName",
+          "contentType",
+          "byteLength",
+          "isInternal",
+          "uploadedById",
+          "uploadedByName",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The attachment's id. What the download route names.",
+            "format": "uuid"
+          },
+          "ticketId": {
+            "type": "string",
+            "description": "The ticket it hangs off.",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "The name the uploader's file had."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The media type the download will declare."
+          },
+          "byteLength": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How large it is.",
+            "format": "int64"
+          },
+          "isInternal": {
+            "type": "boolean",
+            "description": "True when the requester cannot see it. Always false in a payload they receive."
+          },
+          "uploadedById": {
+            "type": "string",
+            "description": "Who uploaded it.",
+            "format": "uuid"
+          },
+          "uploadedByName": {
+            "type": "string",
+            "description": "Their display name at the time."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was uploaded (UTC).",
+            "format": "date-time"
+          }
+        },
+        "description": "A file attached to a ticket, as the API describes it."
+      },
       "TicketCategoryResponse": {
         "required": [
           "id",
@@ -3432,6 +4091,53 @@
           "Resolution"
         ],
         "description": "Which dimension of a ticket a history entry records having moved."
+      },
+      "TicketCommentResponse": {
+        "required": [
+          "id",
+          "ticketId",
+          "body",
+          "isInternal",
+          "authorId",
+          "authorName",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The comment's id.",
+            "format": "uuid"
+          },
+          "ticketId": {
+            "type": "string",
+            "description": "The ticket it belongs to.",
+            "format": "uuid"
+          },
+          "body": {
+            "type": "string",
+            "description": "What was said."
+          },
+          "isInternal": {
+            "type": "boolean",
+            "description": "True when this line is invisible to the requester."
+          },
+          "authorId": {
+            "type": "string",
+            "description": "Who wrote it.",
+            "format": "uuid"
+          },
+          "authorName": {
+            "type": "string",
+            "description": "Their display name at the time."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was posted (UTC).",
+            "format": "date-time"
+          }
+        },
+        "description": "One line of a ticket's conversation, as the API renders it."
       },
       "TicketDetailResponse": {
         "required": [
@@ -3622,6 +4328,28 @@
           "hasMoreHistory": {
             "type": "boolean",
             "description": "True when the ticket's timeline is longer than what\nIReadOnlyList&lt;TicketHistoryEntryResponse&gt; TicketDetailResponse.History carries, so a client knows to offer the paged endpoint."
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketCommentResponse"
+            },
+            "description": "The head of the ticket's conversation, newest first — at most\nint TicketDetailResponse.EmbeddedThreadCount comments the caller is allowed to read."
+          },
+          "hasMoreComments": {
+            "type": "boolean",
+            "description": "True when there are more comments the caller may read than\nIReadOnlyList&lt;TicketCommentResponse&gt; TicketDetailResponse.Comments carries."
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketAttachmentResponse"
+            },
+            "description": "The ticket's attachments, newest first — at most int TicketDetailResponse.EmbeddedThreadCount\nof the ones the caller is allowed to see. Metadata only; the bytes come from the\ndownload route."
+          },
+          "hasMoreAttachments": {
+            "type": "boolean",
+            "description": "True when there are more attachments the caller may see than\nIReadOnlyList&lt;TicketAttachmentResponse&gt; TicketDetailResponse.Attachments carries."
           }
         },
         "description": "One ticket in full, as the detail screen reads it."

@@ -41,6 +41,20 @@ public sealed class IdentityWebFixture : IAsyncLifetime
     /// </remarks>
     public const string RemoteIpAddress = "203.0.113.7";
 
+    /// <summary>
+    /// Where the host writes ticket attachments for the life of this fixture.
+    /// </summary>
+    /// <remarks>
+    /// Overridden away from the configured default, which resolves against the content
+    /// root — and under the test host that is the test project's own directory, so the
+    /// default would drop uploaded files into the repository. A temp directory per fixture
+    /// keeps the suite self-contained and is removed on disposal.
+    /// </remarks>
+    private readonly string _attachmentRoot = Path.Combine(
+        Path.GetTempPath(),
+        "itms-integration-attachments",
+        Guid.CreateVersion7().ToString("N"));
+
     private readonly PostgresDatabase _container = SharedPostgres.Instance;
     private NpgsqlDataSource? _dataSource;
     private Respawner? _respawner;
@@ -71,7 +85,9 @@ public sealed class IdentityWebFixture : IAsyncLifetime
         // Built from the container's string, not read back off the data source: Npgsql
         // strips the password out of NpgsqlDataSource.ConnectionString, and the host needs
         // one it can actually connect with.
-        _factory = new IdentityWebApplicationFactory(_container.ConnectionStringFor(DatabaseName));
+        _factory = new IdentityWebApplicationFactory(
+            _container.ConnectionStringFor(DatabaseName),
+            _attachmentRoot);
 
         // Creating a client is what builds and starts the host, which is what applies the
         // migrations and seeds. Respawn has to read the table graph after that.
@@ -150,10 +166,16 @@ public sealed class IdentityWebFixture : IAsyncLifetime
             await _dataSource.DisposeAsync();
         }
 
+        if (Directory.Exists(_attachmentRoot))
+        {
+            Directory.Delete(_attachmentRoot, recursive: true);
+        }
+
         // The container is shared by the assembly and reaped when the process exits.
     }
 
-    private sealed class IdentityWebApplicationFactory(string connectionString) : WebApplicationFactory<Itms.Web.Host.AssemblyMarker>
+    private sealed class IdentityWebApplicationFactory(string connectionString, string attachmentRoot)
+        : WebApplicationFactory<Itms.Web.Host.AssemblyMarker>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -171,6 +193,11 @@ public sealed class IdentityWebFixture : IAsyncLifetime
             // The rate limit is real and tested on its own; leaving it at the production
             // default here would make the suite's own volume of sign-ins trip it.
             builder.UseSetting("Identity:RateLimitPermits", "100000");
+
+            // Absolute, so it is not resolved against the test project's content root. The
+            // cap and the allowlist are left at their defaults: those are the values a
+            // deployment ships with, and the suite should be asserting against them.
+            builder.UseSetting("Helpdesk:Attachments:RootPath", attachmentRoot);
 
             // Give the pipeline the one thing the in-memory transport cannot: a peer
             // address. Registered as a startup filter because the host is a minimal

@@ -307,6 +307,107 @@ internal static class HelpdeskErrors
             "Unassign the ticket to return it to New.");
 
     /// <summary>
+    /// A User asked to post an internal note, or to attach a file only the queue can see.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A 403, not a 404 and not a silent downgrade to a public comment. The 404 exception
+    /// ARCHITECTURE.md §6 allows is about not letting a caller enumerate ids, and nothing
+    /// is being enumerated here — the caller already holds a ticket they may read, and the
+    /// only fact this answer reveals is that internal notes exist, which SPEC.md §14 states
+    /// in the role table anyway.
+    /// </para>
+    /// <para>
+    /// Silently posting it as a public comment would be worse than either: the author would
+    /// believe they had written something the requester cannot see, and the requester would
+    /// be reading it.
+    /// </para>
+    /// </remarks>
+    public static Error InternalCommentForbidden() =>
+        Error.Forbidden(
+            "helpdesk.internal_not_permitted",
+            "Only a technician or an administrator can write an internal note.");
+
+    /// <summary>No such attachment on this ticket, or none the caller may see.</summary>
+    /// <remarks>
+    /// Covers three cases on purpose, exactly as <see cref="TicketNotFound"/> covers three:
+    /// no such file, a file on somebody else's ticket, and an internal file the caller is
+    /// not inside the queue for. Answering the third differently would let a requester
+    /// discover that their technician attached something they cannot see, which is the one
+    /// thing the internal flag exists to prevent.
+    /// </remarks>
+    public static Error AttachmentNotFound() =>
+        Error.NotFound("helpdesk.attachment_not_found", "No such attachment.");
+
+    /// <summary>The upload carried no file, or an empty one.</summary>
+    public static Error AttachmentFileRequired() =>
+        Error.Validation(
+            "helpdesk.attachment_file_required",
+            "Attach a file.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["file"] = ["Attach a file."],
+            });
+
+    /// <summary>The file is bigger than the deployment allows.</summary>
+    public static Error AttachmentTooLarge(long maxBytes)
+    {
+        var megabytes = maxBytes / (1024d * 1024d);
+        var message = string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"That file is larger than the {megabytes:0.#} MB limit.");
+
+        return Error.Validation(
+            "helpdesk.attachment_too_large",
+            message,
+            new Dictionary<string, string[]>(StringComparer.Ordinal) { ["file"] = [message] });
+    }
+
+    /// <summary>The file's extension is not one this deployment accepts.</summary>
+    public static Error AttachmentTypeNotAllowed(IEnumerable<string> allowed)
+    {
+        var message = $"That kind of file is not accepted. Allowed types: {string.Join(", ", allowed)}.";
+
+        return Error.Validation(
+            "helpdesk.attachment_type_not_allowed",
+            message,
+            new Dictionary<string, string[]>(StringComparer.Ordinal) { ["file"] = [message] });
+    }
+
+    /// <summary>
+    /// The extension is accepted but the bytes are not what that extension describes.
+    /// </summary>
+    /// <remarks>
+    /// The one check that survives a caller renaming a file to get past the allowlist.
+    /// CONVENTIONS.md's security floor names content-type sniffing beside the allowlist for
+    /// exactly this reason: an allowlist alone is a check on a string the uploader chose.
+    /// </remarks>
+    public static Error AttachmentContentMismatch()
+    {
+        const string Message = "The file's contents do not match its extension.";
+
+        return Error.Validation(
+            "helpdesk.attachment_content_mismatch",
+            Message,
+            new Dictionary<string, string[]>(StringComparer.Ordinal) { ["file"] = [Message] });
+    }
+
+    /// <summary>
+    /// The row is there and the bytes are not. A 500, because the caller did nothing wrong
+    /// and there is nothing they can do about it.
+    /// </summary>
+    /// <remarks>
+    /// Reachable by a restore that brought the database back without the storage volume, or
+    /// by somebody tidying the directory. It is worth its own code rather than a bare
+    /// exception, so the log and the operator see "the file is missing" instead of a stack
+    /// trace ending in the filesystem.
+    /// </remarks>
+    public static Error AttachmentContentMissing() =>
+        Error.Unexpected(
+            "helpdesk.attachment_unavailable",
+            "The attachment's contents could not be read.");
+
+    /// <summary>
     /// Somebody else moved the ticket between this request reading it and writing it.
     /// The <c>xmin</c> token WP-1.2 mapped is what notices.
     /// </summary>

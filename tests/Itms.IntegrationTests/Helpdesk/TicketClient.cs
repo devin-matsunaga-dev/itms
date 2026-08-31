@@ -55,6 +55,10 @@ public sealed record TicketHistoryDto(
 /// <param name="AllowedNextStatuses">The moves it may still make.</param>
 /// <param name="History">The head of its timeline, newest first.</param>
 /// <param name="HasMoreHistory">True when the timeline is longer than what is embedded.</param>
+/// <param name="Comments">The head of its conversation, filtered to what the caller may read.</param>
+/// <param name="HasMoreComments">True when there are more comments the caller may read.</param>
+/// <param name="Attachments">Its attachments, filtered to what the caller may see.</param>
+/// <param name="HasMoreAttachments">True when there are more attachments the caller may see.</param>
 public sealed record TicketDetailDto(
     Guid Id,
     string Number,
@@ -83,7 +87,11 @@ public sealed record TicketDetailDto(
     DateTimeOffset? DueAt,
     IReadOnlyList<TicketStatus> AllowedNextStatuses,
     IReadOnlyList<TicketHistoryDto> History,
-    bool HasMoreHistory);
+    bool HasMoreHistory,
+    IReadOnlyList<TicketCommentDto> Comments,
+    bool HasMoreComments,
+    IReadOnlyList<TicketAttachmentDto> Attachments,
+    bool HasMoreAttachments);
 
 /// <summary>One row of the queue, as the list endpoint renders it.</summary>
 /// <param name="Id">The ticket's id.</param>

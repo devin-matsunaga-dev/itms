@@ -488,10 +488,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticketId}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reads a ticket's comments, newest first.
+         * @description A Technician or an Admin sees internal notes alongside public comments; the requester sees only the public ones, and the total counts only what they can see.
+         */
+        get: operations["ListTicketComments"];
+        put?: never;
+        /**
+         * Posts a comment, or an internal note, on a ticket.
+         * @description Set isInternal to keep the comment inside the queue. Only a Technician or an Admin may do that; a requester attempting it is refused with 403 rather than having their note quietly published. Any status accepts a comment, including a closed ticket.
+         */
+        post: operations["AddTicketComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticketId}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reads a ticket's attachments, newest first.
+         * @description Metadata only. Internal attachments are absent for anybody but a Technician or an Admin, and the total counts only what the caller can see.
+         */
+        get: operations["ListTicketAttachments"];
+        put?: never;
+        /**
+         * Attaches a file to a ticket.
+         * @description Multipart form with a 'file' part and an optional 'isInternal' field. The extension must be on the allowlist and the file's leading bytes must agree with it; the declared media type is ignored. Only a Technician or an Admin may attach an internal file.
+         */
+        post: operations["UploadTicketAttachment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticketId}/attachments/{attachmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fetches an attachment's contents.
+         * @description Re-checks the ticket and the audience on every request: an attachment on a ticket the caller cannot read, or an internal one they are not staff for, is 404 either way. Always served as a download, never inline.
+         */
+        get: operations["DownloadTicketAttachment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description The body of `POST /api/v1/tickets/{id}/comments`. */
+        AddTicketCommentRequest: {
+            /** @description What is being said. */
+            body: string;
+            /**
+             * @description True to write a note only the queue can read. A User sending this is refused with 403
+             *     rather than quietly downgraded — see `HelpdeskErrors.InternalCommentForbidden`.
+             * @default false
+             */
+            isInternal: boolean;
+        };
         /** @description The body of `POST /api/v1/tickets/{id}/assignments`. */
         AssignTicketRequest: {
             /**
@@ -690,6 +769,9 @@ export interface components {
             /** @description The machine-readable error identifier, e.g. auth.antiforgery_failed. Present on every problem this system produces itself; absent on one produced by the framework. */
             code?: string;
         };
+        /** Format: binary */
+        IFormFile: string;
+        IResult: Record<string, never>;
         /**
          * @description What a node in the location tree represents. The five levels SPEC.md §5 names:
          *     Organization → Site → Building → Floor/Area → Room.
@@ -821,9 +903,71 @@ export interface components {
          *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
          *     object so the shape reaches OpenAPI and, from there, the generated client.
          */
+        PagedResultOfTicketAttachmentResponse: {
+            /** @description The items on this page. */
+            items: components["schemas"]["TicketAttachmentResponse"][];
+            /**
+             * Format: int32
+             * @description The total number of matching items across all pages.
+             */
+            total: number | string;
+            /**
+             * Format: int32
+             * @description The 1-based page number this envelope represents.
+             */
+            page: number | string;
+            /**
+             * Format: int32
+             * @description The page size that was applied, after clamping.
+             */
+            pageSize: number | string;
+            /**
+             * Format: int32
+             * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
+             */
+            totalPages?: number | string;
+            /** @description True when a further page exists. */
+            hasNextPage?: boolean;
+        };
+        /**
+         * @description The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as
+         *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
+         *     object so the shape reaches OpenAPI and, from there, the generated client.
+         */
         PagedResultOfTicketCategoryResponse: {
             /** @description The items on this page. */
             items: components["schemas"]["TicketCategoryResponse"][];
+            /**
+             * Format: int32
+             * @description The total number of matching items across all pages.
+             */
+            total: number | string;
+            /**
+             * Format: int32
+             * @description The 1-based page number this envelope represents.
+             */
+            page: number | string;
+            /**
+             * Format: int32
+             * @description The page size that was applied, after clamping.
+             */
+            pageSize: number | string;
+            /**
+             * Format: int32
+             * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
+             */
+            totalPages?: number | string;
+            /** @description True when a further page exists. */
+            hasNextPage?: boolean;
+        };
+        /**
+         * @description The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as
+         *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
+         *     object so the shape reaches OpenAPI and, from there, the generated client.
+         */
+        PagedResultOfTicketCommentResponse: {
+            /** @description The items on this page. */
+            items: components["schemas"]["TicketCommentResponse"][];
             /**
              * Format: int32
              * @description The total number of matching items across all pages.
@@ -1002,6 +1146,42 @@ export interface components {
              */
             allowedNextStatuses: components["schemas"]["TicketStatus"][];
         };
+        /** @description A file attached to a ticket, as the API describes it. */
+        TicketAttachmentResponse: {
+            /**
+             * Format: uuid
+             * @description The attachment's id. What the download route names.
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description The ticket it hangs off.
+             */
+            ticketId: string;
+            /** @description The name the uploader's file had. */
+            fileName: string;
+            /** @description The media type the download will declare. */
+            contentType: string;
+            /**
+             * Format: int64
+             * @description How large it is.
+             */
+            byteLength: number | string;
+            /** @description True when the requester cannot see it. Always false in a payload they receive. */
+            isInternal: boolean;
+            /**
+             * Format: uuid
+             * @description Who uploaded it.
+             */
+            uploadedById: string;
+            /** @description Their display name at the time. */
+            uploadedByName: string;
+            /**
+             * Format: date-time
+             * @description When it was uploaded (UTC).
+             */
+            createdAt: string;
+        };
         /** @description A ticket category as the API renders it. */
         TicketCategoryResponse: {
             /**
@@ -1036,6 +1216,35 @@ export interface components {
          * @enum {unknown}
          */
         TicketChangeKind: "Status" | "Priority" | "Assignment" | "Resolution";
+        /** @description One line of a ticket's conversation, as the API renders it. */
+        TicketCommentResponse: {
+            /**
+             * Format: uuid
+             * @description The comment's id.
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description The ticket it belongs to.
+             */
+            ticketId: string;
+            /** @description What was said. */
+            body: string;
+            /** @description True when this line is invisible to the requester. */
+            isInternal: boolean;
+            /**
+             * Format: uuid
+             * @description Who wrote it.
+             */
+            authorId: string;
+            /** @description Their display name at the time. */
+            authorName: string;
+            /**
+             * Format: date-time
+             * @description When it was posted (UTC).
+             */
+            createdAt: string;
+        };
         /** @description One ticket in full, as the detail screen reads it. */
         TicketDetailResponse: {
             /**
@@ -1145,6 +1354,27 @@ export interface components {
              *     IReadOnlyList&lt;TicketHistoryEntryResponse&gt; TicketDetailResponse.History carries, so a client knows to offer the paged endpoint.
              */
             hasMoreHistory?: boolean;
+            /**
+             * @description The head of the ticket's conversation, newest first — at most
+             *     int TicketDetailResponse.EmbeddedThreadCount comments the caller is allowed to read.
+             */
+            comments?: components["schemas"]["TicketCommentResponse"][];
+            /**
+             * @description True when there are more comments the caller may read than
+             *     IReadOnlyList&lt;TicketCommentResponse&gt; TicketDetailResponse.Comments carries.
+             */
+            hasMoreComments?: boolean;
+            /**
+             * @description The ticket's attachments, newest first — at most int TicketDetailResponse.EmbeddedThreadCount
+             *     of the ones the caller is allowed to see. Metadata only; the bytes come from the
+             *     download route.
+             */
+            attachments?: components["schemas"]["TicketAttachmentResponse"][];
+            /**
+             * @description True when there are more attachments the caller may see than
+             *     IReadOnlyList&lt;TicketAttachmentResponse&gt; TicketDetailResponse.Attachments carries.
+             */
+            hasMoreAttachments?: boolean;
         };
         /** @description One line of a ticket's timeline, as the API renders it. */
         TicketHistoryEntryResponse: {
@@ -3114,6 +3344,297 @@ export interface operations {
             };
             /** @description Precondition Failed */
             412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListTicketComments: {
+        parameters: {
+            query?: {
+                page?: number | string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path: {
+                ticketId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfTicketCommentResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AddTicketComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticketId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddTicketCommentRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketCommentResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListTicketAttachments: {
+        parameters: {
+            query?: {
+                page?: number | string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path: {
+                ticketId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfTicketAttachmentResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UploadTicketAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticketId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: components["schemas"]["IFormFile"];
+                } & {
+                    isInternal?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketAttachmentResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Payload Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DownloadTicketAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticketId: string;
+                attachmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": components["schemas"]["IResult"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

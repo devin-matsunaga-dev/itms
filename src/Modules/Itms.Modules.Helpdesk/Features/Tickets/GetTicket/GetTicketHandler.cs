@@ -1,4 +1,6 @@
 using Itms.Modules.Helpdesk.Domain;
+using Itms.Modules.Helpdesk.Features.TicketAttachments;
+using Itms.Modules.Helpdesk.Features.TicketComments;
 using Itms.Modules.Helpdesk.Features.TicketHistory;
 using Itms.Modules.Helpdesk.Persistence;
 using Itms.Platform.Identity;
@@ -10,17 +12,24 @@ namespace Itms.Modules.Helpdesk.Features.Tickets.GetTicket;
 /// <summary>Reads one ticket in full.</summary>
 /// <remarks>
 /// <para>
-/// Two queries, deliberately: the ticket with its reference data, then the head of its
-/// timeline. They are separate because the second is a one-to-many — folding it into the
-/// first would multiply the ticket's columns by its history and hand the client the same
-/// subject twenty-five times.
+/// Four queries, deliberately: the ticket with its reference data, then the heads of its
+/// timeline, its conversation, and its attachments. They are separate because each of the
+/// three is a one-to-many — folding them into the first would multiply the ticket's columns
+/// by its history by its comments and hand the client the same subject several hundred
+/// times.
 /// </para>
 /// <para>
-/// The timeline is embedded rather than linked, at the human's direction, so the normal
-/// detail view is one round trip. A ticket with a longer history than
-/// <see cref="TicketDetailResponse.EmbeddedHistoryCount"/> sets
-/// <c>hasMoreHistory</c> and the client pages on through
-/// <c>GET /api/v1/tickets/{id}/history</c>.
+/// All three are embedded rather than linked, at the human's direction, so the normal
+/// detail view is one round trip. A list longer than its embedded count sets its
+/// <c>hasMore…</c> flag and the client pages on through that list's own endpoint.
+/// </para>
+/// <para>
+/// <b>The conversation and the attachments are filtered by
+/// <see cref="TicketVisibility"/> before they are counted, not after.</b> A requester's
+/// detail contains no internal note, no internal attachment, and no flag or count implying
+/// either exists — which is why <c>hasMoreComments</c> is decided from the filtered query
+/// rather than from the ticket's true total. <see cref="TicketScope"/> alone would not have
+/// caught this: it says which tickets they may read, and this is their own.
 /// </para>
 /// </remarks>
 /// <param name="database">The helpdesk context.</param>
@@ -71,6 +80,34 @@ internal sealed class GetTicketHandler(HelpdeskDbContext database, ICurrentUser 
             entries.RemoveAt(entries.Count - 1);
         }
 
+        // Scoped to what this caller may read before the page is taken, so the "one more
+        // than the page" trick counts visible rows and the flag cannot betray a hidden one.
+        var comments = await database.TicketComments
+            .AsNoTracking()
+            .Where(comment => comment.TicketId == ticketId)
+            .VisibleTo(currentUser)
+            .OrderByDescending(comment => comment.CreatedAt)
+            .ThenByDescending(comment => comment.Id)
+            .Take(TicketDetailResponse.EmbeddedThreadCount + 1)
+            .Select(TicketCommentResponse.Projection())
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var hasMoreComments = Trim(comments);
+
+        var attachments = await database.TicketAttachments
+            .AsNoTracking()
+            .Where(attachment => attachment.TicketId == ticketId)
+            .VisibleTo(currentUser)
+            .OrderByDescending(attachment => attachment.CreatedAt)
+            .ThenByDescending(attachment => attachment.Id)
+            .Take(TicketDetailResponse.EmbeddedThreadCount + 1)
+            .Select(TicketAttachmentResponse.Projection())
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var hasMoreAttachments = Trim(attachments);
+
         return Result.Success(detail with
         {
             Response = detail.Response with
@@ -80,7 +117,33 @@ internal sealed class GetTicketHandler(HelpdeskDbContext database, ICurrentUser 
                 AllowedNextStatuses = TicketStateMachine.DestinationsFrom(detail.Response.Status),
                 History = entries,
                 HasMoreHistory = hasMore,
+                Comments = comments,
+                HasMoreComments = hasMoreComments,
+                Attachments = attachments,
+                HasMoreAttachments = hasMoreAttachments,
             },
         });
+    }
+
+    /// <summary>
+    /// Drops the extra row read to answer "is there more?", and says whether there was one.
+    /// </summary>
+    /// <remarks>
+    /// One row over the page beats a second <c>COUNT</c>: the flag is the only thing the
+    /// detail needs, and the list endpoints carry the real total for anybody who wants it.
+    /// </remarks>
+    /// <typeparam name="T">The projected row type.</typeparam>
+    /// <param name="rows">The rows read, one longer than the page if there are more.</param>
+    /// <returns><see langword="true"/> when a row was dropped.</returns>
+    private static bool Trim<T>(List<T> rows)
+    {
+        if (rows.Count <= TicketDetailResponse.EmbeddedThreadCount)
+        {
+            return false;
+        }
+
+        rows.RemoveAt(rows.Count - 1);
+
+        return true;
     }
 }

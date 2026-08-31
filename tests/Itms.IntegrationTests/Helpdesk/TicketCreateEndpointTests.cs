@@ -1,5 +1,6 @@
 using System.Net;
 using Itms.IntegrationTests.Api;
+using Itms.IntegrationTests.AuditModule;
 using Itms.IntegrationTests.Identity;
 using Itms.Modules.Helpdesk.Domain;
 
@@ -380,6 +381,41 @@ public sealed class TicketCreateEndpointTests(IdentityWebFixture fixture) : IAsy
 
         var next = await TicketClient.CreateAsync(admin, reference, departmentId, "Second", Token);
         next.Number.ShouldBe("TKT-0002");
+    }
+
+    /// <summary>
+    /// SPEC.md §15 counts ticket modifications as mandatory audit coverage, and coverage
+    /// that cannot say who acted is not coverage.
+    /// </summary>
+    /// <remarks>
+    /// WP-1.6 stamped <c>ActorId</c> onto every event its two handlers publish and
+    /// recorded that <c>CreateTicketHandler</c> had been missed, so every creation since
+    /// WP-1.5 was audited as having happened at nobody's hand. This is the assertion that
+    /// would have failed. The row is written by the Audit module's consumer, so it arrives
+    /// with the dispatcher rather than inside the request.
+    /// </remarks>
+    [Fact]
+    public async Task Creation_is_audited_against_the_account_that_raised_the_ticket()
+    {
+        using var admin = await AuthClient.SignedInAsync(fixture, "admin", Token);
+        using var tech = await AuthClient.SignedInAsync(fixture, "tech", Token);
+        var techId = await TicketClient.UserIdAsync(fixture, "tech", Token);
+
+        var reference = await TicketWriter.ReferenceDataAsync(fixture.Services, Token);
+        var departmentId = await TicketClient.DepartmentAsync(admin, "Water Operations", Token);
+
+        var ticket = await TicketClient.CreateAsync(
+            tech, reference, departmentId, "Monitor flickers", Token);
+
+        await Eventually.UntilAsync(
+            async () => (await AuditQueries
+                .ByEntityAsync(fixture.DataSource, "Ticket", ticket.Id.ToString(), Token)).Count >= 1,
+            $"an audit row for ticket {ticket.Id}",
+            Token);
+
+        var rows = await AuditQueries.ByEntityAsync(fixture.DataSource, "Ticket", ticket.Id.ToString(), Token);
+
+        rows.Single(row => row.Action == "ticket.created").ActorId.ShouldBe(techId);
     }
 
     [Fact]

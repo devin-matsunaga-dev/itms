@@ -1,10 +1,18 @@
 using FluentValidation;
+using Itms.Modules.Helpdesk.Configuration;
+using Itms.Modules.Helpdesk.Features.TicketAttachments;
+using Itms.Modules.Helpdesk.Features.TicketAttachments.DownloadTicketAttachment;
+using Itms.Modules.Helpdesk.Features.TicketAttachments.ListTicketAttachments;
+using Itms.Modules.Helpdesk.Features.TicketAttachments.UploadTicketAttachment;
 using Itms.Modules.Helpdesk.Features.TicketCategories;
 using Itms.Modules.Helpdesk.Features.TicketCategories.CreateTicketCategory;
 using Itms.Modules.Helpdesk.Features.TicketCategories.GetTicketCategory;
 using Itms.Modules.Helpdesk.Features.TicketCategories.ListTicketCategories;
 using Itms.Modules.Helpdesk.Features.TicketCategories.SetTicketCategoryStatus;
 using Itms.Modules.Helpdesk.Features.TicketCategories.UpdateTicketCategory;
+using Itms.Modules.Helpdesk.Features.TicketComments;
+using Itms.Modules.Helpdesk.Features.TicketComments.AddTicketComment;
+using Itms.Modules.Helpdesk.Features.TicketComments.ListTicketComments;
 using Itms.Modules.Helpdesk.Features.TicketHistory;
 using Itms.Modules.Helpdesk.Features.TicketHistory.ListTicketHistory;
 using Itms.Modules.Helpdesk.Features.TicketPriorities;
@@ -25,6 +33,8 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Itms.Modules.Helpdesk;
 
@@ -73,6 +83,8 @@ public static class HelpdeskModule
         // scope's own transaction.
         services.TryAddScoped<TicketNumberGenerator>();
 
+        AddAttachmentStorage(services);
+
         services.TryAddScoped<ListTicketCategoriesHandler>();
         services.TryAddScoped<GetTicketCategoryHandler>();
         services.TryAddScoped<CreateTicketCategoryHandler>();
@@ -85,6 +97,11 @@ public static class HelpdeskModule
         services.TryAddScoped<ChangeTicketStatusHandler>();
         services.TryAddScoped<AssignTicketHandler>();
         services.TryAddScoped<ListTicketHistoryHandler>();
+        services.TryAddScoped<AddTicketCommentHandler>();
+        services.TryAddScoped<ListTicketCommentsHandler>();
+        services.TryAddScoped<UploadTicketAttachmentHandler>();
+        services.TryAddScoped<ListTicketAttachmentsHandler>();
+        services.TryAddScoped<DownloadTicketAttachmentHandler>();
 
         // Scoped, because it adds its entries to the scope's own context and they go to
         // the database on that scope's own SaveChanges, inside that scope's transaction.
@@ -103,8 +120,61 @@ public static class HelpdeskModule
         services.TryAddScoped<IValidator<ChangeTicketStatusRequest>, ChangeTicketStatusValidator>();
         services.TryAddScoped<IValidator<CreateTicketRequest>, CreateTicketValidator>();
         services.TryAddScoped<IValidator<AssignTicketRequest>, AssignTicketValidator>();
+        services.TryAddScoped<IValidator<AddTicketCommentRequest>, AddTicketCommentValidator>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Binds and validates the attachment settings, and registers the store the bytes go
+    /// through.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Validated at startup, not on the first upload.</b> A deployment with no storage
+    /// root, a nonsensical cap, or an extension nothing knows how to check should fail to
+    /// come up — the alternative is a service that looks healthy until somebody attaches a
+    /// screenshot to a ticket, which is the worst moment to discover it.
+    /// </para>
+    /// <para>
+    /// <b>The allowlist can only narrow.</b> An extension that
+    /// <see cref="AttachmentContentRules"/> has no signature rule for is rejected here,
+    /// because accepting it would mean accepting a file type the content check can only
+    /// answer "no" for — an allowlist entry that silently refuses every upload, or worse, a
+    /// future edit that makes it silently accept anything.
+    /// </para>
+    /// </remarks>
+    /// <param name="services">The container.</param>
+    private static void AddAttachmentStorage(IServiceCollection services)
+    {
+        services
+            .AddOptions<HelpdeskAttachmentOptions>()
+            .BindConfiguration(HelpdeskAttachmentOptions.SectionName)
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.RootPath),
+                $"{HelpdeskAttachmentOptions.SectionName}:RootPath must name a directory outside the web root.")
+            .Validate(
+                options => options.MaxBytes > 0,
+                $"{HelpdeskAttachmentOptions.SectionName}:MaxBytes must be greater than zero.")
+            .Validate(
+                options => options.AllowedExtensions.Count > 0,
+                $"{HelpdeskAttachmentOptions.SectionName}:AllowedExtensions must name at least one extension.")
+            .Validate(
+                options => options.AllowedExtensions.All(extension =>
+                    AttachmentContentRules.KnownExtensions.Contains(
+                        extension.ToLowerInvariant(),
+                        StringComparer.Ordinal)),
+                $"{HelpdeskAttachmentOptions.SectionName}:AllowedExtensions may only narrow the built-in set: "
+                + string.Join(", ", AttachmentContentRules.KnownExtensions))
+            .ValidateOnStart();
+
+        // Singleton, built here rather than by the container's constructor injection,
+        // because resolving a configured relative path against the content root is a
+        // composition concern and the store is better off not knowing what a host is.
+        services.TryAddSingleton<IAttachmentStore>(provider => new FileSystemAttachmentStore(
+            Path.GetFullPath(
+                provider.GetRequiredService<IOptions<HelpdeskAttachmentOptions>>().Value.RootPath,
+                provider.GetRequiredService<IHostEnvironment>().ContentRootPath)));
     }
 
     /// <summary>Maps the ticket, ticket-category, and ticket-priority endpoints.</summary>
@@ -117,6 +187,8 @@ public static class HelpdeskModule
         endpoints.MapTicketCategories();
         endpoints.MapTicketPriorities();
         endpoints.MapTickets();
+        endpoints.MapTicketComments();
+        endpoints.MapTicketAttachments();
 
         return endpoints;
     }

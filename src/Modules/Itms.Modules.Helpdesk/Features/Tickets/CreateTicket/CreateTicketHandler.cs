@@ -160,7 +160,16 @@ internal sealed class CreateTicketHandler(
                         ticket.RequesterId,
                         ticket.CategoryId,
                         priorityName,
-                        ticket.Subject),
+                        ticket.Subject)
+                    {
+                        // Stamped explicitly: the dispatcher runs on a background scope
+                        // with no principal, so an unstamped event produces an audit row
+                        // that says a ticket was raised without saying who raised it —
+                        // and SPEC.md §15 counts ticket modifications as mandatory
+                        // coverage with an actor. WP-1.6 stamped its four events the same
+                        // way and recorded that this one had been missed.
+                        ActorId = currentUser.UserId,
+                    },
                     token).ConfigureAwait(false);
 
                 // Read back through the same projection the detail endpoint uses, rather
