@@ -468,10 +468,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assigns, reassigns, or unassigns a ticket.
+         * @description Send an assigneeId to put a technician in charge, or null to unassign. The first assignment moves the ticket from New to Assigned and unassigning moves it back; reassignment leaves the status alone. Send the ticket's ETag as If-Match to be refused with 412 if it has moved since you read it.
+         */
+        post: operations["AssignTicket"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description The body of `POST /api/v1/tickets/{id}/assignments`. */
+        AssignTicketRequest: {
+            /**
+             * Format: uuid
+             * @description The technician taking the ticket on, or `null` to unassign it. A null
+             *     is a deliberate instruction, not an omitted field: unassigning returns the ticket to
+             *     `New`, and is refused once work has started.
+             */
+            assigneeId: null | string;
+        };
         /**
          * @description The account the caller is signed in as. Returned by both `/login` and
          *     `/me`, so the client has one shape to hold for "who am I" however it got there.
@@ -929,6 +959,49 @@ export interface components {
         };
         /** @enum {unknown} */
         SortDirection: "Ascending" | "Descending" | null;
+        /** @description What a ticket looks like immediately after its assignee changed. */
+        TicketAssignmentResponse: {
+            /**
+             * Format: uuid
+             * @description The ticket.
+             */
+            id: string;
+            /** @description Its human-readable number, so a toast can name it. */
+            number: string;
+            /**
+             * Format: uuid
+             * @description Who held it before, or `null` if nobody did.
+             */
+            previousAssigneeId: null | string;
+            /** @description Their display name as the ticket had cached it, or `null`. */
+            previousAssigneeName: null | string;
+            /**
+             * Format: uuid
+             * @description Who holds it now, or `null` after an unassignment.
+             */
+            assigneeId: null | string;
+            /** @description Their display name, cached on the row at this moment. */
+            assigneeName: null | string;
+            /** @description The status before the assignment. */
+            previousStatus: components["schemas"]["TicketStatus"];
+            /**
+             * @description The status now. It differs from PreviousStatus only on a first
+             *     assignment (`New → Assigned`) and on an unassignment (`Assigned → New`);
+             *     reassignment leaves the workflow exactly where it was.
+             */
+            status: components["schemas"]["TicketStatus"];
+            /**
+             * Format: date-time
+             * @description When the assignment happened, in UTC.
+             */
+            changedAt: string;
+            /**
+             * @description Where the ticket may go next, straight from the state machine, for the same reason
+             *     TicketStatusChangeResponse carries it: WP-1.10 must not render a
+             *     transition the server would refuse.
+             */
+            allowedNextStatuses: components["schemas"]["TicketStatus"][];
+        };
         /** @description A ticket category as the API renders it. */
         TicketCategoryResponse: {
             /**
@@ -1335,6 +1408,15 @@ export interface components {
             locationId: null | string;
             /** @description False once deactivated. A deactivated user still owns their history (invariant 9). */
             isActive: boolean;
+            /**
+             * @description The roles the account holds, from the three `ItmsRoles` names. Carried because
+             *     eligibility rules are a module's own business but the role that decides them is
+             *     Identity's: Helpdesk may only assign a ticket to a technician (WP-1.6), and without
+             *     this it would have to either reference `Modules.Identity` or trust the caller.
+             *     A membership list rather than a workflow flag, so no one module's question is baked
+             *     into the contract.
+             */
+            roles: string[];
         };
     };
     responses: never;
@@ -2903,6 +2985,86 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TicketStatusChangeResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AssignTicket: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignTicketRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketAssignmentResponse"];
                 };
             };
             /** @description Bad Request */

@@ -26,8 +26,9 @@ public sealed class TicketTransitionTests
     /// <remarks>
     /// Deliberately not a back door that writes the field: if the only way to reach
     /// Waiting in a test were to set it directly, the test would never notice the day the
-    /// path to Waiting broke. <see cref="TicketStatus.Assigned"/> is reached with the bare
-    /// <see cref="Ticket.ChangeStatus"/> because WP-1.6's <c>Assign</c> does not exist yet.
+    /// path to Waiting broke. <see cref="TicketStatus.Assigned"/> is reached through
+    /// <see cref="Ticket.Assign"/>, which is the only door to it — WP-1.3 reached it with
+    /// the bare mover because assignment did not exist yet.
     /// </remarks>
     private Ticket TicketIn(TicketStatus status)
     {
@@ -44,7 +45,7 @@ public sealed class TicketTransitionTests
             return ticket;
         }
 
-        ticket.ChangeStatus(TicketStatus.Assigned, null, _clock.UtcNow, Technician).IsSuccess.ShouldBeTrue();
+        ticket.Assign(Technician, "Priya Raman", _clock.UtcNow, Technician).IsSuccess.ShouldBeTrue();
 
         switch (status)
         {
@@ -94,13 +95,24 @@ public sealed class TicketTransitionTests
         return data;
     }
 
+    /// <summary>
+    /// Every pair the table calls legal <em>and</em> the general mover is willing to
+    /// walk.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="TicketStatus.New"/> is excluded because <see cref="Ticket.ChangeStatus"/>
+    /// refuses it outright: the edge exists for unassignment, and unassignment has to
+    /// clear the assignee in the same call, so the door is <see cref="Ticket.Unassign"/>.
+    /// <see cref="Only_Unassign_may_walk_the_edge_back_to_New"/> is what covers the pair
+    /// this exclusion drops, and <c>TicketAssignmentTests</c> covers what walking it does.
+    /// </remarks>
     public static TheoryData<TicketStatus, TicketStatus> LegalPairs()
     {
         var data = new TheoryData<TicketStatus, TicketStatus>();
 
         foreach (var from in Enum.GetValues<TicketStatus>())
         {
-            foreach (var to in TicketStateMachine.DestinationsFrom(from))
+            foreach (var to in TicketStateMachine.DestinationsFrom(from).Where(to => to != TicketStatus.New))
             {
                 data.Add(from, to);
             }
@@ -148,6 +160,53 @@ public sealed class TicketTransitionTests
         ticket.Status.ShouldBe(to);
         ticket.UpdatedAt.ShouldBe(_clock.UtcNow);
         ticket.UpdatedBy.ShouldBe(Author);
+    }
+
+    /// <summary>
+    /// The one legal pair the general mover will not walk, and the reason it will not.
+    /// </summary>
+    /// <remarks>
+    /// <c>Assigned → New</c> is in the table so that unassignment is a real transition,
+    /// refused from the wrong state like any other and writing its own history line. But
+    /// walking it without clearing the assignee would leave a New ticket still holding a
+    /// technician — exactly the incoherent row the edge was added to avoid — so the mover
+    /// refuses the destination and names the operation that does it properly.
+    /// </remarks>
+    [Fact]
+    public void Only_Unassign_may_walk_the_edge_back_to_New()
+    {
+        var ticket = TicketIn(TicketStatus.Assigned);
+
+        TicketStateMachine.CanTransition(TicketStatus.Assigned, TicketStatus.New).ShouldBeTrue();
+
+        var result = ticket.ChangeStatus(TicketStatus.New, null, _clock.UtcNow, Author);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error!.Code.ShouldBe("helpdesk.unassign_to_return_to_new");
+        ticket.Status.ShouldBe(TicketStatus.Assigned);
+        ticket.AssigneeId.ShouldBe(Technician);
+    }
+
+    /// <summary>
+    /// Every other request for New keeps the plain refusal it has always had. The guard
+    /// above is about the one state that could walk the edge, not about the destination.
+    /// </summary>
+    [Theory]
+    [InlineData(TicketStatus.New)]
+    [InlineData(TicketStatus.InProgress)]
+    [InlineData(TicketStatus.Waiting)]
+    [InlineData(TicketStatus.Resolved)]
+    [InlineData(TicketStatus.Closed)]
+    [InlineData(TicketStatus.Cancelled)]
+    public void Every_other_state_is_refused_New_as_an_ordinary_illegal_transition(TicketStatus from)
+    {
+        var ticket = TicketIn(from);
+
+        var result = ticket.ChangeStatus(TicketStatus.New, null, _clock.UtcNow, Author);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error!.Code.ShouldBe("helpdesk.illegal_transition");
+        ticket.Status.ShouldBe(from);
     }
 
     [Fact]

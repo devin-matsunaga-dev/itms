@@ -17,9 +17,13 @@ namespace Itms.IntegrationTests.Helpdesk;
 /// criterion is about.
 /// </para>
 /// <para>
-/// Tickets are parked in their starting state with <c>TicketWriter.ParkAsync</c> — see the
-/// remarks there for why, and for what WP-1.6 should change about it. Every transition
-/// under test still goes through the real endpoint.
+/// <b>The walks now start from a real assignment.</b> WP-1.3 had to write the status
+/// column with SQL to reach anything past New, and recorded that WP-1.6 should retire that
+/// once <c>Assign</c> existed. It has: <see cref="ParkedTicket"/> reaches
+/// <c>Assigned</c> through the entity's own <c>Assign</c>, and only the states beyond it
+/// are still parked — the deeper ones need a chain of transitions this suite is not
+/// testing on the way to the one it is. Every transition under test goes through the real
+/// endpoint, as it always did.
 /// </para>
 /// </remarks>
 [Collection(IdentityTestGroup.Name)]
@@ -41,9 +45,11 @@ public sealed class TicketStatusEndpointTests(IdentityWebFixture fixture) : IAsy
         {
             foreach (var to in TicketStateMachine.DestinationsFrom(from))
             {
-                // Assigned is legal in the machine but not offered by this endpoint —
-                // it has no assignee to set. See TicketEndpoints and WP-1.6.
-                if (to != TicketStatus.Assigned)
+                // Assigned and New are both legal in the machine and neither is offered
+                // by this endpoint: reaching Assigned means naming somebody and returning
+                // to New means clearing them, and this request carries no assignee either
+                // way. The assignment endpoint owns both. See TicketEndpoints.
+                if (!IsAssignmentsWork(to))
                 {
                     data.Add(from, to);
                 }
@@ -61,7 +67,7 @@ public sealed class TicketStatusEndpointTests(IdentityWebFixture fixture) : IAsy
         {
             foreach (var to in Enum.GetValues<TicketStatus>())
             {
-                if (!TicketStateMachine.CanTransition(from, to) && to != TicketStatus.Assigned)
+                if (!TicketStateMachine.CanTransition(from, to) && !IsAssignmentsWork(to))
                 {
                     data.Add(from, to);
                 }
@@ -70,6 +76,17 @@ public sealed class TicketStatusEndpointTests(IdentityWebFixture fixture) : IAsy
 
         return data;
     }
+
+    /// <summary>
+    /// Whether <paramref name="to"/> is a destination the assignment endpoint owns rather
+    /// than this one.
+    /// </summary>
+    /// <remarks>
+    /// Both are states whose status and assignee have to be written together, which is
+    /// exactly what a status-change request cannot do.
+    /// </remarks>
+    private static bool IsAssignmentsWork(TicketStatus to) =>
+        to is TicketStatus.Assigned or TicketStatus.New;
 
     /// <summary>Every legal move this endpoint offers is accepted and persisted.</summary>
     [Theory]
@@ -380,8 +397,24 @@ public sealed class TicketStatusEndpointTests(IdentityWebFixture fixture) : IAsy
     /// SPEC.md §15 counts ticket modifications as mandatory audit coverage, and a status
     /// transition is the modification the workflow is made of.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The trail is built from the events now, not from an <c>IAuditWriter</c> call in
+    /// the handler.</b> WP-1.3 wrote <c>helpdesk.ticket_status_changed</c> directly because
+    /// it could not publish; WP-1.6 publishes, and deleting that call was the condition
+    /// WP-1.3 attached to doing so. The Audit module's consumer has been bound to these
+    /// events since WP-0.7, so the actions are its own: <c>ticket.status_changed</c> and,
+    /// for a resolve, <c>ticket.resolved</c>.
+    /// </para>
+    /// <para>
+    /// Which makes the rows <em>eventually</em> written, by the outbox dispatcher, rather
+    /// than inside the request — hence the wait. The actor survives the trip because the
+    /// handler stamps it onto the event; the source address does not, because the
+    /// dispatcher runs on a background scope with no request to read one from.
+    /// </para>
+    /// </remarks>
     [Fact]
-    public async Task A_transition_writes_an_audit_row_naming_the_actor_and_the_move()
+    public async Task A_transition_writes_audit_rows_naming_the_actor_and_the_move()
     {
         var client = fixture.CreateClient();
         using var technician = client;
@@ -392,21 +425,44 @@ public sealed class TicketStatusEndpointTests(IdentityWebFixture fixture) : IAsy
         var ticket = await ParkedTicket(TicketStatus.InProgress);
         await Succeeds(technician, ticket, TicketStatus.Resolved, "Replaced the charger.");
 
-        var row = (await AuditQueries.ByEntityAsync(fixture.DataSource, "Ticket", ticket.ToString(), Token))
-            .ShouldHaveSingleItem();
+        var rows = await AuditRowsAsync(ticket, expected: 2);
 
-        row.Action.ShouldBe("helpdesk.ticket_status_changed");
-        row.ActorId.ShouldBe(actor);
-        row.SourceIp.ShouldBe(IdentityWebFixture.RemoteIpAddress);
-        row.Changes["status"].ShouldBe(new("InProgress", "Resolved"));
-        row.Changes["resolutionNotes"].ShouldBe(new(null, "Replaced the charger."));
-        row.Changes.ShouldContainKey("resolvedAt");
-        row.Changes.ShouldNotContainKey("closedAt");
+        var moved = rows.Single(row => row.Action == "ticket.status_changed");
+        moved.ActorId.ShouldBe(actor);
+        moved.Changes["status"].ShouldBe(new("InProgress", "Resolved"));
+
+        // Resolution is a second event rather than four more fields on the first. It is
+        // what keeps the resolution text in the trail now that the handler's own diff is
+        // gone, and it is the event Phase 4's requester notification reads.
+        var resolved = rows.Single(row => row.Action == "ticket.resolved");
+        resolved.ActorId.ShouldBe(actor);
+        resolved.Changes["resolutionSummary"].ShouldBe(new(null, "Replaced the charger."));
+        resolved.Changes.ShouldContainKey("resolvedAt");
+
+        // The cost of deriving the trail from events, asserted rather than assumed so a
+        // later package cannot be surprised by it.
+        moved.SourceIp.ShouldBeNull();
+    }
+
+    /// <summary>A transition that records no resolution raises no resolution event.</summary>
+    [Fact]
+    public async Task An_ordinary_transition_writes_one_audit_row()
+    {
+        using var technician = await SignedInAsync("tech");
+        var ticket = await ParkedTicket(TicketStatus.Assigned);
+
+        await Succeeds(technician, ticket, TicketStatus.InProgress);
+
+        var row = (await AuditRowsAsync(ticket, expected: 1)).ShouldHaveSingleItem();
+
+        row.Action.ShouldBe("ticket.status_changed");
+        row.Changes["status"].ShouldBe(new("Assigned", "InProgress"));
     }
 
     /// <summary>
-    /// The audit row and the change commit together, so a refused transition must leave
-    /// no entry claiming it happened.
+    /// The event and the change commit together, so a refused transition must leave no
+    /// entry claiming it happened — nothing reaches the outbox, so the dispatcher has
+    /// nothing to deliver.
     /// </summary>
     [Fact]
     public async Task A_refused_transition_writes_no_audit_row()
@@ -416,7 +472,33 @@ public sealed class TicketStatusEndpointTests(IdentityWebFixture fixture) : IAsy
 
         (await Move(technician, ticket, TicketStatus.Closed, null)).StatusCode.ShouldBe(HttpStatusCode.Conflict);
 
+        // Driven rather than waited on: an absence proved by a timeout is an absence that
+        // passes for the wrong reason. One deliberate pass of the dispatcher is what makes
+        // "nothing was published" different from "nothing has been delivered yet".
+        await OutboxClient.ProcessOnceAsync(fixture.Services, Token);
+
         (await AuditQueries.ByEntityAsync(fixture.DataSource, "Ticket", ticket.ToString(), Token)).ShouldBeEmpty();
+    }
+
+    /// <summary>
+    /// The audit rows for <paramref name="ticketId"/> once the dispatcher has delivered
+    /// <paramref name="expected"/> of them.
+    /// </summary>
+    /// <param name="ticketId">The ticket whose trail is wanted.</param>
+    /// <param name="expected">How many rows the change should have produced.</param>
+    /// <returns>The rows.</returns>
+    private async Task<IReadOnlyList<AuditRow>> AuditRowsAsync(Guid ticketId, int expected)
+    {
+        await Eventually.UntilAsync(
+            async () => (await AuditQueries.ByEntityAsync(fixture.DataSource, "Ticket", ticketId.ToString(), Token))
+                .Count >= expected,
+            $"{expected} audit rows for ticket {ticketId}",
+            Token);
+
+        var rows = await AuditQueries.ByEntityAsync(fixture.DataSource, "Ticket", ticketId.ToString(), Token);
+        rows.Count.ShouldBe(expected);
+
+        return rows;
     }
 
     private static string Path(Guid ticketId) => $"/api/v1/tickets/{ticketId}/status-changes";
@@ -449,7 +531,17 @@ public sealed class TicketStatusEndpointTests(IdentityWebFixture fixture) : IAsy
         var reference = await TicketWriter.ReferenceDataAsync(fixture.Services, Token);
         var ticket = await TicketWriter.CreateAsync(fixture.Services, TicketWriter.Draft(reference), Token);
 
-        if (status != TicketStatus.New)
+        if (status == TicketStatus.New)
+        {
+            return ticket.Id;
+        }
+
+        // Every state past New is reached by assigning the ticket to somebody, and since
+        // WP-1.6 that is a real operation rather than a SQL update — so the row a walk
+        // starts from carries a coherent assignee, which is what WP-1.3 asked for here.
+        await TicketWriter.AssignAsync(fixture.Services, ticket.Id, Token);
+
+        if (status != TicketStatus.Assigned)
         {
             await TicketWriter.ParkAsync(fixture.DataSource, ticket.Id, status, Token);
         }

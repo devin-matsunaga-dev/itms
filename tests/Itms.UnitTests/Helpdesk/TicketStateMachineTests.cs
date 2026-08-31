@@ -40,6 +40,13 @@ public sealed class TicketStateMachineTests
         // Reopen.
         (TicketStatus.Resolved, TicketStatus.InProgress),
 
+        // Unassignment. The one edge SPEC.md §2 does not draw, added at WP-1.6 at the
+        // human's direction: the alternative was a ticket left in Assigned with nobody
+        // holding it, which is a status that contradicts itself. Only Ticket.Unassign
+        // walks it — Ticket.ChangeStatus refuses New — because unassignment has to clear
+        // the assignee in the same call.
+        (TicketStatus.Assigned, TicketStatus.New),
+
         // Cancelled from any pre-Resolved state.
         (TicketStatus.New, TicketStatus.Cancelled),
         (TicketStatus.Assigned, TicketStatus.Cancelled),
@@ -79,17 +86,25 @@ public sealed class TicketStateMachineTests
         AllOrderedPairs().Count.ShouldBe(49);
     }
 
-    /// <summary>A ticket never returns to New. Nothing in the table points at it.</summary>
+    /// <summary>
+    /// Unassignment is the only way back to New, and it is only available from Assigned.
+    /// </summary>
+    /// <remarks>
+    /// Until WP-1.6 nothing in the table pointed at New at all. The edge exists now so
+    /// that a ticket can be taken off a technician without being left in a state whose
+    /// name claims it still has one — but it stays a single edge, so a ticket that has
+    /// been worked cannot be silently returned to the top of the queue.
+    /// </remarks>
     [Theory]
-    [InlineData(TicketStatus.New)]
-    [InlineData(TicketStatus.Assigned)]
-    [InlineData(TicketStatus.InProgress)]
-    [InlineData(TicketStatus.Waiting)]
-    [InlineData(TicketStatus.Resolved)]
-    [InlineData(TicketStatus.Closed)]
-    [InlineData(TicketStatus.Cancelled)]
-    public void Nothing_returns_a_ticket_to_New(TicketStatus from) =>
-        TicketStateMachine.CanTransition(from, TicketStatus.New).ShouldBeFalse();
+    [InlineData(TicketStatus.New, false)]
+    [InlineData(TicketStatus.Assigned, true)]
+    [InlineData(TicketStatus.InProgress, false)]
+    [InlineData(TicketStatus.Waiting, false)]
+    [InlineData(TicketStatus.Resolved, false)]
+    [InlineData(TicketStatus.Closed, false)]
+    [InlineData(TicketStatus.Cancelled, false)]
+    public void Only_an_Assigned_ticket_can_return_to_New(TicketStatus from, bool expected) =>
+        TicketStateMachine.CanTransition(from, TicketStatus.New).ShouldBe(expected);
 
     /// <summary>Staying put is not a transition — see the remarks on <c>CanTransition</c>.</summary>
     [Theory]

@@ -1,5 +1,6 @@
 using Itms.Modules.Helpdesk.Features.TicketHistory;
 using Itms.Modules.Helpdesk.Features.TicketHistory.ListTicketHistory;
+using Itms.Modules.Helpdesk.Features.Tickets.AssignTicket;
 using Itms.Modules.Helpdesk.Features.Tickets.ChangeTicketStatus;
 using Itms.Modules.Helpdesk.Features.Tickets.CreateTicket;
 using Itms.Modules.Helpdesk.Features.Tickets.GetTicket;
@@ -20,8 +21,9 @@ namespace Itms.Modules.Helpdesk.Features.Tickets;
 /// <summary>The ticket endpoints, under <c>/api/v1/tickets</c>.</summary>
 /// <remarks>
 /// <para>
-/// WP-1.3 mapped the status change, WP-1.4 the timeline that records it, and WP-1.5 the
-/// three that make a ticket reachable at all: create, list, detail.
+/// WP-1.3 mapped the status change, WP-1.4 the timeline that records it, WP-1.5 the three
+/// that make a ticket reachable at all — create, list, detail — and WP-1.6 the assignment
+/// that decides who works it.
 /// </para>
 /// <para>
 /// <b>The group is no longer Technician-only.</b> ARCHITECTURE.md §7 gives a User their own
@@ -85,7 +87,7 @@ internal static class TicketEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var result = await handler.HandleAsync(id, cancellationToken).ConfigureAwait(false);
-                return WithETag(result, context);
+                return WithETag(result, context, detail => detail.Response, detail => detail.Version);
             })
             .WithName("GetTicket")
             .WithSummary("Reads one ticket in full, with the head of its timeline.")
@@ -170,7 +172,7 @@ internal static class TicketEndpoints
                     .HandleAsync(id, request, TicketETag.PreconditionFrom(context.Request), cancellationToken)
                     .ConfigureAwait(false);
 
-                return result.ToOk();
+                return WithETag(result, context, change => change.Response, change => change.Version);
             })
             // Technician or Admin only, narrower than the group: a requester may read and
             // (from WP-1.7) comment on their own ticket, and nothing else.
@@ -188,27 +190,79 @@ internal static class TicketEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed);
+
+        writes
+            .MapPost("/{id:guid}/assignments", async (
+                Guid id,
+                AssignTicketRequest request,
+                AssignTicketHandler handler,
+                HttpContext context,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await handler
+                    .HandleAsync(id, request, TicketETag.PreconditionFrom(context.Request), cancellationToken)
+                    .ConfigureAwait(false);
+
+                return WithETag(result, context, a => a.Response, a => a.Version);
+            })
+            // Technician or Admin, narrower than the group and matching the transitions: a
+            // requester may read and comment on their own ticket, never decide who works it.
+            .RequireAuthorization(ItmsPolicies.Technician)
+            .WithValidation<AssignTicketRequest>()
+            .WithName("AssignTicket")
+            .WithSummary("Assigns, reassigns, or unassigns a ticket.")
+            .WithDescription(
+                "Send an assigneeId to put a technician in charge, or null to unassign. The first "
+                + "assignment moves the ticket from New to Assigned and unassigning moves it back; "
+                + "reassignment leaves the status alone. Send the ticket's ETag as If-Match to be "
+                + "refused with 412 if it has moved since you read it.")
+            .Produces<TicketAssignmentResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed);
     }
 
     /// <summary>
-    /// 200 with the ticket and its <c>ETag</c>, or the mapped problem response.
+    /// 200 with the payload and its <c>ETag</c>, or the mapped problem response.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Not <c>ToOk</c>, because the header has to be set on the way out and only a success
     /// has a version to set it from. A failure goes through exactly the same mapper every
     /// other endpoint uses.
+    /// </para>
+    /// <para>
+    /// Every read and every write of a ticket answers with a tag, so a client always
+    /// leaves an exchange holding a precondition it can state on the next one. WP-1.5 left
+    /// the status change without one because the freshness of the <c>xmin</c> shadow
+    /// property after <c>SaveChanges</c> had not been checked; WP-1.6 checked it, and the
+    /// two writes now answer the same way the detail read does.
+    /// </para>
     /// </remarks>
-    private static IResult WithETag(Result<TicketDetail> result, HttpContext context)
+    /// <typeparam name="TResult">The handler's result, carrying a response and a version.</typeparam>
+    /// <typeparam name="TResponse">The body the client sees.</typeparam>
+    /// <param name="result">What the handler returned.</param>
+    /// <param name="context">The request, whose response headers the tag is set on.</param>
+    /// <param name="response">Reads the body out of the result.</param>
+    /// <param name="version">Reads the row version out of the result.</param>
+    private static IResult WithETag<TResult, TResponse>(
+        Result<TResult> result,
+        HttpContext context,
+        Func<TResult, TResponse> response,
+        Func<TResult, uint> version)
     {
         if (result.IsFailure)
         {
             return ProblemDetailsMapper.ToProblem(result.Error!);
         }
 
-        var detail = result.Value;
-        SetETag(context, detail.Version);
+        var value = result.Value;
+        SetETag(context, version(value));
 
-        return MinimalApi.Ok(detail.Response);
+        return MinimalApi.Ok(response(value));
     }
 
     private static void SetETag(HttpContext context, uint version) =>

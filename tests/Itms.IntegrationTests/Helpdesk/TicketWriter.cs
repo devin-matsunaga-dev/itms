@@ -119,18 +119,18 @@ internal static class TicketWriter
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Why this bypasses the entity.</b> Every state past <c>New</c> is reached by
-    /// first assigning the ticket to somebody, and assignment is WP-1.6 — so until that
-    /// package lands there is no legitimate route to <c>Assigned</c> and therefore none to
-    /// anything beyond it. A suite that could only reach <c>New</c> could not assert the
-    /// state machine over the wire at all, which is what WP-1.3 is required to do.
+    /// <b>Why this bypasses the entity, and what WP-1.6 took back from it.</b> Reaching
+    /// <c>Assigned</c> no longer needs this — <see cref="AssignAsync"/> does it through
+    /// the entity — and <c>TicketStatusEndpointTests</c> now starts its walks there. What
+    /// this is still for is the states <em>beyond</em> Assigned: reaching Waiting or
+    /// Resolved legitimately means walking a chain of transitions that are themselves
+    /// under test elsewhere, and arranging one test by exercising another is how a suite
+    /// stops telling you which thing broke.
     /// </para>
     /// <para>
     /// It is test <em>arrangement</em>, never the thing under test: every assertion still
     /// makes its transition through the real endpoint. This is the same move WP-1.2 made
     /// when it attacked the foreign keys and the soft-delete filter with plain SQL.
-    /// <b>When WP-1.6 arrives, the walks that start here should start from a real
-    /// assignment instead.</b>
     /// </para>
     /// </remarks>
     /// <param name="dataSource">The test database.</param>
@@ -282,6 +282,68 @@ internal static class TicketWriter
             },
             cancellationToken);
     }
+
+    /// <summary>
+    /// Assigns a ticket the way <c>AssignTicketHandler</c> does — snapshot, entity call,
+    /// record, save — so a starting state past <c>New</c> is reached by the production
+    /// path rather than by writing the status column.
+    /// </summary>
+    /// <remarks>
+    /// It stops short of publishing. A suite arranging a starting state does not want two
+    /// audit rows about the arrangement turning up in the trail it is asserting on, and
+    /// <c>TicketAssignmentEndpointTests</c> is where the events themselves are proved.
+    /// </remarks>
+    /// <param name="services">The host's provider.</param>
+    /// <param name="ticketId">The ticket to assign.</param>
+    /// <param name="cancellationToken">Cancels the work.</param>
+    /// <param name="assigneeId">Who takes it on. Defaults to a stable fake technician.</param>
+    /// <param name="assigneeName">Their display name.</param>
+    public static async Task AssignAsync(
+        IServiceProvider services,
+        Guid ticketId,
+        CancellationToken cancellationToken,
+        Guid? assigneeId = null,
+        string assigneeName = "Priya Raman")
+    {
+        await using var scope = services.CreateAsyncScope();
+        var provider = scope.ServiceProvider;
+        var database = provider.GetRequiredService<HelpdeskDbContext>();
+        var session = provider.GetRequiredService<IModuleDbSession>();
+        var history = provider.GetRequiredService<TicketHistoryRecorder>();
+        var clock = provider.GetRequiredService<IClock>();
+
+        await session.ExecuteInTransactionAsync(
+            async token =>
+            {
+                await session.EnlistAsync(database, token);
+
+                var ticket = await database.Tickets.SingleAsync(candidate => candidate.Id == ticketId, token);
+                var before = TicketSnapshot.Of(ticket);
+                var now = clock.UtcNow;
+
+                var assigned = ticket.Assign(assigneeId ?? StandInTechnician, assigneeName, now, actor: null);
+                if (assigned.IsFailure)
+                {
+                    throw new InvalidOperationException(
+                        $"The suite could not assign ticket {ticketId}: {assigned.Error!.Message}");
+                }
+
+                await history.RecordAsync(ticket, before, now, token);
+                await database.SaveChangesAsync(token);
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// The technician <see cref="AssignAsync"/> hands tickets to by default.
+    /// </summary>
+    /// <remarks>
+    /// A fixed id rather than a fresh one per call, so two arrangements in one test assign
+    /// to the same person and a reassignment in a test is visibly a different id. It is
+    /// not a real account: the entity does not check, and the endpoint tests use the
+    /// seeded ones where it does.
+    /// </remarks>
+    public static readonly Guid StandInTechnician = new("0199a2c1-0000-7000-8000-000000000001");
 
     /// <summary>The numbers of every ticket in the database, in issue order.</summary>
     /// <param name="services">The host's provider.</param>

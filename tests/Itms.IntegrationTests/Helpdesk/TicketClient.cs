@@ -132,7 +132,8 @@ public sealed record TicketListItemDto(
 /// <remarks>
 /// Unlike <c>TicketWriter</c>, everything here goes over the wire through the real
 /// endpoints. <c>TicketWriter</c> stays for the two things HTTP cannot reach — arranging a
-/// starting status before WP-1.6's assignment exists, and failing a transaction from inside.
+/// starting status past <c>Assigned</c> without walking transitions that are themselves
+/// under test, and failing a transaction from inside.
 /// </remarks>
 internal static class TicketClient
 {
@@ -289,6 +290,67 @@ internal static class TicketClient
         return await client.SendAsync(request, cancellationToken);
     }
 
+    /// <summary>Changes a ticket's assignee, optionally stating an <c>If-Match</c> precondition.</summary>
+    /// <remarks>
+    /// Built by hand rather than through <c>ApiClient.SendAsync</c> for the reason
+    /// <see cref="ChangeStatusAsync"/> is: a test has to be able to attach a deliberately
+    /// malformed <c>If-Match</c> without <c>HttpClient</c> validating it away.
+    /// </remarks>
+    /// <param name="client">A technician or admin client.</param>
+    /// <param name="ticketId">The ticket to assign.</param>
+    /// <param name="assigneeId">Who takes it on, or null to unassign.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="ifMatch">The entity tag to require, or null to state no precondition.</param>
+    /// <returns>The raw response.</returns>
+    public static async Task<HttpResponseMessage> AssignAsync(
+        HttpClient client,
+        Guid ticketId,
+        Guid? assigneeId,
+        CancellationToken cancellationToken,
+        string? ifMatch = null)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{Tickets}/{ticketId}/assignments")
+        {
+            Content = JsonContent.Create(new { assigneeId }, options: Json),
+        };
+
+        if (ifMatch is not null)
+        {
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        var csrf = await client.GetFromJsonAsync<CsrfDto>(
+            new Uri("/api/v1/auth/csrf", UriKind.Relative),
+            Json,
+            cancellationToken)
+            ?? throw new InvalidOperationException("No antiforgery token was issued.");
+
+        request.Headers.Add(csrf.HeaderName, csrf.Token);
+        return await client.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>Assigns a ticket and returns the result, failing loudly if the call did not succeed.</summary>
+    /// <param name="client">A technician or admin client.</param>
+    /// <param name="ticketId">The ticket to assign.</param>
+    /// <param name="assigneeId">Who takes it on, or null to unassign.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The assignment, and the ETag the response carried.</returns>
+    public static async Task<(TicketAssignmentDto Assignment, string ETag)> AssignsAsync(
+        HttpClient client,
+        Guid ticketId,
+        Guid? assigneeId,
+        CancellationToken cancellationToken)
+    {
+        var response = await AssignAsync(client, ticketId, assigneeId, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (
+            await ApiClient.ReadAsync<TicketAssignmentDto>(response, cancellationToken),
+            response.Headers.ETag?.ToString() ?? string.Empty);
+    }
+
     /// <summary>Reads a page of the queue.</summary>
     /// <param name="client">The signed-in client.</param>
     /// <param name="query">The query string, without the leading question mark.</param>
@@ -323,3 +385,26 @@ internal static class TicketClient
 
     private sealed record CsrfDto(string HeaderName, string Token);
 }
+
+/// <summary>An assignment as the suite reads it off the wire.</summary>
+/// <param name="Id">The ticket.</param>
+/// <param name="Number">Its human-readable number.</param>
+/// <param name="PreviousAssigneeId">Who held it before, or null.</param>
+/// <param name="PreviousAssigneeName">Their cached display name, or null.</param>
+/// <param name="AssigneeId">Who holds it now, or null.</param>
+/// <param name="AssigneeName">Their cached display name, or null.</param>
+/// <param name="PreviousStatus">The status before the assignment.</param>
+/// <param name="Status">The status after it.</param>
+/// <param name="ChangedAt">When it happened.</param>
+/// <param name="AllowedNextStatuses">The moves the ticket may still make.</param>
+public sealed record TicketAssignmentDto(
+    Guid Id,
+    string Number,
+    Guid? PreviousAssigneeId,
+    string? PreviousAssigneeName,
+    Guid? AssigneeId,
+    string? AssigneeName,
+    TicketStatus PreviousStatus,
+    TicketStatus Status,
+    DateTimeOffset ChangedAt,
+    IReadOnlyList<TicketStatus> AllowedNextStatuses);

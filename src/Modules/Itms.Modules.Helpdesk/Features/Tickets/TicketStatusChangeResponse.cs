@@ -29,3 +29,13 @@ public sealed record TicketStatusChangeResponse(
     DateTimeOffset? ResolvedAt,
     DateTimeOffset? ClosedAt,
     IReadOnlyCollection<TicketStatus> AllowedNextStatuses);
+
+/// <summary>A status change together with the row version the ticket carries after it.</summary>
+/// <remarks>
+/// Internal and never serialised, for the reason <see cref="TicketDetail"/> gives: the
+/// version is a fact about the write rather than part of the ticket, and it travels as an
+/// <c>ETag</c> header.
+/// </remarks>
+/// <param name="Response">The transition as the client sees it.</param>
+/// <param name="Version">The <c>xmin</c> row version after the write.</param>
+internal sealed record TicketStatusChange(TicketStatusChangeResponse Response, uint Version);

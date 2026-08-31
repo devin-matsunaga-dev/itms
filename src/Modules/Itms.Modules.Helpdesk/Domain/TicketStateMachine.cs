@@ -27,6 +27,16 @@ namespace Itms.Modules.Helpdesk.Domain;
 /// SPEC.md names no way out of it, and terminal is the safer reading of silence.
 /// </para>
 /// <para>
+/// <b><c>Assigned → New</c> is the one edge SPEC.md §2 does not draw, and it is here on
+/// purpose.</b> WP-1.6 has to be able to unassign, and the alternative — leaving the
+/// ticket in <see cref="TicketStatus.Assigned"/> with nobody holding it — is a state
+/// that contradicts its own name. Making unassignment a real transition instead means it
+/// is refused from the wrong state like any other move, and writes its history line like
+/// any other move. It is walked only by <c>Ticket.Unassign</c>: the general mover
+/// refuses <see cref="TicketStatus.New"/> outright, because a bare move here would strand
+/// the assignee on a ticket that is New again.
+/// </para>
+/// <para>
 /// <b>This type decides nothing about who may make a move, or what else the move
 /// writes.</b> It is a pure lookup over the states. <see cref="Ticket"/> owns the field
 /// writes and the invariants that go with them; the endpoint owns the policy, and owns
@@ -42,16 +52,17 @@ public static class TicketStateMachine
     /// <remarks>
     /// <see cref="TicketStatus.Assigned"/> is in the table like any other state, because
     /// the table is the workflow and the workflow contains it. What it does <em>not</em>
-    /// have is an intent-named wrapper on <see cref="Ticket"/>: a ticket reaches Assigned
-    /// by being assigned to somebody, which is WP-1.6's <c>Assign</c>, and the
-    /// status-change endpoint refuses that destination because it carries no assignee to
-    /// go with it.
+    /// have is an intent-named wrapper reachable from the status-change endpoint: a ticket
+    /// reaches Assigned by being assigned to somebody — <c>Ticket.Assign</c> — and that
+    /// endpoint refuses the destination because it carries no assignee to go with it.
+    /// <see cref="TicketStatus.New"/> is the mirror image: legal from Assigned, walked
+    /// only by <c>Ticket.Unassign</c>, refused by the general mover and by the endpoint.
     /// </remarks>
     private static readonly FrozenDictionary<TicketStatus, FrozenSet<TicketStatus>> LegalDestinations =
         new Dictionary<TicketStatus, FrozenSet<TicketStatus>>
         {
             [TicketStatus.New] = Set(TicketStatus.Assigned, TicketStatus.Cancelled),
-            [TicketStatus.Assigned] = Set(TicketStatus.InProgress, TicketStatus.Waiting, TicketStatus.Cancelled),
+            [TicketStatus.Assigned] = Set(TicketStatus.New, TicketStatus.InProgress, TicketStatus.Waiting, TicketStatus.Cancelled),
             [TicketStatus.InProgress] = Set(TicketStatus.Waiting, TicketStatus.Resolved, TicketStatus.Cancelled),
             [TicketStatus.Waiting] = Set(TicketStatus.InProgress, TicketStatus.Resolved, TicketStatus.Cancelled),
             [TicketStatus.Resolved] = Set(TicketStatus.Closed, TicketStatus.InProgress),

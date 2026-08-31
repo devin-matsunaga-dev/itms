@@ -11,8 +11,9 @@ namespace Itms.Modules.Helpdesk.Domain;
 /// <b>Shape and number</b> are WP-1.2's. <b>Movement</b> is WP-1.3's: <see cref="ChangeStatus"/>
 /// and the intent-named methods around it are the only way <see cref="Status"/> ever
 /// changes, and they are the only place <see cref="ResolvedAt"/> and <see cref="ClosedAt"/>
-/// are written. There is still no <c>Assign</c> — that is WP-1.6, and it is what moves a
-/// ticket out of <see cref="TicketStatus.New"/>.
+/// are written. <b>Who holds it</b> is WP-1.6's: <see cref="Assign"/> and
+/// <see cref="Unassign"/> are the only way <see cref="AssigneeId"/> ever changes, and each
+/// moves the status in the same call rather than leaving the two to be set separately.
 /// </para>
 /// <para>
 /// <b>Why the forward fields are here and empty.</b> <see cref="AssigneeId"/>,
@@ -96,10 +97,20 @@ public sealed class Ticket
     /// <summary>Where it sits in the workflow. Always set; <see cref="TicketStatus.New"/> at creation.</summary>
     public TicketStatus Status { get; private set; }
 
-    /// <summary>The technician responsible, or <see langword="null"/> while unassigned. WP-1.6 moves it.</summary>
+    /// <summary>
+    /// The technician responsible, or <see langword="null"/> while unassigned.
+    /// </summary>
+    /// <remarks>
+    /// <b>Non-null exactly when the ticket has left <see cref="TicketStatus.New"/> without
+    /// being cancelled.</b> Nothing but <see cref="Assign"/> and <see cref="Unassign"/>
+    /// writes it, and both move the status in the same call, so "Assigned to nobody"
+    /// cannot be reached: assigning a New ticket moves it to
+    /// <see cref="TicketStatus.Assigned"/>, and unassigning an Assigned one moves it back
+    /// to New.
+    /// </remarks>
     public Guid? AssigneeId { get; private set; }
 
-    /// <summary>That technician's display name, cached when they were assigned. WP-1.6 sets it.</summary>
+    /// <summary>That technician's display name, cached when they were assigned. See the class remarks on staleness.</summary>
     public string? AssigneeName { get; private set; }
 
     /// <summary>
@@ -213,13 +224,15 @@ public sealed class Ticket
     /// on the entity is written on a failure.
     /// </para>
     /// <para>
-    /// <b>One destination has no wrapper, on purpose.</b> Moving to
-    /// <see cref="TicketStatus.Assigned"/> is legal in the table — it is the workflow's
-    /// own first step — but a ticket in that state with nobody responsible for it would be
-    /// a lie, and this method has no assignee to set. WP-1.6's <c>Assign</c> is what
-    /// composes the two, and until it exists the status-change endpoint refuses
-    /// <see cref="TicketStatus.Assigned"/> outright. <b>WP-1.6 must set
-    /// <see cref="AssigneeId"/> in the same call that moves the status here.</b>
+    /// <b>Two destinations are not this method's to give.</b> Both
+    /// <see cref="TicketStatus.Assigned"/> and <see cref="TicketStatus.New"/> are legal in
+    /// the table, and both are half of a change this method cannot make: reaching Assigned
+    /// means naming somebody, and returning to New means clearing them. A ticket that was
+    /// Assigned to nobody, or New while somebody still held it, would be a row that
+    /// contradicts its own status. <see cref="Assign"/> and <see cref="Unassign"/> compose
+    /// the two writes; this method refuses <see cref="TicketStatus.New"/> outright, and
+    /// the status-change endpoint refuses <see cref="TicketStatus.Assigned"/> because it
+    /// carries no assignee to go with it.
     /// </para>
     /// </remarks>
     /// <param name="target">The status being asked for.</param>
@@ -232,6 +245,44 @@ public sealed class Ticket
     /// <param name="actor">Who is making the move.</param>
     /// <returns>Success, or a conflict describing why the move is refused.</returns>
     public Result ChangeStatus(
+        TicketStatus target,
+        string? resolutionNotes,
+        DateTimeOffset now,
+        Guid? actor)
+    {
+        if (target == TicketStatus.New && TicketStateMachine.CanTransition(Status, TicketStatus.New))
+        {
+            // The table allows Assigned → New, because unassignment is a real transition
+            // and has to be refused from the wrong state like any other. Only Unassign may
+            // walk it: it clears the assignee in the same call, and a bare move here would
+            // leave a New ticket still holding a technician.
+            //
+            // Guarded on the edge existing, not on the destination, so that every other
+            // request for New — from Closed, from Waiting, from New itself — keeps the
+            // plain illegal_transition it has always answered with. Only the one state
+            // that could walk the edge is told to use the door instead.
+            return HelpdeskErrors.UnassignToReturnToNew();
+        }
+
+        return Move(target, resolutionNotes, now, actor);
+    }
+
+    /// <summary>
+    /// The transition itself, with no opinion about which destinations a caller is
+    /// entitled to ask for.
+    /// </summary>
+    /// <remarks>
+    /// Private, and the only writer of <see cref="Status"/>. <see cref="ChangeStatus"/>
+    /// is the door for every destination but <see cref="TicketStatus.New"/>;
+    /// <see cref="Unassign"/> is the door for that one, and it is a door precisely
+    /// because it also clears the assignee.
+    /// </remarks>
+    /// <param name="target">The status being moved to.</param>
+    /// <param name="resolutionNotes">The resolution, when resolving.</param>
+    /// <param name="now">The current instant.</param>
+    /// <param name="actor">Who is making the move.</param>
+    /// <returns>Success, or a conflict describing why the move is refused.</returns>
+    private Result Move(
         TicketStatus target,
         string? resolutionNotes,
         DateTimeOffset now,
@@ -288,14 +339,19 @@ public sealed class Ticket
                 break;
 
             case TicketStatus.Assigned:
-                // Reached only through WP-1.6's Assign, which sets the assignee in the same
-                // breath. See the remarks: this method will not stop a caller asking for it
-                // bare, and the status-change endpoint is what refuses to.
+                // Reached only through Assign, which sets the assignee in the same breath.
+                // See the remarks: this method will not stop a caller asking for it bare,
+                // and the status-change endpoint is what refuses to.
                 break;
 
             case TicketStatus.New:
+                // Reached only through Unassign, which clears the assignee in the same
+                // breath. ChangeStatus refuses this destination before it ever gets here.
+                break;
+
             default:
-                // Unreachable: nothing in the table returns a ticket to New.
+                // Unreachable for a defined TicketStatus; a value outside the enum would
+                // already have failed CanTransition above.
                 return HelpdeskErrors.IllegalTransition(Status, target);
         }
 
@@ -355,6 +411,122 @@ public sealed class Ticket
     /// <returns>Success, or a conflict.</returns>
     public Result Cancel(DateTimeOffset now, Guid? actor) =>
         ChangeStatus(TicketStatus.Cancelled, resolutionNotes: null, now, actor);
+
+    /// <summary>
+    /// Puts <paramref name="assigneeId"/> in charge of the ticket, moving it out of
+    /// <see cref="TicketStatus.New"/> if that is where it was.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The assignee and the status are written in one call, and that is the point.</b>
+    /// A ticket in <see cref="TicketStatus.Assigned"/> that nobody holds is a row that
+    /// contradicts its own status, and the only way to be sure it never exists is for the
+    /// entity — not a handler that remembered both steps — to make them together.
+    /// </para>
+    /// <para>
+    /// <b>Reassignment preserves the status.</b> Handing an In Progress ticket to somebody
+    /// else does not restart it, and handing on a Waiting one does not unblock it; only
+    /// the first assignment moves the workflow, because only New has somewhere to move to.
+    /// </para>
+    /// <para>
+    /// <b>Whether the assignee is a technician is not decided here.</b> That is a fact
+    /// about an account in another module, which this entity cannot read and must not
+    /// guess at; the handler resolves it through <c>IUserLookup</c> before calling in.
+    /// What is decided here is that a terminal ticket has no work left to hand anybody.
+    /// </para>
+    /// </remarks>
+    /// <param name="assigneeId">The technician taking it on.</param>
+    /// <param name="assigneeName">Their display name, cached on the row (§3 rule 6).</param>
+    /// <param name="now">The current instant, from <c>IClock</c>.</param>
+    /// <param name="actor">Who is making the assignment.</param>
+    /// <returns>Success, or a conflict describing why the assignment is refused.</returns>
+    /// <exception cref="ArgumentException">The id is empty or the name is blank or over-long.</exception>
+    public Result Assign(Guid assigneeId, string assigneeName, DateTimeOffset now, Guid? actor)
+    {
+        var id = Required(assigneeId, nameof(assigneeId), nameof(assigneeId));
+        var name = ReferenceText.Name(assigneeName, DisplayNameMaxLength, nameof(assigneeName));
+
+        if (TicketStateMachine.IsTerminal(Status))
+        {
+            return HelpdeskErrors.TicketNotAssignable(Status);
+        }
+
+        if (id == AssigneeId)
+        {
+            // Not a no-op: it would write a history line saying the ticket moved from a
+            // technician to the same technician. The same call WP-1.3 made for a status
+            // that is already the ticket's own.
+            return HelpdeskErrors.AlreadyAssignedToThatTechnician(name);
+        }
+
+        // Moved first, so a refused transition leaves the assignee untouched. From any
+        // state but New there is nothing to move: only the first assignment starts the
+        // workflow.
+        if (Status == TicketStatus.New)
+        {
+            var moved = Move(TicketStatus.Assigned, resolutionNotes: null, now, actor);
+
+            if (moved.IsFailure)
+            {
+                return moved;
+            }
+        }
+
+        AssigneeId = id;
+        AssigneeName = name;
+        UpdatedAt = now;
+        UpdatedBy = actor;
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Takes the ticket back off whoever holds it, returning it to
+    /// <see cref="TicketStatus.New"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Only an <see cref="TicketStatus.Assigned"/> ticket can be unassigned</b>, and it
+    /// goes back to New rather than sitting assigned to nobody. Once work has started —
+    /// In Progress, Waiting, Resolved — the ticket has a history somebody owns, and the
+    /// answer to "this is not mine" is to hand it on with <see cref="Assign"/>, not to
+    /// drop it back on the queue as though nothing had happened.
+    /// </para>
+    /// <para>
+    /// <c>Assigned → New</c> is the one edge SPEC.md §2 does not draw. It is in the table
+    /// at the human's direction, as the alternative to a ticket whose status claims an
+    /// owner it does not have.
+    /// </para>
+    /// </remarks>
+    /// <param name="now">The current instant, from <c>IClock</c>.</param>
+    /// <param name="actor">Who is unassigning it.</param>
+    /// <returns>Success, or a conflict describing why the ticket cannot be unassigned.</returns>
+    public Result Unassign(DateTimeOffset now, Guid? actor)
+    {
+        if (AssigneeId is null)
+        {
+            return HelpdeskErrors.TicketNotAssigned();
+        }
+
+        if (Status != TicketStatus.Assigned)
+        {
+            return HelpdeskErrors.CannotUnassignFrom(Status);
+        }
+
+        var moved = Move(TicketStatus.New, resolutionNotes: null, now, actor);
+
+        if (moved.IsFailure)
+        {
+            return moved;
+        }
+
+        AssigneeId = null;
+        AssigneeName = null;
+        UpdatedAt = now;
+        UpdatedBy = actor;
+
+        return Result.Success();
+    }
 
     private static Guid Required(Guid value, string field, string parameterName) =>
         value == Guid.Empty

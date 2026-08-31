@@ -213,6 +213,99 @@ internal static class HelpdeskErrors
                 ["resolutionNotes"] = ["Resolution notes are only recorded when resolving a ticket."],
             });
 
+    /// <summary>No such user, as far as Identity is concerned.</summary>
+    public static Error AssigneeNotFound() =>
+        Error.Validation(
+            "helpdesk.assignee_not_found",
+            "No such user.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["assigneeId"] = ["No such user."],
+            });
+
+    /// <summary>The account exists but has been deactivated, so it cannot be given work.</summary>
+    public static Error AssigneeInactive() =>
+        Error.Validation(
+            "helpdesk.assignee_inactive",
+            "That account has been deactivated, so a ticket cannot be assigned to it.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["assigneeId"] = ["That account has been deactivated, so a ticket cannot be assigned to it."],
+            });
+
+    /// <summary>
+    /// The account exists and is active but holds neither the Technician nor the Admin
+    /// role, so it is not somebody a ticket can be given to.
+    /// </summary>
+    /// <remarks>
+    /// Checked server-side against <c>IUserLookup</c>'s role list rather than left to the
+    /// picker: ARCHITECTURE.md §7 says the React app hiding what a role cannot do is never
+    /// the enforcement, and assigning a ticket to an end user would put it in a queue they
+    /// have no route to work.
+    /// </remarks>
+    public static Error AssigneeNotTechnician() =>
+        Error.Validation(
+            "helpdesk.assignee_not_technician",
+            "A ticket can only be assigned to a technician or an administrator.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["assigneeId"] = ["A ticket can only be assigned to a technician or an administrator."],
+            });
+
+    /// <summary>The ticket is Closed or Cancelled, so there is no work left to hand anybody.</summary>
+    public static Error TicketNotAssignable(TicketStatus status) =>
+        Error.Conflict(
+            "helpdesk.ticket_not_assignable",
+            $"A {Describe(status)} ticket cannot be assigned.");
+
+    /// <summary>
+    /// The ticket is already held by the technician the caller named.
+    /// </summary>
+    /// <remarks>
+    /// A conflict rather than a silent success, for the reason WP-1.3 refused a move to
+    /// the status a ticket is already in: it would write a history line saying the ticket
+    /// passed from somebody to themselves.
+    /// </remarks>
+    public static Error AlreadyAssignedToThatTechnician(string assigneeName) =>
+        Error.Conflict(
+            "helpdesk.already_assigned",
+            $"The ticket is already assigned to {assigneeName}.");
+
+    /// <summary>Nobody holds the ticket, so there is nothing to take off them.</summary>
+    public static Error TicketNotAssigned() =>
+        Error.Conflict(
+            "helpdesk.ticket_not_assigned",
+            "The ticket is not assigned to anybody.");
+
+    /// <summary>
+    /// The ticket has moved past <see cref="TicketStatus.Assigned"/>, so it cannot be
+    /// dropped back on the queue.
+    /// </summary>
+    /// <remarks>
+    /// Work that has started belongs to somebody until it is handed on. Reassigning is the
+    /// answer to "this is not mine"; unassigning would leave an In Progress ticket with no
+    /// owner, which is the state this package exists to make unreachable.
+    /// </remarks>
+    public static Error CannotUnassignFrom(TicketStatus status) =>
+        Error.Conflict(
+            "helpdesk.cannot_unassign",
+            $"A {Describe(status)} ticket cannot be unassigned. Assign it to somebody else instead.");
+
+    /// <summary>
+    /// A caller asked the general status mover to return a ticket to
+    /// <see cref="TicketStatus.New"/>.
+    /// </summary>
+    /// <remarks>
+    /// <c>Assigned → New</c> is legal in the table, but it is unassignment, and
+    /// unassignment clears the assignee in the same call. Walking the edge without doing
+    /// that would leave a New ticket still holding a technician — so the mover refuses it
+    /// and names the operation that does it properly.
+    /// </remarks>
+    public static Error UnassignToReturnToNew() =>
+        Error.Conflict(
+            "helpdesk.unassign_to_return_to_new",
+            "Unassign the ticket to return it to New.");
+
     /// <summary>
     /// Somebody else moved the ticket between this request reading it and writing it.
     /// The <c>xmin</c> token WP-1.2 mapped is what notices.

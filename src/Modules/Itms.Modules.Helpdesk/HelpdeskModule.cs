@@ -14,6 +14,7 @@ using Itms.Modules.Helpdesk.Features.TicketPriorities.ListTicketPriorities;
 using Itms.Modules.Helpdesk.Features.TicketPriorities.SetTicketPriorityStatus;
 using Itms.Modules.Helpdesk.Features.TicketPriorities.UpdateTicketPriority;
 using Itms.Modules.Helpdesk.Features.Tickets;
+using Itms.Modules.Helpdesk.Features.Tickets.AssignTicket;
 using Itms.Modules.Helpdesk.Features.Tickets.ChangeTicketStatus;
 using Itms.Modules.Helpdesk.Features.Tickets.CreateTicket;
 using Itms.Modules.Helpdesk.Features.Tickets.GetTicket;
@@ -82,6 +83,7 @@ public static class HelpdeskModule
         services.TryAddScoped<ListTicketsHandler>();
         services.TryAddScoped<GetTicketHandler>();
         services.TryAddScoped<ChangeTicketStatusHandler>();
+        services.TryAddScoped<AssignTicketHandler>();
         services.TryAddScoped<ListTicketHistoryHandler>();
 
         // Scoped, because it adds its entries to the scope's own context and they go to
@@ -100,6 +102,7 @@ public static class HelpdeskModule
         services.TryAddScoped<IValidator<UpdateTicketPriorityRequest>, UpdateTicketPriorityValidator>();
         services.TryAddScoped<IValidator<ChangeTicketStatusRequest>, ChangeTicketStatusValidator>();
         services.TryAddScoped<IValidator<CreateTicketRequest>, CreateTicketValidator>();
+        services.TryAddScoped<IValidator<AssignTicketRequest>, AssignTicketValidator>();
 
         return services;
     }

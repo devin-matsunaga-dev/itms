@@ -10,13 +10,22 @@ namespace Itms.Contracts.Lookups;
 /// <param name="DepartmentId">Their department, if set.</param>
 /// <param name="LocationId">Their location, if set.</param>
 /// <param name="IsActive">False once deactivated. A deactivated user still owns their history (invariant 9).</param>
+/// <param name="Roles">
+/// The roles the account holds, from the three <c>ItmsRoles</c> names. Carried because
+/// eligibility rules are a module's own business but the role that decides them is
+/// Identity's: Helpdesk may only assign a ticket to a technician (WP-1.6), and without
+/// this it would have to either reference <c>Modules.Identity</c> or trust the caller.
+/// A membership list rather than a workflow flag, so no one module's question is baked
+/// into the contract.
+/// </param>
 public sealed record UserSummary(
     Guid Id,
     string DisplayName,
     string Email,
     Guid? DepartmentId,
     Guid? LocationId,
-    bool IsActive);
+    bool IsActive,
+    IReadOnlyList<string> Roles);
 
 /// <summary>
 /// How every other module reads users. Helpdesk needs a requester's name, Assets

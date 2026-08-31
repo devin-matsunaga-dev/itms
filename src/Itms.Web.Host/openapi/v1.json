@@ -2216,10 +2216,133 @@
           { }
         ]
       }
+    },
+    "/api/v1/tickets/{id}/assignments": {
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Assigns, reassigns, or unassigns a ticket.",
+        "description": "Send an assigneeId to put a technician in charge, or null to unassign. The first assignment moves the ticket from New to Assigned and unassigning moves it back; reassignment leaves the status alone. Send the ticket's ETag as If-Match to be refused with 412 if it has moved since you read it.",
+        "operationId": "AssignTicket",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignTicketRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketAssignmentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "AssignTicketRequest": {
+        "required": [
+          "assigneeId"
+        ],
+        "type": "object",
+        "properties": {
+          "assigneeId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The technician taking the ticket on, or `null` to unassign it. A null\nis a deliberate instruction, not an omitted field: unassigning returns the ticket to\n`New`, and is refused once work has started.",
+            "format": "uuid"
+          }
+        },
+        "description": "The body of `POST /api/v1/tickets/{id}/assignments`."
+      },
       "AuthenticatedUserResponse": {
         "required": [
           "id",
@@ -3170,6 +3293,83 @@
           null
         ]
       },
+      "TicketAssignmentResponse": {
+        "required": [
+          "id",
+          "number",
+          "previousAssigneeId",
+          "previousAssigneeName",
+          "assigneeId",
+          "assigneeName",
+          "previousStatus",
+          "status",
+          "changedAt",
+          "allowedNextStatuses"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The ticket.",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "Its human-readable number, so a toast can name it."
+          },
+          "previousAssigneeId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who held it before, or `null` if nobody did.",
+            "format": "uuid"
+          },
+          "previousAssigneeName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Their display name as the ticket had cached it, or `null`."
+          },
+          "assigneeId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who holds it now, or `null` after an unassignment.",
+            "format": "uuid"
+          },
+          "assigneeName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Their display name, cached on the row at this moment."
+          },
+          "previousStatus": {
+            "description": "The status before the assignment.",
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "status": {
+            "description": "The status now. It differs from PreviousStatus only on a first\nassignment (`New → Assigned`) and on an unassignment (`Assigned → New`);\nreassignment leaves the workflow exactly where it was.",
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "changedAt": {
+            "type": "string",
+            "description": "When the assignment happened, in UTC.",
+            "format": "date-time"
+          },
+          "allowedNextStatuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketStatus"
+            },
+            "description": "Where the ticket may go next, straight from the state machine, for the same reason\nTicketStatusChangeResponse carries it: WP-1.10 must not render a\ntransition the server would refuse."
+          }
+        },
+        "description": "What a ticket looks like immediately after its assignee changed."
+      },
       "TicketCategoryResponse": {
         "required": [
           "id",
@@ -3921,7 +4121,8 @@
           "email",
           "departmentId",
           "locationId",
-          "isActive"
+          "isActive",
+          "roles"
         ],
         "type": "object",
         "properties": {
@@ -3957,6 +4158,13 @@
           "isActive": {
             "type": "boolean",
             "description": "False once deactivated. A deactivated user still owns their history (invariant 9)."
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The roles the account holds, from the three `ItmsRoles` names. Carried because\neligibility rules are a module's own business but the role that decides them is\nIdentity's: Helpdesk may only assign a ticket to a technician (WP-1.6), and without\nthis it would have to either reference `Modules.Identity` or trust the caller.\nA membership list rather than a workflow flag, so no one module's question is baked\ninto the contract."
           }
         },
         "description": "The fields another module is allowed to know about a user. It carries no\ncredential state of any kind — that never leaves Identity."

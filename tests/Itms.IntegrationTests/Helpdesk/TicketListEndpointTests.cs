@@ -166,24 +166,52 @@ public sealed class TicketListEndpointTests(IdentityWebFixture fixture) : IAsync
     }
 
     /// <summary>
-    /// Nothing is assigned before WP-1.6, so the unassigned view is the whole queue — which
-    /// is exactly the state the filter has to survive.
+    /// The unassigned view is the queue minus whatever somebody has picked up.
     /// </summary>
+    /// <remarks>
+    /// WP-1.5 wrote this against a world where nothing could be assigned, so it passed
+    /// because <em>every</em> ticket was unassigned and proved only that the filter did not
+    /// crash. WP-1.6 gives it something to exclude, which is what makes it a filter test.
+    /// </remarks>
     [Fact]
     public async Task The_unassigned_filter_returns_the_tickets_nobody_holds()
     {
         var world = await WorldAsync();
+        var techId = await TicketClient.UserIdAsync(fixture, "tech", Token);
+        await TicketClient.AssignsAsync(world.Admin, world.Second.Id, techId, Token);
 
         var page = await TicketClient.ListAsync(world.Admin, "unassigned=true", Token);
 
-        page.Total.ShouldBe(4);
+        page.Total.ShouldBe(3);
         page.Items.ShouldAllBe(t => t.AssigneeId == null);
+        page.Items.ShouldNotContain(t => t.Id == world.Second.Id);
+    }
+
+    /// <summary>
+    /// And the mirror of it: naming an assignee returns exactly what they hold, with the
+    /// display name the ticket cached when they took it on.
+    /// </summary>
+    [Fact]
+    public async Task Filtering_by_an_assignee_returns_only_their_tickets()
+    {
+        var world = await WorldAsync();
+        var techId = await TicketClient.UserIdAsync(fixture, "tech", Token);
+        await TicketClient.AssignsAsync(world.Admin, world.Second.Id, techId, Token);
+
+        var page = await TicketClient.ListAsync(world.Admin, $"assigneeId={techId}", Token);
+
+        var row = page.Items.ShouldHaveSingleItem();
+        row.Id.ShouldBe(world.Second.Id);
+        row.AssigneeId.ShouldBe(techId);
+        row.AssigneeName.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
     public async Task Filtering_by_an_assignee_nobody_matches_returns_nothing()
     {
         var world = await WorldAsync();
+        var techId = await TicketClient.UserIdAsync(fixture, "tech", Token);
+        await TicketClient.AssignsAsync(world.Admin, world.Second.Id, techId, Token);
 
         var page = await TicketClient.ListAsync(world.Admin, $"assigneeId={Guid.CreateVersion7()}", Token);
 

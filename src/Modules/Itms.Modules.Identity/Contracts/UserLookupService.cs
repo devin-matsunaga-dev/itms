@@ -80,12 +80,29 @@ internal sealed class UserLookupService(ItmsIdentityDbContext database) : IUserL
             .ConfigureAwait(false);
     }
 
-    private static System.Linq.Expressions.Expression<Func<Domain.ItmsUser, UserSummary>> Projection() =>
+    /// <summary>
+    /// The one shape every read here projects to, so no method can widen what leaves
+    /// Identity by editing its own query.
+    /// </summary>
+    /// <remarks>
+    /// The roles come from a correlated subquery rather than a second round trip: a
+    /// picker reading fifty users would otherwise be fifty-one queries. It is an instance
+    /// method rather than a static one only because it has to close over the context to
+    /// write that subquery.
+    /// </remarks>
+    private System.Linq.Expressions.Expression<Func<Domain.ItmsUser, UserSummary>> Projection() =>
         user => new UserSummary(
             user.Id,
             user.DisplayName,
             user.Email!,
             user.DepartmentId,
             user.LocationId,
-            user.IsActive);
+            user.IsActive,
+            database.UserRoles
+                .Where(membership => membership.UserId == user.Id)
+                .Join(database.Roles, membership => membership.RoleId, role => role.Id, (_, role) => role.Name!)
+                // Ordered so the list is stable between reads; nothing depends on which
+                // role comes first, and a set that reshuffles is a diff nobody wanted.
+                .OrderBy(name => name)
+                .ToList());
 }
