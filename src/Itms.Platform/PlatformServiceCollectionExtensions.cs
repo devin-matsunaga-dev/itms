@@ -1,3 +1,4 @@
+using Itms.Platform.Http;
 using Itms.Platform.Identity;
 using Itms.Platform.Time;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,8 @@ namespace Itms.Platform;
 public static class PlatformServiceCollectionExtensions
 {
     /// <summary>Adds the clock, the current-user accessor, and RFC 7807 problem details.</summary>
+    /// <param name="services">The container.</param>
+    /// <returns>The container, for chaining.</returns>
     public static IServiceCollection AddPlatform(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -26,6 +29,10 @@ public static class PlatformServiceCollectionExtensions
         // Makes the framework's own 400/401/403/404/500 responses ProblemDetails too, so
         // "errors are ProblemDetails, always" holds for the ones no handler produced.
         services.AddProblemDetails();
+
+        // ...and for the ones thrown during model binding, before any endpoint filter can
+        // run. Without this a body the framework cannot parse is a 500 (WP-1.3).
+        services.AddExceptionHandler<MalformedRequestExceptionHandler>();
 
         return services;
     }

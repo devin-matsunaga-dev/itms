@@ -387,6 +387,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{id}/status-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Moves a ticket to another status, refusing any transition SPEC.md §2 does not allow. */
+        post: operations["ChangeTicketStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -426,6 +443,21 @@ export interface components {
             currentPassword: string;
             /** @description The replacement. Checked against the password policy server-side. */
             newPassword: string;
+        };
+        /** @description The body of `POST /api/v1/tickets/{id}/status-changes`. */
+        ChangeTicketStatusRequest: {
+            /**
+             * @description The status to move to. `Assigned` is not accepted here: a ticket becomes assigned
+             *     by assigning it to somebody (WP-1.6), so that the status and the assignee arrive
+             *     together. `New` is not accepted either — nothing returns to it.
+             */
+            status: components["schemas"]["TicketStatus"];
+            /**
+             * @description What was done. Required and non-blank when Status is
+             *     `Resolved`, and rejected for every other destination, because no other transition
+             *     records a resolution and silently dropping the text would lose it.
+             */
+            resolutionNotes: null | string;
         };
         /** @description The body of `POST /api/v1/departments`. */
         CreateDepartmentRequest: {
@@ -809,6 +841,46 @@ export interface components {
              * @description When it was last changed (UTC).
              */
             updatedAt: string;
+        };
+        /**
+         * @description Where a ticket sits in the workflow SPEC.md §2 defines.
+         * @enum {unknown}
+         */
+        TicketStatus: "New" | "Assigned" | "InProgress" | "Waiting" | "Resolved" | "Closed" | "Cancelled";
+        /** @description What a ticket looks like immediately after a status change. */
+        TicketStatusChangeResponse: {
+            /**
+             * Format: uuid
+             * @description The ticket.
+             */
+            id: string;
+            /** @description Its human-readable number, so a toast can name it. */
+            number: string;
+            /** @description The status it moved from. */
+            previousStatus: components["schemas"]["TicketStatus"];
+            /** @description The status it is in now. */
+            status: components["schemas"]["TicketStatus"];
+            /**
+             * Format: date-time
+             * @description When the move happened, in UTC.
+             */
+            changedAt: string;
+            /**
+             * Format: date-time
+             * @description When it was resolved, or `null` — cleared by a reopen.
+             */
+            resolvedAt: null | string;
+            /**
+             * Format: date-time
+             * @description When it was closed, or `null`.
+             */
+            closedAt: null | string;
+            /**
+             * @description Where it may go next, straight from the state machine. WP-1.10 must not render a
+             *     transition button the server would refuse, and reading it from here is what stops the
+             *     table being written a second time in TypeScript. Empty from a terminal state.
+             */
+            allowedNextStatuses: components["schemas"]["TicketStatus"][];
         };
         /** @description The body of `PUT /api/v1/departments/{id}`. */
         UpdateDepartmentRequest: {
@@ -2210,6 +2282,77 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ChangeTicketStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeTicketStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketStatusChangeResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

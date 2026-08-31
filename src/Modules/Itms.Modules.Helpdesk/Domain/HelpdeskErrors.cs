@@ -30,4 +30,73 @@ internal static class HelpdeskErrors
     /// </summary>
     public static Error DuplicatePriorityCode(string code) =>
         Error.Conflict("helpdesk.duplicate_priority_code", $"A ticket priority with the code '{code}' already exists.");
+
+    /// <summary>The ticket does not exist, or has been soft-deleted.</summary>
+    public static Error TicketNotFound() =>
+        Error.NotFound("helpdesk.ticket_not_found", "No such ticket.");
+
+    /// <summary>
+    /// The move is not one SPEC.md §2 allows. A 409 rather than a 400: the request was
+    /// well formed and the transition exists in general — it is this ticket's current
+    /// state that refuses it, which is what <see cref="ErrorKind.Conflict"/> means.
+    /// </summary>
+    public static Error IllegalTransition(TicketStatus from, TicketStatus to) =>
+        Error.Conflict(
+            "helpdesk.illegal_transition",
+            TicketStateMachine.IsTerminal(from)
+                ? $"A {Describe(from)} ticket cannot change status."
+                : $"A ticket cannot move from {Describe(from)} to {Describe(to)}.");
+
+    /// <summary>Resolving without saying what was done leaves the work undocumented.</summary>
+    public static Error ResolutionNotesRequired() =>
+        Error.Validation(
+            "helpdesk.resolution_notes_required",
+            "Describe what was done to resolve the ticket.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["resolutionNotes"] = ["Describe what was done to resolve the ticket."],
+            });
+
+    /// <summary>The notes exceed what the column holds.</summary>
+    public static Error ResolutionNotesTooLong() =>
+        Error.Validation(
+            "helpdesk.resolution_notes_too_long",
+            $"Resolution notes cannot be longer than {Ticket.ResolutionNotesMaxLength} characters.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["resolutionNotes"] =
+                    [$"Resolution notes cannot be longer than {Ticket.ResolutionNotesMaxLength} characters."],
+            });
+
+    /// <summary>
+    /// Only resolving records a resolution. Silently dropping the notes on any other
+    /// transition would lose text somebody typed.
+    /// </summary>
+    public static Error ResolutionNotesNotAccepted(TicketStatus target) =>
+        Error.Validation(
+            "helpdesk.resolution_notes_not_accepted",
+            $"Resolution notes are only recorded when resolving a ticket, not when moving it to {Describe(target)}.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["resolutionNotes"] = ["Resolution notes are only recorded when resolving a ticket."],
+            });
+
+    /// <summary>
+    /// Somebody else moved the ticket between this request reading it and writing it.
+    /// The <c>xmin</c> token WP-1.2 mapped is what notices.
+    /// </summary>
+    public static Error TicketChangedConcurrently() =>
+        Error.Conflict(
+            "helpdesk.ticket_conflict",
+            "The ticket was changed by somebody else. Reload it and try again.");
+
+    /// <summary>
+    /// The status as a person reads it. The enum names are the wire format, but
+    /// <c>InProgress</c> in a sentence shown to a technician reads as a typo.
+    /// </summary>
+    private static string Describe(TicketStatus status) => status switch
+    {
+        TicketStatus.InProgress => "In Progress",
+        _ => status.ToString(),
+    };
 }

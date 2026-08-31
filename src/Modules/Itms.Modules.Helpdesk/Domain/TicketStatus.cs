@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Itms.Modules.Helpdesk.Domain;
 
 /// <summary>
@@ -15,7 +17,14 @@ namespace Itms.Modules.Helpdesk.Domain;
 /// <c>LocationKind</c>: a ticket row is read at a psql prompt during an incident far more
 /// often than an enum is renumbered.
 /// </para>
+/// <para>
+/// Serialised as text on the wire too, for the same reasons and by the same mechanism
+/// <c>LocationKind</c> uses: the converter sits on the type rather than being configured
+/// host-wide, so a client reads <c>"InProgress"</c> rather than a <c>2</c> that would
+/// change meaning the day somebody reorders the enum.
+/// </para>
 /// </remarks>
+[JsonConverter(typeof(JsonStringEnumConverter<TicketStatus>))]
 public enum TicketStatus
 {
     /// <summary>Raised and not yet picked up. Every ticket starts here.</summary>

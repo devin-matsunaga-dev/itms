@@ -47,6 +47,30 @@ internal static class HelpdeskAudit
     /// <summary>A retired ticket priority was brought back.</summary>
     public const string PriorityReinstated = "helpdesk.priority_reinstated";
 
+    /// <summary>
+    /// A ticket moved through the state machine.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is written through <c>IAuditWriter</c> rather than derived from a
+    /// <c>TicketStatusChanged</c> domain event, because WP-1.3 was not given leave to move
+    /// <c>IEventPublisher</c> out of the bus and a module may not reference it. The Audit
+    /// module already binds a consumer to that event under its own action name
+    /// <c>ticket.status_changed</c>, so <b>the package that starts publishing it must
+    /// delete this writer call at the same time</b> or every transition will record two
+    /// rows. STATUS.md carries the same warning.
+    /// </para>
+    /// <para>
+    /// Resolution and closure are not separate actions here. They are transitions like any
+    /// other, and the diff carries which one it was; a consumer counting resolutions reads
+    /// the <c>status</c> field's <c>after</c> value.
+    /// </para>
+    /// </remarks>
+    public const string TicketStatusChanged = "helpdesk.ticket_status_changed";
+
+    /// <summary>The entity type of a ticket entry.</summary>
+    public const string TicketEntityType = "Ticket";
+
     /// <summary>The entity type of a category entry.</summary>
     public const string CategoryEntityType = "TicketCategory";
 

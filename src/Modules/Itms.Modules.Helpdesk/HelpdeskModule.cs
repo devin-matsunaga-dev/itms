@@ -11,6 +11,8 @@ using Itms.Modules.Helpdesk.Features.TicketPriorities.GetTicketPriority;
 using Itms.Modules.Helpdesk.Features.TicketPriorities.ListTicketPriorities;
 using Itms.Modules.Helpdesk.Features.TicketPriorities.SetTicketPriorityStatus;
 using Itms.Modules.Helpdesk.Features.TicketPriorities.UpdateTicketPriority;
+using Itms.Modules.Helpdesk.Features.Tickets;
+using Itms.Modules.Helpdesk.Features.Tickets.ChangeTicketStatus;
 using Itms.Modules.Helpdesk.Persistence;
 using Itms.Platform.Data;
 using Microsoft.AspNetCore.Routing;
@@ -61,6 +63,8 @@ public static class HelpdeskModule
         services.TryAddScoped<UpdateTicketCategoryHandler>();
         services.TryAddScoped<SetTicketCategoryStatusHandler>();
 
+        services.TryAddScoped<ChangeTicketStatusHandler>();
+
         services.TryAddScoped<ListTicketPrioritiesHandler>();
         services.TryAddScoped<GetTicketPriorityHandler>();
         services.TryAddScoped<CreateTicketPriorityHandler>();
@@ -71,11 +75,12 @@ public static class HelpdeskModule
         services.TryAddScoped<IValidator<UpdateTicketCategoryRequest>, UpdateTicketCategoryValidator>();
         services.TryAddScoped<IValidator<CreateTicketPriorityRequest>, CreateTicketPriorityValidator>();
         services.TryAddScoped<IValidator<UpdateTicketPriorityRequest>, UpdateTicketPriorityValidator>();
+        services.TryAddScoped<IValidator<ChangeTicketStatusRequest>, ChangeTicketStatusValidator>();
 
         return services;
     }
 
-    /// <summary>Maps the ticket-category and ticket-priority endpoints.</summary>
+    /// <summary>Maps the ticket, ticket-category, and ticket-priority endpoints.</summary>
     /// <param name="endpoints">The host's route builder.</param>
     /// <returns>The route builder, for chaining.</returns>
     public static IEndpointRouteBuilder MapHelpdeskEndpoints(this IEndpointRouteBuilder endpoints)
@@ -84,6 +89,7 @@ public static class HelpdeskModule
 
         endpoints.MapTicketCategories();
         endpoints.MapTicketPriorities();
+        endpoints.MapTickets();
 
         return endpoints;
     }

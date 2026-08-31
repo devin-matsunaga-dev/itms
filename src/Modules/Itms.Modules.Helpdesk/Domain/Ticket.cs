@@ -1,3 +1,5 @@
+using Itms.Platform.Results;
+
 namespace Itms.Modules.Helpdesk.Domain;
 
 /// <summary>
@@ -6,11 +8,11 @@ namespace Itms.Modules.Helpdesk.Domain;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>What this package owns.</b> WP-1.2 owns the ticket's shape, its invariants at
-/// creation, and its number. It deliberately owns no behaviour beyond creation: there is
-/// no <c>Assign</c>, no <c>ChangeStatus</c>, no <c>Resolve</c>, and no <c>Close</c> here.
-/// Those are WP-1.3's state machine and land on this entity, which is why every field
-/// they will move already exists and is private to set.
+/// <b>Shape and number</b> are WP-1.2's. <b>Movement</b> is WP-1.3's: <see cref="ChangeStatus"/>
+/// and the intent-named methods around it are the only way <see cref="Status"/> ever
+/// changes, and they are the only place <see cref="ResolvedAt"/> and <see cref="ClosedAt"/>
+/// are written. There is still no <c>Assign</c> — that is WP-1.6, and it is what moves a
+/// ticket out of <see cref="TicketStatus.New"/>.
 /// </para>
 /// <para>
 /// <b>Why the forward fields are here and empty.</b> <see cref="AssigneeId"/>,
@@ -113,7 +115,11 @@ public sealed class Ticket
     /// <summary>The alert the ticket was raised from, or <see langword="null"/>. WP-3.7 links it, permanently (invariant 8).</summary>
     public Guid? RelatedAlertId { get; private set; }
 
-    /// <summary>What was done about it, recorded at resolution. WP-1.3 writes it.</summary>
+    /// <summary>
+    /// What was done about it, recorded at resolution. Required and non-blank whenever
+    /// the ticket is resolved; kept, not cleared, when it is reopened, because the notes
+    /// are what the requester rejected and the next technician has to read them.
+    /// </summary>
     public string? ResolutionNotes { get; private set; }
 
     /// <summary>When it was resolved (UTC), or <see langword="null"/>.</summary>
@@ -186,6 +192,169 @@ public sealed class Ticket
             UpdatedBy = actor,
         };
     }
+
+    /// <summary>
+    /// Moves the ticket to <paramref name="target"/> if SPEC.md §2 allows it, and applies
+    /// whatever else that move writes.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is the only guard, and it is inside the entity.</b> Invariant 2 says an
+    /// illegal transition is rejected server-side; the endpoint and the client both get
+    /// their answer from here, so there is no second copy of the table to drift out of
+    /// step with <see cref="TicketStateMachine"/>. The intent-named wrappers below —
+    /// <see cref="Start"/>, <see cref="Wait"/>, <see cref="Resume"/>,
+    /// <see cref="Resolve"/>, <see cref="Reopen"/>, <see cref="Close"/>,
+    /// <see cref="Cancel"/> — all land here.
+    /// </para>
+    /// <para>
+    /// A failure returns rather than throws: an illegal transition is something a caller
+    /// can act on, which CONVENTIONS.md says travels as a <see cref="Result"/>. Nothing
+    /// on the entity is written on a failure.
+    /// </para>
+    /// <para>
+    /// <b>One destination has no wrapper, on purpose.</b> Moving to
+    /// <see cref="TicketStatus.Assigned"/> is legal in the table — it is the workflow's
+    /// own first step — but a ticket in that state with nobody responsible for it would be
+    /// a lie, and this method has no assignee to set. WP-1.6's <c>Assign</c> is what
+    /// composes the two, and until it exists the status-change endpoint refuses
+    /// <see cref="TicketStatus.Assigned"/> outright. <b>WP-1.6 must set
+    /// <see cref="AssigneeId"/> in the same call that moves the status here.</b>
+    /// </para>
+    /// </remarks>
+    /// <param name="target">The status being asked for.</param>
+    /// <param name="resolutionNotes">
+    /// What was done, required and non-blank when <paramref name="target"/> is
+    /// <see cref="TicketStatus.Resolved"/> and rejected otherwise — no other transition
+    /// records a resolution.
+    /// </param>
+    /// <param name="now">The current instant, from <c>IClock</c>.</param>
+    /// <param name="actor">Who is making the move.</param>
+    /// <returns>Success, or a conflict describing why the move is refused.</returns>
+    public Result ChangeStatus(
+        TicketStatus target,
+        string? resolutionNotes,
+        DateTimeOffset now,
+        Guid? actor)
+    {
+        if (!TicketStateMachine.CanTransition(Status, target))
+        {
+            return HelpdeskErrors.IllegalTransition(Status, target);
+        }
+
+        if (target == TicketStatus.Resolved)
+        {
+            if (string.IsNullOrWhiteSpace(resolutionNotes))
+            {
+                return HelpdeskErrors.ResolutionNotesRequired();
+            }
+
+            if (resolutionNotes.Length > ResolutionNotesMaxLength)
+            {
+                return HelpdeskErrors.ResolutionNotesTooLong();
+            }
+        }
+        else if (resolutionNotes is not null)
+        {
+            return HelpdeskErrors.ResolutionNotesNotAccepted(target);
+        }
+
+        switch (target)
+        {
+            case TicketStatus.InProgress:
+                // Reopening: the ticket is not resolved any more, so the instant goes. The
+                // notes stay — see the remarks on ResolutionNotes.
+                if (Status == TicketStatus.Resolved)
+                {
+                    ResolvedAt = null;
+                }
+
+                break;
+
+            case TicketStatus.Resolved:
+                ResolutionNotes = resolutionNotes!.Trim();
+                ResolvedAt = now;
+                break;
+
+            case TicketStatus.Closed:
+                ClosedAt = now;
+                break;
+
+            case TicketStatus.Waiting:
+            case TicketStatus.Cancelled:
+                // Neither writes a field of its own. Waiting's effect on the SLA clock is
+                // WP-1.8's, computed from the history rather than stored here, and there
+                // is no CancelledAt column: UpdatedAt and WP-1.4's history say when.
+                break;
+
+            case TicketStatus.Assigned:
+                // Reached only through WP-1.6's Assign, which sets the assignee in the same
+                // breath. See the remarks: this method will not stop a caller asking for it
+                // bare, and the status-change endpoint is what refuses to.
+                break;
+
+            case TicketStatus.New:
+            default:
+                // Unreachable: nothing in the table returns a ticket to New.
+                return HelpdeskErrors.IllegalTransition(Status, target);
+        }
+
+        Status = target;
+        UpdatedAt = now;
+        UpdatedBy = actor;
+
+        return Result.Success();
+    }
+
+    /// <summary>A technician started work. <see cref="TicketStatus.Assigned"/> → <see cref="TicketStatus.InProgress"/>.</summary>
+    /// <param name="now">The current instant.</param>
+    /// <param name="actor">Who started.</param>
+    /// <returns>Success, or a conflict.</returns>
+    public Result Start(DateTimeOffset now, Guid? actor) =>
+        ChangeStatus(TicketStatus.InProgress, resolutionNotes: null, now, actor);
+
+    /// <summary>Work is blocked on somebody else. → <see cref="TicketStatus.Waiting"/>.</summary>
+    /// <param name="now">The current instant.</param>
+    /// <param name="actor">Who parked it.</param>
+    /// <returns>Success, or a conflict.</returns>
+    public Result Wait(DateTimeOffset now, Guid? actor) =>
+        ChangeStatus(TicketStatus.Waiting, resolutionNotes: null, now, actor);
+
+    /// <summary>Whatever it was waiting on arrived. <see cref="TicketStatus.Waiting"/> → <see cref="TicketStatus.InProgress"/>.</summary>
+    /// <param name="now">The current instant.</param>
+    /// <param name="actor">Who resumed it.</param>
+    /// <returns>Success, or a conflict.</returns>
+    public Result Resume(DateTimeOffset now, Guid? actor) =>
+        ChangeStatus(TicketStatus.InProgress, resolutionNotes: null, now, actor);
+
+    /// <summary>The problem is fixed, pending the requester's acceptance. → <see cref="TicketStatus.Resolved"/>.</summary>
+    /// <param name="resolutionNotes">What was done. Required and non-blank.</param>
+    /// <param name="now">The current instant.</param>
+    /// <param name="actor">Who resolved it.</param>
+    /// <returns>Success, or a conflict.</returns>
+    public Result Resolve(string resolutionNotes, DateTimeOffset now, Guid? actor) =>
+        ChangeStatus(TicketStatus.Resolved, resolutionNotes, now, actor);
+
+    /// <summary>The fix did not hold. <see cref="TicketStatus.Resolved"/> → <see cref="TicketStatus.InProgress"/>.</summary>
+    /// <param name="now">The current instant.</param>
+    /// <param name="actor">Who reopened it.</param>
+    /// <returns>Success, or a conflict.</returns>
+    public Result Reopen(DateTimeOffset now, Guid? actor) =>
+        ChangeStatus(TicketStatus.InProgress, resolutionNotes: null, now, actor);
+
+    /// <summary>The requester accepted the resolution. <see cref="TicketStatus.Resolved"/> → <see cref="TicketStatus.Closed"/>, which is terminal.</summary>
+    /// <param name="now">The current instant.</param>
+    /// <param name="actor">Who closed it.</param>
+    /// <returns>Success, or a conflict.</returns>
+    public Result Close(DateTimeOffset now, Guid? actor) =>
+        ChangeStatus(TicketStatus.Closed, resolutionNotes: null, now, actor);
+
+    /// <summary>Abandoned before resolution. Legal from any pre-resolved state, and terminal.</summary>
+    /// <param name="now">The current instant.</param>
+    /// <param name="actor">Who cancelled it.</param>
+    /// <returns>Success, or a conflict.</returns>
+    public Result Cancel(DateTimeOffset now, Guid? actor) =>
+        ChangeStatus(TicketStatus.Cancelled, resolutionNotes: null, now, actor);
 
     private static Guid Required(Guid value, string field, string parameterName) =>
         value == Guid.Empty

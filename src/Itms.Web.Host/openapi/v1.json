@@ -1724,6 +1724,101 @@
           { }
         ]
       }
+    },
+    "/api/v1/tickets/{id}/status-changes": {
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Moves a ticket to another status, refusing any transition SPEC.md §2 does not allow.",
+        "operationId": "ChangeTicketStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeTicketStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketStatusChangeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
     }
   },
   "components": {
@@ -1800,6 +1895,27 @@
           }
         },
         "description": "A password change by the account holder."
+      },
+      "ChangeTicketStatusRequest": {
+        "required": [
+          "status",
+          "resolutionNotes"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "The status to move to. `Assigned` is not accepted here: a ticket becomes assigned\nby assigning it to somebody (WP-1.6), so that the status and the assignee arrive\ntogether. `New` is not accepted either — nothing returns to it.",
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "resolutionNotes": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What was done. Required and non-blank when Status is\n`Resolved`, and rejected for every other destination, because no other transition\nrecords a resolution and silently dropping the text would lose it."
+          }
+        },
+        "description": "The body of `POST /api/v1/tickets/{id}/status-changes`."
       },
       "CreateDepartmentRequest": {
         "required": [
@@ -2619,6 +2735,79 @@
         },
         "description": "A ticket priority as the API renders it."
       },
+      "TicketStatus": {
+        "enum": [
+          "New",
+          "Assigned",
+          "InProgress",
+          "Waiting",
+          "Resolved",
+          "Closed",
+          "Cancelled"
+        ],
+        "description": "Where a ticket sits in the workflow SPEC.md §2 defines."
+      },
+      "TicketStatusChangeResponse": {
+        "required": [
+          "id",
+          "number",
+          "previousStatus",
+          "status",
+          "changedAt",
+          "resolvedAt",
+          "closedAt",
+          "allowedNextStatuses"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The ticket.",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "Its human-readable number, so a toast can name it."
+          },
+          "previousStatus": {
+            "description": "The status it moved from.",
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "status": {
+            "description": "The status it is in now.",
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "changedAt": {
+            "type": "string",
+            "description": "When the move happened, in UTC.",
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was resolved, or `null` — cleared by a reopen.",
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was closed, or `null`.",
+            "format": "date-time"
+          },
+          "allowedNextStatuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketStatus"
+            },
+            "description": "Where it may go next, straight from the state machine. WP-1.10 must not render a\ntransition button the server would refuse, and reading it from here is what stops the\ntable being written a second time in TypeScript. Empty from a terminal state."
+          }
+        },
+        "description": "What a ticket looks like immediately after a status change."
+      },
       "UpdateDepartmentRequest": {
         "required": [
           "name",
@@ -2826,6 +3015,9 @@
     },
     {
       "name": "Ticket priorities"
+    },
+    {
+      "name": "Tickets"
     }
   ]
 }
