@@ -95,6 +95,85 @@ public sealed class OpenApiDocumentTests(IdentityWebFixture fixture)
     }
 
     /// <summary>
+    /// No schema anywhere in the document says a number may arrive as a string.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>JsonSerializerDefaults.Web</c> sets <c>AllowReadingFromString</c>, so the schema
+    /// exporter widens every <c>int</c> to <c>["integer", "string"]</c> — describing what
+    /// the parser tolerates rather than what the wire carries. <c>NumericSchemaTransformer</c>
+    /// narrows them back, and this is what says so: a widened schema costs the generated
+    /// client a <c>number | string</c> at every page number, total, and target.
+    /// </para>
+    /// <para>
+    /// Parameter schemas are checked as well as component schemas, because paging arrives
+    /// as query parameters and that is where the union was first noticed (WP-1.5).
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task No_number_in_the_contract_is_also_described_as_a_string()
+    {
+        var widened = new List<string>();
+        Inspect((await DocumentAsync()).RootElement, string.Empty, widened);
+
+        widened.ShouldBeEmpty();
+    }
+
+    /// <summary>Walks the document collecting the paths of any number-or-string schema.</summary>
+    /// <param name="element">The node to inspect.</param>
+    /// <param name="path">Where <paramref name="element"/> sits, for the failure message.</param>
+    /// <param name="widened">Collects one entry per offending schema.</param>
+    private static void Inspect(JsonElement element, string path, List<string> widened)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                if (element.TryGetProperty("type", out var type) && IsNumericUnion(type))
+                {
+                    widened.Add(path);
+                }
+
+                foreach (var property in element.EnumerateObject())
+                {
+                    Inspect(property.Value, $"{path}/{property.Name}", widened);
+                }
+
+                break;
+
+            case JsonValueKind.Array:
+                var index = 0;
+                foreach (var item in element.EnumerateArray())
+                {
+                    Inspect(item, $"{path}/{index++}", widened);
+                }
+
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    /// <summary>True when a schema's type list carries both a number and a string.</summary>
+    /// <param name="type">The schema's <c>type</c> member, which may be a name or a list.</param>
+    private static bool IsNumericUnion(JsonElement type)
+    {
+        if (type.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        var names = type.EnumerateArray()
+            .Where(name => name.ValueKind == JsonValueKind.String)
+            .Select(name => name.GetString())
+            .ToList();
+
+        return names.Contains("string", StringComparer.Ordinal)
+            && (names.Contains("integer", StringComparer.Ordinal)
+                || names.Contains("number", StringComparer.Ordinal));
+    }
+
+    /// <summary>
     /// ARCHITECTURE.md §7: the session cookie is the only credential, and there is no
     /// bearer token anywhere in this system.
     /// </summary>

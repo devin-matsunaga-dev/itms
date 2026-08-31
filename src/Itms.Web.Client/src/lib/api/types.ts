@@ -36,3 +36,36 @@ export type CsrfTokenResponse = Schemas['CsrfTokenResponse']
  * `errors` is present only on a validation failure, keyed by camel-cased field name.
  */
 export type ProblemDetails = Schemas['ProblemDetails']
+
+/** One row of the ticket queue — `GET /api/v1/tickets`. */
+export type TicketListItem = Schemas['TicketListItemResponse']
+
+/** The queue's page envelope. */
+export type PagedTickets = Schemas['PagedResultOfTicketListItemResponse']
+
+/** A ticket's two SLA clocks, and where each stands right now. */
+export type TicketSla = Schemas['TicketSlaResponse']
+
+/** Where a ticket sits in the workflow (SPEC.md §2). */
+export type TicketStatus = Schemas['TicketStatus']
+
+/** Where one of a ticket's SLA clocks stands. */
+export type SlaState = Schemas['SlaState']
+
+/** The columns the queue may be ordered by. */
+export type TicketSort = NonNullable<Schemas['TicketSort']>
+
+/** Which way an ordering runs. */
+export type SortDirection = NonNullable<Schemas['SortDirection']>
+
+/** A ticket category, for the queue's category filter. */
+export type TicketCategory = Schemas['TicketCategoryResponse']
+
+/** A ticket priority, for the queue's priority filter. */
+export type TicketPriority = Schemas['TicketPriorityResponse']
+
+/** A department, for the queue's department filter. */
+export type Department = Schemas['DepartmentResponse']
+
+/** A person, as every picker in the system sees them. */
+export type UserSummary = Schemas['UserSummary']

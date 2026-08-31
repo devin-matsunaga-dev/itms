@@ -27,6 +27,11 @@ internal static class OpenApiRegistration
             options.AddDocumentTransformer<ApiInfoTransformer>();
             options.AddDocumentTransformer<SessionCookieSchemeTransformer>();
             options.AddOperationTransformer<AuthenticatedOperationTransformer>();
+
+            // Order matters between these two: the numeric transformer narrows every
+            // number-or-string union in the document, and the ProblemDetails one then
+            // replaces `status` outright with a described schema of its own.
+            options.AddSchemaTransformer<NumericSchemaTransformer>();
             options.AddSchemaTransformer<ProblemDetailsSchemaTransformer>();
         });
 

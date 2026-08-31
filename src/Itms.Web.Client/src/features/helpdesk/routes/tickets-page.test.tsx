@@ -1,20 +1,469 @@
-import { describe, expect, it } from 'vitest'
-import { screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { Route, Routes, useLocation } from 'react-router'
 import { TicketsPage } from '@/features/helpdesk/routes/tickets-page'
+import { ApiError } from '@/lib/api/client'
+import { Roles } from '@/lib/roles'
+import type {
+  AuthenticatedUser,
+  Department,
+  PagedTickets,
+  TicketCategory,
+  TicketListItem,
+  TicketPriority,
+  UserSummary,
+} from '@/lib/api/types'
+import type { TicketQuery } from '@/features/helpdesk/lib/ticket-query'
 import { renderWithProviders } from '@/test/render'
 
-describe('TicketsPage', () => {
-  it('offers ticket creation from the screen the ticket belongs to', () => {
-    renderWithProviders(<TicketsPage />)
+const fetchTickets = vi.fn<(query: TicketQuery) => Promise<PagedTickets>>()
+const fetchCurrentUser = vi.fn<() => Promise<AuthenticatedUser | null>>()
+const fetchAssignableUsers = vi.fn<() => Promise<UserSummary[]>>()
 
-    // The action moved off the sidebar and onto this page's header; the empty state
-    // offers the same action, which is what DESIGN.md asks an empty state to do.
-    expect(screen.getAllByRole('button', { name: /new ticket/i })).toHaveLength(2)
+vi.mock('@/features/helpdesk/api/tickets-api', () => ({
+  fetchTickets: (query: TicketQuery) => fetchTickets(query),
+  fetchTicketCategories: (): Promise<TicketCategory[]> => Promise.resolve(categories),
+  fetchTicketPriorities: (): Promise<TicketPriority[]> => Promise.resolve(priorities),
+  fetchDepartments: (): Promise<Department[]> => Promise.resolve(departments),
+  fetchAssignableUsers: () => fetchAssignableUsers(),
+}))
+
+const toastInfo = vi.fn()
+
+vi.mock('sonner', () => ({ toast: { info: (message: string) => toastInfo(message) } }))
+
+vi.mock('@/features/auth/api/auth-api', () => ({
+  fetchCurrentUser: () => fetchCurrentUser(),
+  login: vi.fn(),
+  logout: vi.fn(),
+}))
+
+const me = '11111111-1111-1111-1111-111111111111'
+
+const technician: AuthenticatedUser = {
+  id: me,
+  userName: 'tech',
+  email: 'tech@itms.local',
+  displayName: 'Mark Reyes',
+  roles: [Roles.technician],
+  departmentId: null,
+  locationId: null,
+}
+
+const endUser: AuthenticatedUser = { ...technician, userName: 'user', roles: [Roles.user] }
+
+const categories: TicketCategory[] = [
+  {
+    id: 'cat-network',
+    name: 'Network',
+    description: null,
+    sortOrder: 1,
+    isActive: true,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+]
+
+const priorities: TicketPriority[] = [
+  {
+    id: 'pri-high',
+    code: 'high',
+    name: 'High',
+    description: null,
+    rank: 2,
+    responseTargetMinutes: 30,
+    resolutionTargetMinutes: 480,
+    isActive: true,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+]
+
+const departments: Department[] = [
+  {
+    id: 'dep-it',
+    name: 'Information Technology',
+    code: 'IT',
+    description: null,
+    isActive: true,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+]
+
+function ticket(overrides: Partial<TicketListItem> = {}): TicketListItem {
+  return {
+    id: 'ticket-1',
+    number: 'TKT-0001',
+    subject: 'Laptop will not connect to Wi-Fi',
+    status: 'New',
+    categoryId: 'cat-network',
+    categoryName: 'Network',
+    priorityId: 'pri-high',
+    priorityName: 'High',
+    priorityCode: 'high',
+    priorityRank: 2,
+    requesterId: 'requester-1',
+    requesterName: 'Jane Doe',
+    departmentId: 'dep-it',
+    departmentName: 'Information Technology',
+    assigneeId: null,
+    assigneeName: null,
+    createdAt: '2026-08-31T09:00:00Z',
+    updatedAt: '2026-08-31T09:00:00Z',
+    dueAt: '2026-09-01T09:00:00Z',
+    sla: {
+      responseTargetMinutes: 30,
+      responseDueAt: '2026-08-31T09:30:00Z',
+      responseWarnAt: '2026-08-31T09:24:00Z',
+      respondedAt: null,
+      resolutionTargetMinutes: 480,
+      resolutionDueAt: '2026-09-01T09:00:00Z',
+      resolutionWarnAt: '2026-09-01T02:36:00Z',
+      resolvedAt: null,
+      pausedAt: null,
+      responseState: 'Pending',
+      resolutionState: 'Pending',
+      isPaused: false,
+      pausedSeconds: 0,
+    },
+    ...overrides,
+  }
+}
+
+function page(items: TicketListItem[], total = items.length, pageNumber = 1): PagedTickets {
+  return {
+    items,
+    total,
+    page: pageNumber,
+    pageSize: 25,
+    totalPages: Math.max(1, Math.ceil(total / 25)),
+    hasNextPage: pageNumber * 25 < total,
+  }
+}
+
+/** Reports the address the screen has navigated to, so the URL can be asserted on. */
+function Address(): React.JSX.Element {
+  const location = useLocation()
+  return <output data-testid="address">{location.search}</output>
+}
+
+function renderQueue(route = '/tickets') {
+  return renderWithProviders(
+    <>
+      <Routes>
+        <Route path="/tickets" element={<TicketsPage />} />
+      </Routes>
+      <Address />
+    </>,
+    { route },
+  )
+}
+
+/** The query the screen last asked the API for. */
+function lastQuery(): TicketQuery {
+  const call = fetchTickets.mock.calls.at(-1)
+  if (call === undefined) {
+    throw new Error('The queue was never requested.')
+  }
+  return call[0]
+}
+
+const address = () => screen.getByTestId('address').textContent ?? ''
+
+beforeEach(() => {
+  fetchTickets.mockReset()
+  fetchCurrentUser.mockReset()
+  fetchAssignableUsers.mockReset()
+  toastInfo.mockReset()
+
+  fetchTickets.mockResolvedValue(page([ticket()]))
+  fetchCurrentUser.mockResolvedValue(technician)
+  fetchAssignableUsers.mockResolvedValue([
+    { ...technician, isActive: true, roles: [Roles.technician] } as UserSummary,
+  ])
+})
+
+describe('TicketsPage — the queue', () => {
+  it('renders a row per ticket in the reference table treatment', async () => {
+    renderQueue()
+
+    const row = (await screen.findByText('TKT-0001')).closest('tr')
+    expect(row).not.toBeNull()
+
+    const cells = within(row as HTMLElement)
+    expect(cells.getByText('Laptop will not connect to Wi-Fi')).toBeInTheDocument()
+    expect(cells.getByText('Jane Doe')).toBeInTheDocument()
+    expect(cells.getByText('High')).toBeInTheDocument()
+    expect(cells.getByText('New')).toBeInTheDocument()
+    expect(cells.getByText('Unassigned')).toBeInTheDocument()
   })
 
-  it('says what will fill the screen rather than showing an empty table', () => {
-    renderWithProviders(<TicketsPage />)
+  it('shows a skeleton in the table’s own shape while the page loads', () => {
+    fetchTickets.mockReturnValue(new Promise(() => undefined))
+    renderQueue()
 
-    expect(screen.getByText('No ticket queue yet')).toBeInTheDocument()
+    expect(screen.getByLabelText('Loading tickets')).toBeInTheDocument()
+  })
+
+  it('states what failed and offers a retry', async () => {
+    fetchTickets.mockRejectedValue(new ApiError(500, null, 'boom'))
+    renderQueue()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The ticket queue could not be loaded.',
+    )
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
+  })
+
+  it('offers ticket creation from the screen the ticket belongs to', async () => {
+    fetchTickets.mockResolvedValue(page([]))
+    renderQueue()
+
+    // The header action, and the empty state offering the same thing a second time.
+    expect(await screen.findByText('No tickets yet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /new ticket/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /create the first ticket/i })).toBeInTheDocument()
+  })
+
+  it('distinguishes an empty queue from a queue nothing matches', async () => {
+    fetchTickets.mockResolvedValue(page([]))
+    renderQueue('/tickets?status=Closed&sort=Priority&direction=Ascending&pageSize=25')
+
+    expect(await screen.findByText('No tickets match these filters')).toBeInTheDocument()
+    // The filter bar's control, and the empty state offering the same way out again.
+    expect(screen.getAllByRole('button', { name: /clear filters/i })).toHaveLength(2)
+  })
+
+  it('says the detail screen is still to come rather than linking into a 404', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+
+    await person.click(await screen.findByRole('button', { name: 'TKT-0001' }))
+
+    expect(toastInfo).toHaveBeenCalledWith('Ticket detail for TKT-0001 arrives in WP-1.10.')
+  })
+})
+
+describe('TicketsPage — the URL is the state', () => {
+  it('writes the queue’s own ordering into a bare address', async () => {
+    renderQueue()
+
+    await waitFor(() => {
+      expect(address()).toContain('sort=Priority')
+    })
+    expect(address()).toContain('direction=Ascending')
+  })
+
+  it('asks the API for exactly what the address says', async () => {
+    renderQueue(
+      '/tickets?status=New&status=Waiting&priorityId=pri-high&slaState=Breached' +
+        '&sort=DueAt&direction=Descending&page=2&pageSize=50',
+    )
+
+    await waitFor(() => {
+      expect(fetchTickets).toHaveBeenCalled()
+    })
+
+    const query = lastQuery()
+    expect(query.status).toEqual(['New', 'Waiting'])
+    expect(query.priorityId).toBe('pri-high')
+    expect(query.slaState).toBe('Breached')
+    expect(query.sort).toBe('DueAt')
+    expect(query.direction).toBe('Descending')
+    expect(query.page).toBe(2)
+    expect(query.pageSize).toBe(50)
+  })
+
+  it('puts a new sort in the address, so the view stays linkable', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+    await screen.findByText('TKT-0001')
+
+    await person.click(screen.getByRole('button', { name: /^ticket$/i }))
+
+    await waitFor(() => {
+      expect(address()).toContain('sort=Number')
+    })
+  })
+
+  it('reverses the column it is already sorted on', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+    await screen.findByText('TKT-0001')
+
+    await person.click(screen.getByRole('button', { name: /^priority$/i }))
+
+    await waitFor(() => {
+      expect(address()).toContain('direction=Descending')
+    })
+    expect(address()).toContain('sort=Priority')
+  })
+
+  it('reports the ordering to a screen reader as well as to the eye', async () => {
+    renderQueue()
+    await screen.findByText('TKT-0001')
+
+    const header = screen.getByRole('columnheader', { name: /priority/i })
+    expect(header).toHaveAttribute('aria-sort', 'ascending')
+  })
+
+  it('writes a filter chosen from the bar into the address', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+    await screen.findByText('TKT-0001')
+
+    // The whole point of the bar: no draft state, no apply button — picking a value is
+    // a navigation, so the address and the table cannot come apart.
+    await person.click(screen.getByLabelText('Priority'))
+    await person.click(await screen.findByRole('option', { name: 'High' }))
+
+    await waitFor(() => {
+      expect(address()).toContain('priorityId=pri-high')
+    })
+    expect(lastQuery().priorityId).toBe('pri-high')
+  })
+
+  it('carries a repeated status filter, because "open" is four statuses', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+    await screen.findByText('TKT-0001')
+
+    await person.click(screen.getByLabelText('Status'))
+    await person.click(await screen.findByRole('option', { name: 'New' }))
+    await person.click(await screen.findByRole('option', { name: 'In progress' }))
+
+    await waitFor(() => {
+      expect(lastQuery().status).toEqual(['New', 'InProgress'])
+    })
+    expect(address()).toContain('status=New&status=InProgress')
+  })
+
+  it('pages forward without losing the filters', async () => {
+    const person = userEvent.setup()
+    fetchTickets.mockResolvedValue(page([ticket()], 60))
+    renderQueue('/tickets?status=New&sort=Priority&direction=Ascending&pageSize=25')
+    await screen.findByText('TKT-0001')
+
+    await person.click(screen.getByRole('button', { name: /next page/i }))
+
+    await waitFor(() => {
+      expect(address()).toContain('page=2')
+    })
+    expect(address()).toContain('status=New')
+  })
+
+  it('returns to the first page when a filter changes', async () => {
+    const person = userEvent.setup()
+    fetchTickets.mockResolvedValue(page([ticket()], 60, 3))
+    renderQueue('/tickets?status=New&page=3&sort=Priority&direction=Ascending&pageSize=25')
+    await screen.findByText('TKT-0001')
+
+    await person.click(screen.getByRole('button', { name: /clear filters/i }))
+
+    await waitFor(() => {
+      expect(address()).not.toContain('page=3')
+    })
+    expect(address()).not.toContain('status=New')
+  })
+})
+
+describe('TicketsPage — the built-in views', () => {
+  it('offers the three WP-1.9 names', async () => {
+    renderQueue()
+    const views = await screen.findByRole('group', { name: /saved views/i })
+
+    expect(within(views).getByRole('button', { name: 'My tickets' })).toBeInTheDocument()
+    expect(within(views).getByRole('button', { name: 'Unassigned' })).toBeInTheDocument()
+    expect(within(views).getByRole('button', { name: 'Overdue' })).toBeInTheDocument()
+  })
+
+  it('writes a technician’s "My tickets" as an assignee filter', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+    await screen.findByText('TKT-0001')
+
+    await person.click(screen.getByRole('button', { name: 'My tickets' }))
+
+    await waitFor(() => {
+      expect(address()).toContain(`assigneeId=${me}`)
+    })
+    expect(address()).not.toContain('requesterId')
+  })
+
+  it('writes an end user’s "My tickets" as a requester filter instead', async () => {
+    const person = userEvent.setup()
+    fetchCurrentUser.mockResolvedValue(endUser)
+    renderQueue()
+    await screen.findByText('TKT-0001')
+
+    await person.click(screen.getByRole('button', { name: 'My tickets' }))
+
+    await waitFor(() => {
+      expect(address()).toContain(`requesterId=${me}`)
+    })
+    expect(address()).not.toContain('assigneeId')
+  })
+
+  it('writes "Unassigned" as the unassigned question, not an empty assignee', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+    await screen.findByText('TKT-0001')
+
+    await person.click(screen.getByRole('button', { name: 'Unassigned' }))
+
+    await waitFor(() => {
+      expect(address()).toContain('unassigned=true')
+    })
+  })
+
+  it('writes "Overdue" as the breached resolution SLA', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+    await screen.findByText('TKT-0001')
+
+    await person.click(screen.getByRole('button', { name: 'Overdue' }))
+
+    await waitFor(() => {
+      expect(address()).toContain('slaState=Breached')
+    })
+  })
+
+  it('reads a view as selected from the address alone', async () => {
+    renderQueue('/tickets?slaState=Breached&sort=Priority&direction=Ascending&pageSize=25')
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Overdue' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+    })
+    expect(screen.getByRole('button', { name: 'Unassigned' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+  })
+})
+
+describe('TicketsPage — what each role is offered', () => {
+  it('gives a technician the assignee filter', async () => {
+    renderQueue()
+
+    expect(await screen.findByLabelText('Assignee')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(fetchAssignableUsers).toHaveBeenCalled()
+    })
+  })
+
+  it('does not offer an end user a picker they cannot read', async () => {
+    // The endpoint behind it is Technician-guarded; hiding it is not the enforcement,
+    // it is just not asking a question this person can act on.
+    fetchCurrentUser.mockResolvedValue(endUser)
+    renderQueue()
+
+    await screen.findByText('TKT-0001')
+    expect(screen.queryByLabelText('Assignee')).not.toBeInTheDocument()
+    expect(fetchAssignableUsers).not.toHaveBeenCalled()
   })
 })

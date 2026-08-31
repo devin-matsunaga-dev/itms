@@ -665,7 +665,7 @@ export interface components {
              * Format: int32
              * @description Where it sits in a picker. Ties are broken by name.
              */
-            sortOrder: number | string;
+            sortOrder: number;
         };
         /** @description The body of `POST /api/v1/ticket-priorities`. */
         CreateTicketPriorityRequest: {
@@ -679,17 +679,17 @@ export interface components {
              * Format: int32
              * @description Urgency order, lowest first. Ties are broken by name.
              */
-            rank: number | string;
+            rank: number;
             /**
              * Format: int32
              * @description Minutes from creation within which a technician should respond.
              */
-            responseTargetMinutes: number | string;
+            responseTargetMinutes: number;
             /**
              * Format: int32
              * @description Minutes from creation within which the ticket should be resolved.
              */
-            resolutionTargetMinutes: number | string;
+            resolutionTargetMinutes: number;
         };
         /** @description Raises a ticket. */
         CreateTicketRequest: {
@@ -800,7 +800,7 @@ export interface components {
              * Format: int32
              * @description How far below the root it sits.
              */
-            depth: number | string;
+            depth: number;
             /** @description Free text, or `null`. */
             description: null | string;
             /**
@@ -808,7 +808,7 @@ export interface components {
              * @description How many nodes sit directly beneath it. Carried so a caller can render the tree and
              *     know whether a delete will be refused before it tries.
              */
-            childCount: number | string;
+            childCount: number;
             /**
              * Format: date-time
              * @description When it was created (UTC).
@@ -848,22 +848,22 @@ export interface components {
              * Format: int32
              * @description The total number of matching items across all pages.
              */
-            total: number | string;
+            total: number;
             /**
              * Format: int32
              * @description The 1-based page number this envelope represents.
              */
-            page: number | string;
+            page: number;
             /**
              * Format: int32
              * @description The page size that was applied, after clamping.
              */
-            pageSize: number | string;
+            pageSize: number;
             /**
              * Format: int32
              * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
              */
-            totalPages?: number | string;
+            totalPages?: number;
             /** @description True when a further page exists. */
             hasNextPage?: boolean;
         };
@@ -879,22 +879,22 @@ export interface components {
              * Format: int32
              * @description The total number of matching items across all pages.
              */
-            total: number | string;
+            total: number;
             /**
              * Format: int32
              * @description The 1-based page number this envelope represents.
              */
-            page: number | string;
+            page: number;
             /**
              * Format: int32
              * @description The page size that was applied, after clamping.
              */
-            pageSize: number | string;
+            pageSize: number;
             /**
              * Format: int32
              * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
              */
-            totalPages?: number | string;
+            totalPages?: number;
             /** @description True when a further page exists. */
             hasNextPage?: boolean;
         };
@@ -910,22 +910,22 @@ export interface components {
              * Format: int32
              * @description The total number of matching items across all pages.
              */
-            total: number | string;
+            total: number;
             /**
              * Format: int32
              * @description The 1-based page number this envelope represents.
              */
-            page: number | string;
+            page: number;
             /**
              * Format: int32
              * @description The page size that was applied, after clamping.
              */
-            pageSize: number | string;
+            pageSize: number;
             /**
              * Format: int32
              * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
              */
-            totalPages?: number | string;
+            totalPages?: number;
             /** @description True when a further page exists. */
             hasNextPage?: boolean;
         };
@@ -941,22 +941,22 @@ export interface components {
              * Format: int32
              * @description The total number of matching items across all pages.
              */
-            total: number | string;
+            total: number;
             /**
              * Format: int32
              * @description The 1-based page number this envelope represents.
              */
-            page: number | string;
+            page: number;
             /**
              * Format: int32
              * @description The page size that was applied, after clamping.
              */
-            pageSize: number | string;
+            pageSize: number;
             /**
              * Format: int32
              * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
              */
-            totalPages?: number | string;
+            totalPages?: number;
             /** @description True when a further page exists. */
             hasNextPage?: boolean;
         };
@@ -972,22 +972,22 @@ export interface components {
              * Format: int32
              * @description The total number of matching items across all pages.
              */
-            total: number | string;
+            total: number;
             /**
              * Format: int32
              * @description The 1-based page number this envelope represents.
              */
-            page: number | string;
+            page: number;
             /**
              * Format: int32
              * @description The page size that was applied, after clamping.
              */
-            pageSize: number | string;
+            pageSize: number;
             /**
              * Format: int32
              * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
              */
-            totalPages?: number | string;
+            totalPages?: number;
             /** @description True when a further page exists. */
             hasNextPage?: boolean;
         };
@@ -1003,22 +1003,22 @@ export interface components {
              * Format: int32
              * @description The total number of matching items across all pages.
              */
-            total: number | string;
+            total: number;
             /**
              * Format: int32
              * @description The 1-based page number this envelope represents.
              */
-            page: number | string;
+            page: number;
             /**
              * Format: int32
              * @description The page size that was applied, after clamping.
              */
-            pageSize: number | string;
+            pageSize: number;
             /**
              * Format: int32
              * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
              */
-            totalPages?: number | string;
+            totalPages?: number;
             /** @description True when a further page exists. */
             hasNextPage?: boolean;
         };
@@ -1034,22 +1034,22 @@ export interface components {
              * Format: int32
              * @description The total number of matching items across all pages.
              */
-            total: number | string;
+            total: number;
             /**
              * Format: int32
              * @description The 1-based page number this envelope represents.
              */
-            page: number | string;
+            page: number;
             /**
              * Format: int32
              * @description The page size that was applied, after clamping.
              */
-            pageSize: number | string;
+            pageSize: number;
             /**
              * Format: int32
              * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
              */
-            totalPages?: number | string;
+            totalPages?: number;
             /** @description True when a further page exists. */
             hasNextPage?: boolean;
         };
@@ -1065,22 +1065,22 @@ export interface components {
              * Format: int32
              * @description The total number of matching items across all pages.
              */
-            total: number | string;
+            total: number;
             /**
              * Format: int32
              * @description The 1-based page number this envelope represents.
              */
-            page: number | string;
+            page: number;
             /**
              * Format: int32
              * @description The page size that was applied, after clamping.
              */
-            pageSize: number | string;
+            pageSize: number;
             /**
              * Format: int32
              * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
              */
-            totalPages?: number | string;
+            totalPages?: number;
             /** @description True when a further page exists. */
             hasNextPage?: boolean;
         };
@@ -1173,7 +1173,7 @@ export interface components {
              * Format: int64
              * @description How large it is.
              */
-            byteLength: number | string;
+            byteLength: number;
             /** @description True when the requester cannot see it. Always false in a payload they receive. */
             isInternal: boolean;
             /**
@@ -1204,7 +1204,7 @@ export interface components {
              * Format: int32
              * @description Where it sits in a picker.
              */
-            sortOrder: number | string;
+            sortOrder: number;
             /** @description False once retired. */
             isActive: boolean;
             /**
@@ -1287,7 +1287,7 @@ export interface components {
              * Format: int32
              * @description Its ordering weight.
              */
-            priorityRank: number | string;
+            priorityRank: number;
             /**
              * Format: uuid
              * @description Who the ticket is for.
@@ -1410,7 +1410,7 @@ export interface components {
              * @description Where this line sits among the lines the same change wrote. Entries sharing an
              *     OccurredAt came from one change and are meant to be read together.
              */
-            sequence: number | string;
+            sequence: number;
             /**
              * Format: uuid
              * @description Who made it, or `null` when the system did.
@@ -1452,7 +1452,7 @@ export interface components {
              * Format: int32
              * @description Its ordering weight, so a client can sort a page it already holds.
              */
-            priorityRank: number | string;
+            priorityRank: number;
             /**
              * Format: uuid
              * @description Who the ticket is for.
@@ -1510,17 +1510,17 @@ export interface components {
              * Format: int32
              * @description Urgency order, lowest first.
              */
-            rank: number | string;
+            rank: number;
             /**
              * Format: int32
              * @description Minutes from creation within which a technician should respond.
              */
-            responseTargetMinutes: number | string;
+            responseTargetMinutes: number;
             /**
              * Format: int32
              * @description Minutes from creation within which the ticket should be resolved.
              */
-            resolutionTargetMinutes: number | string;
+            resolutionTargetMinutes: number;
             /** @description False once retired. */
             isActive: boolean;
             /**
@@ -1543,7 +1543,7 @@ export interface components {
              * Format: int32
              * @description Minutes the priority allowed for a response when the ticket was filed.
              */
-            responseTargetMinutes: number | string;
+            responseTargetMinutes: number;
             /**
              * Format: date-time
              * @description When the response target expires. A pause never moves it.
@@ -1564,7 +1564,7 @@ export interface components {
              * Format: int32
              * @description Minutes the priority allowed for a resolution when the ticket was filed.
              */
-            resolutionTargetMinutes: number | string;
+            resolutionTargetMinutes: number;
             /**
              * Format: date-time
              * @description When the resolution target expires, every pause so far included. The same instant the
@@ -1598,7 +1598,7 @@ export interface components {
              * Format: int64
              * @description How long the ticket has spent Waiting in total, in whole seconds.
              */
-            pausedSeconds?: number | string;
+            pausedSeconds?: number;
         };
         /** @enum {unknown} */
         TicketSort: "CreatedAt" | "UpdatedAt" | "Priority" | "Number" | "DueAt" | null;
@@ -1668,7 +1668,7 @@ export interface components {
              * Format: int32
              * @description Where it sits in a picker.
              */
-            sortOrder: number | string;
+            sortOrder: number;
         };
         /** @description The body of `PUT /api/v1/ticket-priorities/{id}`. */
         UpdateTicketPriorityRequest: {
@@ -1680,17 +1680,17 @@ export interface components {
              * Format: int32
              * @description Urgency order, lowest first.
              */
-            rank: number | string;
+            rank: number;
             /**
              * Format: int32
              * @description Minutes from creation within which a technician should respond.
              */
-            responseTargetMinutes: number | string;
+            responseTargetMinutes: number;
             /**
              * Format: int32
              * @description Minutes from creation within which the ticket should be resolved.
              */
-            resolutionTargetMinutes: number | string;
+            resolutionTargetMinutes: number;
         };
         /**
          * @description The fields another module is allowed to know about a user. It carries no
@@ -1906,7 +1906,7 @@ export interface operations {
         parameters: {
             query?: {
                 search?: string;
-                limit?: number | string;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -1984,8 +1984,8 @@ export interface operations {
             query?: {
                 search?: string;
                 includeInactive?: boolean;
-                page?: number | string;
-                pageSize?: number | string;
+                page?: number;
+                pageSize?: number;
             };
             header?: never;
             path?: never;
@@ -2248,8 +2248,8 @@ export interface operations {
                 parentId?: string;
                 rootId?: string;
                 kind?: components["schemas"]["LocationKind"];
-                page?: number | string;
-                pageSize?: number | string;
+                page?: number;
+                pageSize?: number;
             };
             header?: never;
             path?: never;
@@ -2542,8 +2542,8 @@ export interface operations {
         parameters: {
             query?: {
                 includeInactive?: boolean;
-                page?: number | string;
-                pageSize?: number | string;
+                page?: number;
+                pageSize?: number;
             };
             header?: never;
             path?: never;
@@ -2803,8 +2803,8 @@ export interface operations {
         parameters: {
             query?: {
                 includeInactive?: boolean;
-                page?: number | string;
-                pageSize?: number | string;
+                page?: number;
+                pageSize?: number;
             };
             header?: never;
             path?: never;
@@ -3075,8 +3075,8 @@ export interface operations {
                 slaState?: components["schemas"]["SlaState"];
                 sort?: components["schemas"]["TicketSort"];
                 direction?: components["schemas"]["SortDirection"];
-                page?: number | string;
-                pageSize?: number | string;
+                page?: number;
+                pageSize?: number;
             };
             header?: never;
             path?: never;
@@ -3225,8 +3225,8 @@ export interface operations {
     ListTicketHistory: {
         parameters: {
             query?: {
-                page?: number | string;
-                pageSize?: number | string;
+                page?: number;
+                pageSize?: number;
             };
             header?: never;
             path: {
@@ -3437,8 +3437,8 @@ export interface operations {
     ListTicketComments: {
         parameters: {
             query?: {
-                page?: number | string;
-                pageSize?: number | string;
+                page?: number;
+                pageSize?: number;
             };
             header?: never;
             path: {
@@ -3551,8 +3551,8 @@ export interface operations {
     ListTicketAttachments: {
         parameters: {
             query?: {
-                page?: number | string;
-                pageSize?: number | string;
+                page?: number;
+                pageSize?: number;
             };
             header?: never;
             path: {
