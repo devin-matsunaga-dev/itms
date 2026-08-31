@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- The browser-tab icon. 32px for the tab itself, 192px for a bookmark or an
+         installed shortcut, and the Apple touch icon for an iOS home screen. All three
+         are the same mark as the sidebar's, generated from one source image. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/brand-mark.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Commonwealth Utilities Corporation — ITMS</title>
+    <script>
+      // Applies the remembered colour scheme before the first paint, so a reload does
+      // not flash the wrong palette. `src/lib/theme.ts` owns the key and the values;
+      // this is the only copy of that knowledge outside it, and it is here because
+      // React has not mounted yet.
+      (function () {
+        try {
+          var stored = localStorage.getItem('itms.theme')
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+          document.documentElement.classList.toggle('dark', theme === 'dark')
+          document.documentElement.style.colorScheme = theme
+        } catch (error) {
+          // A browser with site data blocked renders light, which is the default.
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -17,6 +17,7 @@
        be bumped with it; ARCHITECTURE.md §10 requires `aspire update` at every
        phase gate. -->
   <ItemGroup>
+    <PackageVersion Include="Aspire.Hosting.JavaScript" Version="13.5.3" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.5.3" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.5.3" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.5.3" />

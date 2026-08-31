@@ -32,6 +32,29 @@ public sealed class AppHostWiringTests(AppHostFixture fixture) : IClassFixture<A
         names.ShouldContain("redis");
         names.ShouldContain("mailhog");
         names.ShouldContain("web-host");
+        names.ShouldContain("web-client");
+    }
+
+    [Fact]
+    public async Task The_react_client_is_told_where_the_api_is()
+    {
+        var environment = await Environment("web-client");
+
+        // The client proxies /api to this address (vite.config.ts). Without the
+        // reference it would fall back to the launchSettings port and silently talk
+        // to whatever happened to be listening there.
+        environment.Keys.ShouldContain(key => key.StartsWith("services__web-host__", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_react_client_waits_for_the_api()
+    {
+        var waits = Resource("web-client").Annotations
+            .OfType<WaitAnnotation>()
+            .Select(w => w.Resource.Name)
+            .ToArray();
+
+        waits.ShouldContain("web-host");
     }
 
     [Fact]

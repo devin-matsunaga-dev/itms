@@ -1,0 +1,282 @@
+/*
+  The ITMS token layer (DESIGN.md §2). Every colour, type step, radius, shadow, and
+  spacing value in this product is defined here and nowhere else — components read
+  tokens and never a raw hex.
+
+  Tailwind v4 is CSS-first: what DESIGN.md calls "tailwind.config.ts + a CSS variable
+  layer" is this file. The values are unchanged; only their home moved.
+
+  Two layers, deliberately:
+    :root            — the raw palette, and the shadcn/ui semantic variables re-pointed
+                       at it, so every primitive inherits this palette rather than the
+                       stock neutral theme.
+    @theme           — the ITMS token names DESIGN.md uses, turned into utilities
+                       (bg-canvas, text-heading, rounded-card, shadow-card, …).
+*/
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+   DESIGN.md §2 — colour, type, shape, elevation as Tailwind utilities.
+   --------------------------------------------------------------------------- */
+@theme {
+  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
+
+  /* Colour. `primary`, `border`, and `sidebar` are shared with the shadcn
+     semantic names below and are defined there; these are the rest.
+     DESIGN.md's `muted` token is Tailwind's `muted-foreground` here, because
+     shadcn already owns `muted` as a surface colour and silently changing what
+     `bg-muted` means would repaint every primitive's hover state. */
+  --color-primary-hover: #1d4fd7;
+  --color-primary-soft: #e8effd;
+  --color-sidebar-deep: #082250;
+  --color-sidebar-fg: #dce6f7;
+  --color-sidebar-fg-muted: #93a9ce;
+  --color-canvas: #f4f7fb;
+  --color-surface: #ffffff;
+  --color-heading: #0f1b33;
+  --color-body: #5a6b85;
+  --color-success: #22c55e;
+  --color-warning: #f5b22d;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+  --color-teal: #14b8a6;
+  --color-violet: #8b5cf6;
+  --color-neutral-chart: #cbd5e1;
+  /* Priority: Critical. The only semantic hue DESIGN.md names without a token. */
+  --color-critical: #b91c1c;
+
+  /* KPI card tints (DESIGN.md §4). Open and SLA reuse primary-soft. */
+  --color-tint-unassigned: #eef2ff;
+  --color-tint-overdue: #fee9e9;
+
+  /* Type scale. */
+  --text-page-title: 28px;
+  --text-page-title--line-height: 36px;
+  --text-card-title: 15px;
+  --text-card-title--line-height: 22px;
+  --text-kpi: 30px;
+  --text-kpi--line-height: 36px;
+  --text-label: 11px;
+  --text-label--line-height: 16px;
+  --text-label--letter-spacing: 0.06em;
+  /* Named `copy` rather than `body`, because `--color-body` already claims the
+     `text-body` utility and one name cannot mean both a size and a colour. */
+  --text-copy: 14px;
+  --text-copy--line-height: 20px;
+  --text-cell: 13.5px;
+  --text-cell--line-height: 20px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  /* Form field label (DESIGN.md §4, Forms: 13/500). */
+  --text-field-label: 13px;
+  --text-field-label--line-height: 18px;
+  /* Section heading inside a card, between the page title and a card title. */
+  --text-section-title: 18px;
+  --text-section-title--line-height: 24px;
+  /* The brand block (DESIGN.md §3): the organisation name over the 9/600 tracked
+     descriptor. Two sizes, because the name is long: it sets at 20/700 on the login
+     page, where there is a 420px column, and at 13/700 over two lines in the 244px
+     sidebar rail, where 20px would truncate or overflow. */
+  --text-brand: 20px;
+  --text-brand--line-height: 24px;
+  --text-org: 13px;
+  --text-org--line-height: 16px;
+  --text-brand-sub: 9px;
+  --text-brand-sub--line-height: 12px;
+  --text-brand-sub--letter-spacing: 0.14em;
+
+  /* Shape. Buttons and inputs take --radius (8px) through the primitives. */
+  --radius-card: 12px;
+  --radius-tile: 10px;
+
+  /* Elevation. No heavy drop shadows anywhere. */
+  --shadow-card: 0 1px 2px rgba(15, 27, 51, 0.04);
+  --shadow-card-hover: 0 4px 12px rgba(15, 27, 51, 0.08);
+
+  /* Layout constants the shell is measured in (DESIGN.md §3). */
+  --spacing-sidebar: 244px;
+  --spacing-sidebar-collapsed: 72px;
+  --spacing-topbar: 72px;
+}
+
+/* ---------------------------------------------------------------------------
+   shadcn/ui semantic variables, re-pointed at the ITMS palette. Restyling these
+   is what DESIGN.md §1 means by "never ship the shadcn default gray/black theme".
+   --------------------------------------------------------------------------- */
+@theme inline {
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
+
+:root {
+  /* Cards and the topbar sit on `surface`; the app sits on `canvas`. */
+  --background: #ffffff;
+  --foreground: #0f1b33;
+  --card: #ffffff;
+  --card-foreground: #0f1b33;
+  --popover: #ffffff;
+  --popover-foreground: #0f1b33;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f7fb;
+  --secondary-foreground: #0f1b33;
+  /* `muted` is a surface; `muted-foreground` is DESIGN.md's `muted` text token. */
+  --muted: #f4f7fb;
+  --muted-foreground: #8b9bb4;
+  --accent: #e8effd;
+  --accent-foreground: #0f1b33;
+  --destructive: #ef4444;
+  --border: #e6ebf2;
+  --input: #e6ebf2;
+  --ring: #2563eb;
+  --chart-1: #2563eb;
+  --chart-2: #f5b22d;
+  --chart-3: #14b8a6;
+  --chart-4: #8b5cf6;
+  --chart-5: #cbd5e1;
+  /* Buttons and inputs are 8px (DESIGN.md §2); cards use rounded-card. */
+  --radius: 8px;
+  --sidebar: #0b2b63;
+  --sidebar-foreground: #dce6f7;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #2563eb;
+}
+
+/*
+  Dark mode (DESIGN.md §5). Both modes ship; the toggle sits at the bottom of the
+  sidebar and puts `.dark` on the document element.
+
+  Two halves, because the palette has two: the ITMS tokens declared in the `@theme`
+  block above — utilities reference them by variable, so redefining them here repaints
+  every `bg-canvas`, `text-heading`, and soft tile — and the shadcn semantic variables
+  the primitives read.
+
+  §5 holds the semantic hues fixed: success, warning, danger, info, teal, and violet
+  mean the same thing in both modes and are deliberately not redefined. Only their soft
+  fills change, to 15% alpha of the hue.
+*/
+.dark {
+  --color-canvas: #0e1626;
+  --color-surface: #172032;
+  --color-heading: #edf1f7;
+  --color-body: #a5b3c9;
+  /* The sidebar is already dark; §5 asks for slightly deeper. */
+  --color-sidebar-deep: #04122f;
+  --color-primary-soft: rgba(37, 99, 235, 0.15);
+  --color-tint-unassigned: rgba(99, 102, 241, 0.15);
+  --color-tint-overdue: rgba(239, 68, 68, 0.15);
+  /* Chart gridlines and the retired/closed series dim rather than glare. */
+  --color-neutral-chart: #475569;
+
+  /* Elevation is deliberately not redefined here. Tailwind inlines a shadow's value
+     into the utility rather than reading the variable at runtime, so overriding
+     `--shadow-card` would be dead CSS — and on a dark ground a 4% black shadow is
+     invisible anyway. The border is what carries a card's edge in dark mode. */
+
+  --background: #0e1626;
+  --foreground: #edf1f7;
+  --card: #172032;
+  --card-foreground: #edf1f7;
+  --popover: #172032;
+  --popover-foreground: #edf1f7;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  /* A step above `surface`, so a hover or a secondary button is visible against the
+     card it sits on rather than melting into it. */
+  --secondary: #1d2739;
+  --secondary-foreground: #edf1f7;
+  --muted: #1d2739;
+  /* DESIGN.md's `muted` text token, dimmed below `body` as it is in light mode. */
+  --muted-foreground: #8496b0;
+  --accent: rgba(37, 99, 235, 0.15);
+  --accent-foreground: #edf1f7;
+  --destructive: #ef4444;
+  --border: #263247;
+  --input: #263247;
+  --ring: #2563eb;
+  --sidebar: #082250;
+  --sidebar-foreground: #dce6f7;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #2563eb;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  body {
+    @apply bg-canvas text-copy text-body antialiased;
+  }
+
+  /* DESIGN.md §2: tabular numerals on every numeric cell and KPI figure. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* DESIGN.md §6: transitions capped at 150ms, and honoured only when the
+     viewer has not asked for less motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

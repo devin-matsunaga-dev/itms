@@ -40,7 +40,7 @@ var mailhog = builder.AddContainer("mailhog", "mailhog/mailhog", "v1.0.1")
 
 var smtp = mailhog.GetEndpoint("smtp");
 
-builder.AddProject<Projects.Itms_Web_Host>("web-host")
+var webHost = builder.AddProject<Projects.Itms_Web_Host>("web-host")
     .WithReference(database)
     .WithReference(redis)
     .WaitFor(database)
@@ -51,5 +51,19 @@ builder.AddProject<Projects.Itms_Web_Host>("web-host")
     .WithEnvironment("Smtp__Port", smtp.Property(EndpointProperty.Port))
     .WaitFor(mailhog)
     .WithHttpHealthCheck("/health");
+
+// The React shell (WP-0.8). It runs as the Vite dev server rather than as static files
+// behind the host: `npm install` and the dev server are the two steps `aspire run` is
+// meant to remove from a session, and hot reload is worth more in development than the
+// production topology is.
+//
+// The reference gives the client the host's address as a service-discovery variable,
+// which is what `vite.config.ts` proxies /api to. That proxy is deliberate: the session
+// cookie is SameSite=Lax and same-origin, so a cross-origin client would need CORS.
+builder.AddViteApp("web-client", "../Itms.Web.Client")
+    .WithNpm()
+    .WithReference(webHost)
+    .WaitFor(webHost)
+    .WithExternalHttpEndpoints();
 
 builder.Build().Run();

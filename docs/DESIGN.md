@@ -1,6 +1,12 @@
 # DESIGN.md — ITMS Visual System
 
 > Binding for every frontend work package. The reference screenshot at `docs/design/reference-dashboard.png` is the source of truth — when this document and the screenshot disagree, the screenshot wins. Do not invent a new visual direction, do not "modernize" it, do not swap the palette.
+>
+> **Two deliberate departures from the screenshot**, decided at WP-0.8 and not to be "corrected" back:
+>
+> 1. The sidebar's bottom slot holds the **colour-scheme switch**, not a New Ticket button. Ticket creation lives in the Tickets screen header (§4, *Page actions*).
+> 2. The topbar's bell and message icons carry **no count badge** until the Notifications module exists (Phase 4). The screenshot's 6 and 2 are illustrative.
+> 3. The **date and time sit in the topbar**, not in each page header, and the brand block leads with the operating organisation's name rather than the "ITMS" wordmark.
 
 ## 1. Stack
 
@@ -73,11 +79,17 @@ Persistent three-part frame — every page renders inside it.
 └──────────┴────────────────────────────────────────────────┘
 ```
 
-**Sidebar (244px, collapsible to 72px).** Vertical gradient `sidebar` → `sidebar-deep`. Brand block at top: hexagon mark + "ITMS" 20/700 white, "UNIFIED IT MANAGEMENT" 9/600 uppercase tracked `sidebar-fg-muted`. Nav items 44px tall, 20px icon + 14/500 label, 10px radius, 12px side inset. Active = solid `primary` fill, white label, no left bar. Inactive hover = `white/8` fill. Order: Dashboard, Tickets, Assets, Users, Monitoring, Alerts, Knowledge Base, Reports, Administration. Pinned to the bottom: full-width **New Ticket** primary button with `+` icon, then a `Collapse` row with chevron in `sidebar-fg-muted`. Administration is hidden for non-admins; the nav is permission-filtered, never disabled-in-place.
+**Sidebar (244px, collapsible to 72px).** Vertical gradient `sidebar` → `sidebar-deep`. Brand block at top: the mark + **"Commonwealth Utilities Corporation"** 13/700 white, wrapping to two lines rather than truncating, over "UNIFIED IT MANAGEMENT" 9/600 uppercase tracked `sidebar-fg-muted`. The organisation's name sets at 13px here and 20px on the login page, where the column is wide enough — an organisation's name is not a field to elide. Both names are spelled once, in `src/lib/branding.ts`.
 
-**Topbar (72px, white, bottom `border`).** Left: search pill — full-round, `canvas` fill, 1px `border`, magnifier icon, placeholder "Search anything…", ~470px wide, opens the global-search palette. Right: bell with count badge, message icon with count badge, vertical divider, 40px round avatar + name 14/600 + role 12/400 `muted` + chevron menu. Badges are `primary` circles with white 11/600 text, top-right of the icon.
+The **mark** is `src/Itms.Web.Client/public/brand-mark.png` — a rounded tile quartering the three services the system exists to keep running: water supply, power distribution, and the reservoir. Its rounded corners are in the alpha channel, so it needs no plate behind it on either the dark sidebar or the light login canvas. The same file is the browser-tab icon, alongside a 32px favicon and a 180px Apple touch icon; all three are generated from one source image and live at stable, unhashed paths. It is decorative in markup — the word "ITMS" always sits beside it. Nav items 44px tall, 20px icon + 14/500 label, 10px radius, 12px side inset. Active = solid `primary` fill, white label, no left bar. Inactive hover = `white/8` fill. Order: Dashboard, Tickets, Assets, Users, Monitoring, Alerts, Knowledge Base, Reports, Administration. Pinned to the bottom: a **colour-scheme switch** — moon icon + "Dark mode" in light, sun icon + "Light mode" in dark, styled as a nav row and announcing its state as a `switch` — then a `Collapse` row with chevron in `sidebar-fg-muted`. Both collapse to icon-plus-tooltip at 72px. Administration is hidden for non-admins; the nav is permission-filtered, never disabled-in-place.
 
-**Page header.** Title 28/600 `heading` ("Welcome back, John" on the dashboard, plain page name elsewhere) with a one-line `body` subtitle under it. Right side: calendar icon in `primary-soft` tile + date 15/600 and weekday/time 12/400 `muted`.
+The sidebar holds navigation and app-level settings only. A create action belongs to the screen that owns the thing being created, not to the frame.
+
+**Topbar (72px, white, bottom `border`).** Left: search pill — full-round, `canvas` fill, 1px `border`, magnifier icon, placeholder "Search anything…", ~470px wide, opens the global-search palette. Right, in order: bell with count badge, message icon with count badge, vertical divider, the date block, then the 40px round avatar + name 14/600 + role 12/400 `muted` + chevron menu. Badges are `primary` circles with white 11/600 text, top-right of the icon.
+
+The **date block** is deliberately quiet: two right-aligned caption lines — date 12/600 `heading` over weekday and time 12/400 `muted`, both tabular — with no icon and no tile, sitting immediately left of the account it is signed in as so the two read as one corner. It is context, not a control. The clock is stated once for the whole application, here, and re-reads the time on an interval: the topbar mounts once and is never remounted by navigation, so a value computed at render would freeze at the moment of sign-in.
+
+**Page header.** Title 28/600 `heading` ("Welcome back, John" on the dashboard, plain page name elsewhere) with a one-line `body` subtitle under it. Right side: the screen's own actions, and nothing else — the date lives in the topbar.
 
 ## 4. Component patterns
 
@@ -97,13 +109,21 @@ Persistent three-part frame — every page renders inside it.
 
 **Buttons.** Primary solid `primary`, white, 40px, 8px radius, 14/500. Secondary white with `border`, `heading` text. Destructive solid `danger`. Ghost/icon for toolbars. Disabled = 50% opacity, no color change.
 
+**Page actions.** The primary action for a screen sits in that screen's page header, left of the date block, as a primary button with a leading icon — **New Ticket** on Tickets, and the same pattern for the create action on Assets, Users, and Knowledge Base. An empty state offers the same action a second time; those are the only two places it appears.
+
 **Forms.** Labels above inputs, 13/500 `heading`. Inputs 40px, 8px radius, `border`, `primary` focus ring at 2px with 2px offset. Errors 12/400 `danger` below the field. Required marked with an asterisk in `danger`. Long forms use section cards, not accordions.
 
 **Empty, loading, error.** Skeleton shimmer inside the card's own shape — never a centered spinner in a card. Empty states get an outlined icon, a plain sentence saying what would appear here, and the primary action button ("Create the first ticket"). Errors state what failed and offer a retry; they don't apologize.
 
 ## 5. Dark mode
 
-Ship light mode in V1; keep the token layer dark-ready. When it lands: `canvas #0E1626`, `surface #172032`, `border #263247`, `heading #EDF1F7`, `body #A5B3C9`. Sidebar is already dark — deepen slightly. Semantic hues hold; soft fills become 15% alpha of the hue; chart gridlines dim.
+**Both modes ship.** The switch is the sidebar's bottom slot (§3). It defaults to the viewer's operating-system preference, remembers a choice per browser, and follows the system until they make one. The class goes on the document element before the first paint, so a reload never flashes the wrong palette.
+
+Dark values: `canvas #0E1626`, `surface #172032`, `border #263247`, `heading #EDF1F7`, `body #A5B3C9`, `muted #8496B0`. Sidebar is already dark — deepen the gradient's bottom stop to `#04122F`. Semantic hues hold: a status is the same colour in both modes. Soft fills become 15% alpha of the hue; chart gridlines and `neutral-chart` dim to `#475569`.
+
+Card elevation is not redefined in dark — a 4% black shadow is invisible on a dark ground, and the `border` carries the edge instead.
+
+Every screen is checked in both modes. A colour that only works in one is a bug, not a trade-off.
 
 ## 6. Quality floor
 
@@ -111,7 +131,7 @@ Non-negotiable on every screen, without being announced in the UI:
 
 - Responsive to 1280px minimum; tables scroll horizontally below that rather than reflowing into cards.
 - Visible `primary` focus ring on every interactive element; full keyboard path through nav, tables, and dialogs.
-- WCAG AA contrast on text and on status pills.
+- WCAG AA contrast on text and on status pills, in **both** colour schemes.
 - `prefers-reduced-motion` respected; transitions capped at 150ms.
 - Dates, times, and durations formatted through one shared utility, rendered in the viewer's local timezone with the absolute value available on hover.
 - Every list view keeps filter/sort/page state in the URL so views are linkable.
