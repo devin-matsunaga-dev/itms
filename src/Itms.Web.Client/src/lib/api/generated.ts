@@ -387,6 +387,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reads a ticket's history, newest first. */
+        get: operations["ListTicketHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{id}/status-changes": {
         parameters: {
             query?: never;
@@ -729,6 +746,37 @@ export interface components {
          *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
          *     object so the shape reaches OpenAPI and, from there, the generated client.
          */
+        PagedResultOfTicketHistoryEntryResponse: {
+            /** @description The items on this page. */
+            items: components["schemas"]["TicketHistoryEntryResponse"][];
+            /**
+             * Format: int32
+             * @description The total number of matching items across all pages.
+             */
+            total: number | string;
+            /**
+             * Format: int32
+             * @description The 1-based page number this envelope represents.
+             */
+            page: number | string;
+            /**
+             * Format: int32
+             * @description The page size that was applied, after clamping.
+             */
+            pageSize: number | string;
+            /**
+             * Format: int32
+             * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
+             */
+            totalPages?: number | string;
+            /** @description True when a further page exists. */
+            hasNextPage?: boolean;
+        };
+        /**
+         * @description The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as
+         *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
+         *     object so the shape reaches OpenAPI and, from there, the generated client.
+         */
         PagedResultOfTicketPriorityResponse: {
             /** @description The items on this page. */
             items: components["schemas"]["TicketPriorityResponse"][];
@@ -800,6 +848,43 @@ export interface components {
              * @description When it was last changed (UTC).
              */
             updatedAt: string;
+        };
+        /**
+         * @description Which dimension of a ticket a history entry records having moved.
+         * @enum {unknown}
+         */
+        TicketChangeKind: "Status" | "Priority" | "Assignment" | "Resolution";
+        /** @description One line of a ticket's timeline, as the API renders it. */
+        TicketHistoryEntryResponse: {
+            /**
+             * Format: uuid
+             * @description The entry's id.
+             */
+            id: string;
+            /** @description Which dimension moved. */
+            kind: components["schemas"]["TicketChangeKind"];
+            /** @description What it read before, or `null` when there was nothing there. */
+            fromValue: null | string;
+            /** @description What it reads now, or `null` when the change cleared it. */
+            toValue: null | string;
+            /**
+             * Format: date-time
+             * @description When the change happened (UTC).
+             */
+            occurredAt: string;
+            /**
+             * Format: int32
+             * @description Where this line sits among the lines the same change wrote. Entries sharing an
+             *     OccurredAt came from one change and are meant to be read together.
+             */
+            sequence: number | string;
+            /**
+             * Format: uuid
+             * @description Who made it, or `null` when the system did.
+             */
+            actorId: null | string;
+            /** @description Their display name at the time, or `null`. */
+            actorName: null | string;
         };
         /** @description A ticket priority as the API renders it. */
         TicketPriorityResponse: {
@@ -2279,6 +2364,58 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListTicketHistory: {
+        parameters: {
+            query?: {
+                page?: number | string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfTicketHistoryEntryResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
             };
             /** @description Not Found */
             404: {

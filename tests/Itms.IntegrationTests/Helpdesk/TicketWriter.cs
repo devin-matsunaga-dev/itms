@@ -1,4 +1,5 @@
 using Itms.Modules.Helpdesk.Domain;
+using Itms.Modules.Helpdesk.Features.TicketHistory;
 using Itms.Modules.Helpdesk.Persistence;
 using Itms.Platform.Data;
 using Itms.Platform.Time;
@@ -188,6 +189,98 @@ internal static class TicketWriter
             .Select(t => new ValueTuple<TicketStatus, DateTimeOffset?, DateTimeOffset?, string?>(
                 t.Status, t.ResolvedAt, t.ClosedAt, t.ResolutionNotes))
             .SingleAsync(cancellationToken);
+    }
+
+    /// <summary>Every history entry a ticket has, oldest first, read straight from the table.</summary>
+    /// <remarks>
+    /// Read off the row rather than through the endpoint, so a test can assert that a
+    /// rolled-back transaction wrote nothing without the read path being able to hide it.
+    /// </remarks>
+    /// <param name="services">The host's provider.</param>
+    /// <param name="ticketId">The ticket whose timeline is wanted.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>The entries, oldest first.</returns>
+    public static async Task<IReadOnlyList<TicketHistoryEntry>> HistoryAsync(
+        IServiceProvider services,
+        Guid ticketId,
+        CancellationToken cancellationToken)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var database = scope.ServiceProvider.GetRequiredService<HelpdeskDbContext>();
+
+        return await database.TicketHistory
+            .AsNoTracking()
+            .Where(entry => entry.TicketId == ticketId)
+            .OrderBy(entry => entry.OccurredAt)
+            .ThenBy(entry => entry.Sequence)
+            .ThenBy(entry => entry.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Moves a ticket the way <c>ChangeTicketStatusHandler</c> does — snapshot, transition,
+    /// record, save — inside one transaction the caller can make fail.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the shape of the handler, not a rehearsal of it: it loads the ticket tracked
+    /// on the session's own connection, takes the before-snapshot, calls the entity, and
+    /// hands the real <see cref="TicketHistoryRecorder"/> the result, all inside one
+    /// <c>IModuleDbSession</c> transaction. WP-1.2 wrote its numbering tests against a
+    /// helper of exactly this shape, for exactly this reason.
+    /// </para>
+    /// <para>
+    /// It exists because invariant 3's rollback half cannot be reached through the endpoint:
+    /// the handler opens and commits its own transaction, so a test that only speaks HTTP
+    /// has no moment at which to make it fail. Every other assertion about history still
+    /// goes through the real endpoint.
+    /// </para>
+    /// </remarks>
+    /// <param name="services">The host's provider.</param>
+    /// <param name="ticketId">The ticket to move.</param>
+    /// <param name="target">The status to move it to.</param>
+    /// <param name="resolutionNotes">The resolution, when moving to Resolved.</param>
+    /// <param name="cancellationToken">Cancels the work.</param>
+    /// <param name="failAfterSave">
+    /// Runs inside the transaction after the change and its history have been saved. A test
+    /// that throws from here rolls both of them back.
+    /// </param>
+    public static async Task MoveAsync(
+        IServiceProvider services,
+        Guid ticketId,
+        TicketStatus target,
+        string? resolutionNotes,
+        CancellationToken cancellationToken,
+        Action? failAfterSave = null)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var provider = scope.ServiceProvider;
+        var database = provider.GetRequiredService<HelpdeskDbContext>();
+        var session = provider.GetRequiredService<IModuleDbSession>();
+        var history = provider.GetRequiredService<TicketHistoryRecorder>();
+        var clock = provider.GetRequiredService<IClock>();
+
+        await session.ExecuteInTransactionAsync(
+            async token =>
+            {
+                await session.EnlistAsync(database, token);
+
+                var ticket = await database.Tickets.SingleAsync(candidate => candidate.Id == ticketId, token);
+                var before = TicketSnapshot.Of(ticket);
+                var now = clock.UtcNow;
+
+                var transition = ticket.ChangeStatus(target, resolutionNotes, now, actor: null);
+                if (transition.IsFailure)
+                {
+                    throw new InvalidOperationException($"The suite asked for an illegal move to {target}.");
+                }
+
+                await history.RecordAsync(ticket, before, now, token);
+                await database.SaveChangesAsync(token);
+
+                failAfterSave?.Invoke();
+            },
+            cancellationToken);
     }
 
     /// <summary>The numbers of every ticket in the database, in issue order.</summary>

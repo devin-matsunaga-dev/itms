@@ -5,6 +5,8 @@ using Itms.Modules.Helpdesk.Features.TicketCategories.GetTicketCategory;
 using Itms.Modules.Helpdesk.Features.TicketCategories.ListTicketCategories;
 using Itms.Modules.Helpdesk.Features.TicketCategories.SetTicketCategoryStatus;
 using Itms.Modules.Helpdesk.Features.TicketCategories.UpdateTicketCategory;
+using Itms.Modules.Helpdesk.Features.TicketHistory;
+using Itms.Modules.Helpdesk.Features.TicketHistory.ListTicketHistory;
 using Itms.Modules.Helpdesk.Features.TicketPriorities;
 using Itms.Modules.Helpdesk.Features.TicketPriorities.CreateTicketPriority;
 using Itms.Modules.Helpdesk.Features.TicketPriorities.GetTicketPriority;
@@ -64,6 +66,11 @@ public static class HelpdeskModule
         services.TryAddScoped<SetTicketCategoryStatusHandler>();
 
         services.TryAddScoped<ChangeTicketStatusHandler>();
+        services.TryAddScoped<ListTicketHistoryHandler>();
+
+        // Scoped, because it adds its entries to the scope's own context and they go to
+        // the database on that scope's own SaveChanges, inside that scope's transaction.
+        services.TryAddScoped<TicketHistoryRecorder>();
 
         services.TryAddScoped<ListTicketPrioritiesHandler>();
         services.TryAddScoped<GetTicketPriorityHandler>();

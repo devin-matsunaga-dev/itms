@@ -27,6 +27,33 @@ public static class AuthClient
     /// <summary>The seeded development password, so no test spells it out itself.</summary>
     public const string Password = "Dev!Passw0rd123";
 
+    /// <summary>
+    /// A client already signed in as one of the seeded development accounts.
+    /// </summary>
+    /// <remarks>
+    /// Eleven test classes had hand-copied this three-line dance by WP-1.3, and STATUS.md
+    /// recorded that it belonged in one place before a twelfth arrived. WP-1.4 is that
+    /// twelfth, so it lives here now. The eleven copies were deliberately left alone rather
+    /// than churn WP-0.5's and WP-0.6's suites into this diff — a package already touching
+    /// those files should point them here and delete them.
+    /// </remarks>
+    /// <param name="fixture">The booted host.</param>
+    /// <param name="userName">Which seeded account to sign in as: <c>admin</c>, <c>tech</c>, or <c>user</c>.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The signed-in client. The caller disposes it.</returns>
+    public static async Task<HttpClient> SignedInAsync(
+        IdentityWebFixture fixture,
+        string userName,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(fixture);
+
+        var client = fixture.CreateClient();
+        var response = await LoginAsync(client, userName, Password, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return client;
+    }
+
     /// <summary>Signs in, fetching the antiforgery token first as a browser would.</summary>
     /// <param name="client">The client, which keeps the cookies.</param>
     /// <param name="userName">The sign-in name or email.</param>

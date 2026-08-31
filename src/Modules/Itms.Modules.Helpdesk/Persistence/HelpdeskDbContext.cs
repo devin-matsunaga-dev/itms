@@ -31,6 +31,9 @@ public sealed class HelpdeskDbContext(DbContextOptions<HelpdeskDbContext> option
     /// <summary>The requests for support themselves.</summary>
     public DbSet<Ticket> Tickets => Set<Ticket>();
 
+    /// <summary>Every ticket's timeline: what moved, when, and at whose hand.</summary>
+    public DbSet<TicketHistoryEntry> TicketHistory => Set<TicketHistoryEntry>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,6 +43,7 @@ public sealed class HelpdeskDbContext(DbContextOptions<HelpdeskDbContext> option
         modelBuilder.ApplyConfiguration(new TicketCategoryConfiguration());
         modelBuilder.ApplyConfiguration(new TicketPriorityConfiguration());
         modelBuilder.ApplyConfiguration(new TicketConfiguration());
+        modelBuilder.ApplyConfiguration(new TicketHistoryEntryConfiguration());
 
         // No DbSet: the ticket-number counter is reached only by TicketNumberGenerator's
         // one statement, and applying its configuration directly is what keeps it that way.

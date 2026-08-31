@@ -4,9 +4,9 @@
 
 **Project:** Unified IT Management System (ITMS)
 **Phase:** 1 — Helpdesk (Phase 0 complete, awaiting the gate walkthrough and the `v0.1-phase0` tag)
-**Current WP:** `WP-1.4 — Ticket history`
-**Branch:** `feat/wp-1.4-ticket-history`
-**Last completed:** `WP-1.3 — Ticket state machine` (2026-08-31)
+**Current WP:** `WP-1.5 — Create, list, detail endpoints`
+**Branch:** `feat/wp-1.5-ticket-endpoints`
+**Last completed:** `WP-1.4 — Ticket history` (2026-08-31)
 **Last updated:** 2026-08-31
 
 ---
@@ -16,7 +16,7 @@
 | Phase | Packages | Done | Tag |
 |---|---|---|---|
 | 0 — Foundation | 0.1 – 0.9 | 9 / 9 | *gate pending* |
-| 1 — Helpdesk | 1.1 – 1.10 | 3 / 10 | — |
+| 1 — Helpdesk | 1.1 – 1.10 | 4 / 10 | — |
 | 2 — Assets & directory | 2.1 – 2.7 | 0 / 7 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
@@ -167,6 +167,20 @@
 - **`Cancelled` is terminal, which SPEC.md does not actually say.** It says only that Closed is terminal. Terminal was chosen at the human's direction as the safer reading of the silence. Reopening a cancelled ticket, if it is ever wanted, is one entry in `TicketStateMachine`'s table plus the tests that follow from it — the exhaustive pair suite means nothing else has to be found by hand.
 - **`SignedInAsync` is now hand-copied into eleven integration test classes.** WP-1.2 recorded ten and said a package already touching those files should hoist it; WP-1.3 added another rather than widen its diff into WP-0.5's and WP-0.6's suites. `tests/Itms.IntegrationTests/Api/ApiClient.cs` is where it belongs, beside the plumbing WP-1.1 already moved there.
 - **A ticket still cannot be created through the API,** so nothing in this package is reachable in a browser. WP-1.5 brings the create endpoint and WP-1.10 the screen; until then the manual checklist below runs through `curl` against a seeded ticket.
+
+### Noticed during WP-1.4
+
+- **Two of the four history kinds have no caller yet, by design.** `TicketChanges.Between` emits `Status`, `Priority`, `Assignment`, and `Resolution`; `ChangeTicketStatusHandler` is the only thing that calls the recorder, so only `Status` and `Resolution` are written in production today. `Priority` and `Assignment` are exhausted in the unit suite against hand-built snapshots. **WP-1.6's `Assign` gets its history for free by taking a `TicketSnapshot` before it moves the ticket and calling `TicketHistoryRecorder.RecordAsync` after** — it must not write entries itself. The same is true of whatever package first moves a ticket's priority; no work package names one, and `WP-1.5` or `WP-1.10` is the natural home.
+- **`TicketWriter.ParkAsync` writes no history, which is now a second reason to retire it.** WP-1.3 recorded that it bypasses the entity; it also bypasses the recorder, so a parked ticket's timeline starts empty rather than at `New`. That is correct for arrangement and wrong for anything else. When WP-1.6 lands, the walks that start at `Assigned` should start from a real assignment, and the timelines they read will then start with the assignment line.
+- **A ticket's timeline is Technician-only, and WP-1.5 owns whether it should be.** `GET /api/v1/tickets/{id}/history` sits on the same policy as the transitions because this package has no requester-scoped read to answer the row-level question against. ARCHITECTURE.md §7 lets a User read their own tickets, so a requester arguably should see their own timeline — but a timeline is exactly the sort of thing an internal note hides behind, which makes it **WP-1.7's** problem as much as WP-1.5's. Widening it is a policy change plus a row-level filter, not a new route.
+- **The history read is the first paged endpoint that is not reference data,** and it clamps through `PageRequest.Of` like the others. It is not URL-synced anywhere yet because there is no screen; `CONVENTIONS.md`'s "every list screen keeps filter/sort/page state in the URL" lands with WP-1.10's detail page.
+- **`helpdesk.ticket_status_changed` audit rows and history entries now both exist for one transition, deliberately.** They are different records for different readers — the audit trail is cross-cutting and administrative, the timeline is the ticket's own narrative and is scoped to Helpdesk. The warning WP-1.3 left stands unchanged and is *only* about the audit row: **the package that starts publishing `TicketStatusChanged` must delete the `audit.WriteAsync` call in `ChangeTicketStatusHandler`. It must not delete the `history.RecordAsync` call** — invariant 3 is not satisfied by an audit row, and a consumer reacting to an event cannot write inside the transaction that produced it.
+- **`TicketHistoryRecorder` is public, and it is a service rather than a domain type.** It had to be reachable from the integration suite to prove the rollback guarantee against the recorder that callers actually use — the same call WP-1.3 made for `TicketStateMachine`, for the same reason (no `InternalsVisibleTo` exists in this repository, and no module can reference Helpdesk anyway). If an `InternalsVisibleTo` is ever introduced, this and `TicketStateMachine` are the two types that should go back to internal.
+- **The entry ordinal (`sequence`) exists because version 7 ids are not monotonic inside one millisecond.** Resolving writes two lines at one instant, and ordering them by id alone returned them in either order between reads — caught by a test, not by reasoning. `sequence` is an ordinal *within a change*, not a global counter; the read orders by `occurred_at DESC, sequence DESC, id DESC` and the index matches. **A UI should group entries sharing an `occurredAt` and render them as one event**, not as separate timeline rows with the same timestamp.
+- **The history table has no update or delete path, but it is not the audit table and is not defended like one.** `AuditRecord` has a database trigger and an architecture test behind invariant 10; `ticket_history` has only a write-once entity. That is the right level for it — invariant 10 names audit entries specifically — but a package that later wants a "correct this entry" affordance should be made to argue for it rather than discovering nothing stops it.
+- **`fk_ticket_history_ticket_id` is `ON DELETE RESTRICT`,** so the still-unowned ticket delete path recorded at WP-1.2 now has a second thing to decide: what happens to the timeline. Soft delete needs no answer; a hard delete would fail on this constraint, which is deliberate — better a failed delete than a silently discarded history.
+- **`SignedInAsync` was hoisted to `AuthClient.SignedInAsync(fixture, userName, token)`,** which WP-1.2 and WP-1.3 both recorded as owed. The new suite uses it; **the eleven existing copies were left in place** rather than churn WP-0.5's and WP-0.6's suites into this diff. A package already touching those files should point them at it and delete them — the count is now capped rather than growing.
+- **`TicketChangeKind` is the third enum on the wire, and the `ConfigureHttpJsonOptions` trigger WP-1.3 set should not be pulled as written.** The attribute is not merely a serialisation choice: the build-time OpenAPI generator reads it off the type, which is what puts `"Status" | "Priority" | "Assignment" | "Resolution"` in `generated.ts` rather than a number. A host-wide converter added at runtime would not obviously reach the document generator, and getting that wrong turns every enum in the contract into an integer silently. If the consolidation is still wanted, it needs the contract diff checked as part of it — it is not the one-line change the earlier note implies.
 
 ## Known issues
 

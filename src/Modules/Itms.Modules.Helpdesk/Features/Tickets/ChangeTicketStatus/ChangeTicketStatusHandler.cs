@@ -1,6 +1,7 @@
 using Itms.Contracts.Auditing;
 using Itms.Modules.Helpdesk.Auditing;
 using Itms.Modules.Helpdesk.Domain;
+using Itms.Modules.Helpdesk.Features.TicketHistory;
 using Itms.Modules.Helpdesk.Persistence;
 using Itms.Platform.Data;
 using Itms.Platform.Identity;
@@ -20,8 +21,10 @@ namespace Itms.Modules.Helpdesk.Features.Tickets.ChangeTicketStatus;
 /// the entity, so a second caller arriving in WP-1.6 or WP-1.10 cannot route around it.
 /// </para>
 /// <para>
-/// The change and its audit row commit together, so a transition that is rolled back
-/// leaves no entry claiming it happened.
+/// The change, its history entries, and its audit row commit together, so a transition
+/// that is rolled back leaves nothing claiming it happened. Invariant 3 is what requires
+/// that of the history in particular: it is written in the same transaction as the change,
+/// not merely soon after it.
 /// </para>
 /// </remarks>
 /// <param name="database">The helpdesk context.</param>
@@ -29,12 +32,14 @@ namespace Itms.Modules.Helpdesk.Features.Tickets.ChangeTicketStatus;
 /// <param name="clock">The system clock. Every instant this writes comes from here.</param>
 /// <param name="currentUser">Who is making the request.</param>
 /// <param name="audit">The audit trail (ARCHITECTURE.md §8, SPEC.md §15).</param>
+/// <param name="history">The ticket's own timeline (invariant 3, SPEC.md §2).</param>
 internal sealed class ChangeTicketStatusHandler(
     HelpdeskDbContext database,
     IModuleDbSession session,
     IClock clock,
     ICurrentUser currentUser,
-    IAuditWriter audit)
+    IAuditWriter audit,
+    TicketHistoryRecorder history)
 {
     /// <summary>Applies <paramref name="request"/> to the ticket.</summary>
     /// <param name="ticketId">The ticket to move.</param>
@@ -68,6 +73,11 @@ internal sealed class ChangeTicketStatusHandler(
                     return;
                 }
 
+                // Taken before the move, and the only thing this handler has to remember:
+                // the recorder works out which entries the change owes from it, so a
+                // resolve records both its status move and its resolution without this
+                // method knowing that is two lines of the timeline.
+                var before = TicketSnapshot.Of(ticket);
                 var from = ticket.Status;
                 var resolvedBefore = ticket.ResolvedAt;
                 var closedBefore = ticket.ClosedAt;
@@ -81,6 +91,12 @@ internal sealed class ChangeTicketStatusHandler(
                     failure = transition.Error;
                     return;
                 }
+
+                // Added, not saved: the entries go to the database on the SaveChanges below,
+                // in one command batch with the ticket update and inside the one transaction
+                // this handler opened. That is invariant 3, and it is what makes a rolled
+                // back transition incapable of leaving an orphan line behind.
+                await history.RecordAsync(ticket, before, now, token).ConfigureAwait(false);
 
                 try
                 {

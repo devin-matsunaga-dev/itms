@@ -1725,6 +1725,95 @@
         ]
       }
     },
+    "/api/v1/tickets/{id}/history": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Reads a ticket's history, newest first.",
+        "operationId": "ListTicketHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfTicketHistoryEntryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
     "/api/v1/tickets/{id}/status-changes": {
       "post": {
         "tags": [
@@ -2489,6 +2578,65 @@
         },
         "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
       },
+      "PagedResultOfTicketHistoryEntryResponse": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketHistoryEntryResponse"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
+      },
       "PagedResultOfTicketPriorityResponse": {
         "required": [
           "items",
@@ -2655,6 +2803,83 @@
           }
         },
         "description": "A ticket category as the API renders it."
+      },
+      "TicketChangeKind": {
+        "enum": [
+          "Status",
+          "Priority",
+          "Assignment",
+          "Resolution"
+        ],
+        "description": "Which dimension of a ticket a history entry records having moved."
+      },
+      "TicketHistoryEntryResponse": {
+        "required": [
+          "id",
+          "kind",
+          "fromValue",
+          "toValue",
+          "occurredAt",
+          "sequence",
+          "actorId",
+          "actorName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The entry's id.",
+            "format": "uuid"
+          },
+          "kind": {
+            "description": "Which dimension moved.",
+            "$ref": "#/components/schemas/TicketChangeKind"
+          },
+          "fromValue": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What it read before, or `null` when there was nothing there."
+          },
+          "toValue": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What it reads now, or `null` when the change cleared it."
+          },
+          "occurredAt": {
+            "type": "string",
+            "description": "When the change happened (UTC).",
+            "format": "date-time"
+          },
+          "sequence": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Where this line sits among the lines the same change wrote. Entries sharing an\nOccurredAt came from one change and are meant to be read together.",
+            "format": "int32"
+          },
+          "actorId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who made it, or `null` when the system did.",
+            "format": "uuid"
+          },
+          "actorName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Their display name at the time, or `null`."
+          }
+        },
+        "description": "One line of a ticket's timeline, as the API renders it."
       },
       "TicketPriorityResponse": {
         "required": [
