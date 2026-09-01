@@ -3,6 +3,8 @@
 
 using Itms.Messaging;
 using Itms.Messaging.Abstractions;
+using Itms.Modules.Assets;
+using Itms.Modules.Assets.Seeding;
 using Itms.Modules.Audit;
 using Itms.Modules.Directory;
 using Itms.Modules.Directory.Seeding;
@@ -55,6 +57,7 @@ builder.Services.AddItmsOpenApi();
 builder.Services.AddIdentityModule();
 builder.Services.AddDirectoryModule();
 builder.Services.AddHelpdeskModule();
+builder.Services.AddAssetsModule();
 builder.Services.AddAuditModule();
 
 var app = builder.Build();
@@ -69,6 +72,7 @@ if (app.Environment.IsDevelopment())
     await startupScope.ServiceProvider.MigrateIdentityAsync();
     await startupScope.ServiceProvider.MigrateDirectoryAsync();
     await startupScope.ServiceProvider.MigrateHelpdeskAsync();
+    await startupScope.ServiceProvider.MigrateAssetsAsync();
     await startupScope.ServiceProvider.MigrateAuditAsync();
     await DevelopmentIdentitySeeder.SeedAsync(startupScope.ServiceProvider);
     await DevelopmentDirectorySeeder.SeedAsync(startupScope.ServiceProvider);
@@ -80,6 +84,11 @@ if (app.Environment.IsDevelopment())
     // every start would also run during build-time OpenAPI generation, which boots the
     // host with no database at all.
     await HelpdeskReferenceDataSeeder.SeedAsync(startupScope.ServiceProvider);
+    // Same shape, same obligation, and the same gap: a deployment with no asset statuses
+    // could not record an asset. WP-6.6 owns the one first-run step that runs every
+    // reference-data seeder — this deliberately joins that gap rather than inventing a
+    // second mechanism.
+    await AssetsReferenceDataSeeder.SeedAsync(startupScope.ServiceProvider);
 }
 
 // ARCHITECTURE.md §6: errors are ProblemDetails, always. These two turn the
@@ -116,6 +125,7 @@ if (app.Environment.IsDevelopment())
 app.MapIdentityEndpoints();
 app.MapDirectoryEndpoints();
 app.MapHelpdeskEndpoints();
+app.MapAssetsEndpoints();
 // Audit maps nothing today; the trail is read by WP-5.9's viewer. The call is here so
 // adding that viewer is an edit inside the module rather than a change to this file.
 app.MapAuditEndpoints();

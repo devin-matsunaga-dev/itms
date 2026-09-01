@@ -1,0 +1,128 @@
+using FluentValidation;
+using Itms.Modules.Assets.Features.AssetStatuses;
+using Itms.Modules.Assets.Features.AssetStatuses.CreateAssetStatus;
+using Itms.Modules.Assets.Features.AssetStatuses.GetAssetStatus;
+using Itms.Modules.Assets.Features.AssetStatuses.ListAssetStatuses;
+using Itms.Modules.Assets.Features.AssetStatuses.SetAssetStatusActivation;
+using Itms.Modules.Assets.Features.AssetStatuses.UpdateAssetStatus;
+using Itms.Modules.Assets.Features.AssetTypes;
+using Itms.Modules.Assets.Features.AssetTypes.CreateAssetType;
+using Itms.Modules.Assets.Features.AssetTypes.GetAssetType;
+using Itms.Modules.Assets.Features.AssetTypes.ListAssetTypes;
+using Itms.Modules.Assets.Features.AssetTypes.SetAssetTypeActivation;
+using Itms.Modules.Assets.Features.AssetTypes.UpdateAssetType;
+using Itms.Modules.Assets.Features.Assets;
+using Itms.Modules.Assets.Features.Assets.CreateAsset;
+using Itms.Modules.Assets.Features.Assets.GetAsset;
+using Itms.Modules.Assets.Persistence;
+using Itms.Platform.Data;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+namespace Itms.Modules.Assets;
+
+/// <summary>
+/// The Assets module's single registration and single mapping point
+/// (ARCHITECTURE.md §3 rule 5).
+/// </summary>
+public static class AssetsModule
+{
+    /// <summary>
+    /// Registers persistence and this module's handlers and validators.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>No public contract implementation yet.</b> <c>IAssetLookup</c> is how every other
+    /// module reads assets and it is still an interface only — <c>WP-2.5</c> claims it by
+    /// name, alongside the ticket ↔ asset link that first needs it. Nothing here registers
+    /// an implementation, so a module resolving <c>IAssetLookup</c> today fails at startup
+    /// rather than silently reading nothing.
+    /// </para>
+    /// <para>
+    /// <b>No event consumer, and this module publishes nothing.</b> ARCHITECTURE.md §5 names
+    /// <c>AssetAssigned</c> and <c>AssetStatusChanged</c>; both belong to the assignment and
+    /// lifecycle transitions <c>WP-2.2</c> adds. Publishing needs nothing registered here —
+    /// <c>IEventPublisher</c> comes from <c>AddMessaging</c>, which the composition root has
+    /// already run — but <b>a consumer would</b>: the assembly list passed to
+    /// <c>AddMessaging</c> is what the bus scans for <c>IEventConsumer&lt;T&gt;</c>, and
+    /// Assets is not on it. The first package to add one here must add
+    /// <c>Itms.Modules.Assets</c> to that call, or the consumer silently never runs and no
+    /// test would notice.
+    /// </para>
+    /// </remarks>
+    /// <param name="services">The container. <c>AddPlatform</c> and <c>AddMessaging</c> must already have run.</param>
+    /// <returns>The container, for chaining.</returns>
+    public static IServiceCollection AddAssetsModule(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        // Built on the connection the ambient session hands out, never on a pool of its
+        // own: that is what lets a handler write an asset change and its outbox event in
+        // one transaction (STATUS.md, WP-0.4).
+        services.AddDbContext<AssetsDbContext>((provider, builder) =>
+            builder.UseNpgsql(
+                provider.GetRequiredService<IModuleDbSession>().Connection,
+                npgsql => npgsql.MigrationsHistoryTable(
+                    AssetsDbContext.MigrationsHistoryTable,
+                    AssetsDbContext.SchemaName)));
+
+        services.TryAddScoped<ListAssetTypesHandler>();
+        services.TryAddScoped<GetAssetTypeHandler>();
+        services.TryAddScoped<CreateAssetTypeHandler>();
+        services.TryAddScoped<UpdateAssetTypeHandler>();
+        services.TryAddScoped<SetAssetTypeActivationHandler>();
+
+        services.TryAddScoped<ListAssetStatusesHandler>();
+        services.TryAddScoped<GetAssetStatusHandler>();
+        services.TryAddScoped<CreateAssetStatusHandler>();
+        services.TryAddScoped<UpdateAssetStatusHandler>();
+        services.TryAddScoped<SetAssetStatusActivationHandler>();
+
+        services.TryAddScoped<CreateAssetHandler>();
+        services.TryAddScoped<GetAssetHandler>();
+
+        services.TryAddScoped<IValidator<CreateAssetTypeRequest>, CreateAssetTypeValidator>();
+        services.TryAddScoped<IValidator<UpdateAssetTypeRequest>, UpdateAssetTypeValidator>();
+        services.TryAddScoped<IValidator<CreateAssetStatusRequest>, CreateAssetStatusValidator>();
+        services.TryAddScoped<IValidator<UpdateAssetStatusRequest>, UpdateAssetStatusValidator>();
+        services.TryAddScoped<IValidator<CreateAssetRequest>, CreateAssetValidator>();
+
+        return services;
+    }
+
+    /// <summary>Maps the asset, asset-type, and asset-status endpoints.</summary>
+    /// <param name="endpoints">The host's route builder.</param>
+    /// <returns>The route builder, for chaining.</returns>
+    public static IEndpointRouteBuilder MapAssetsEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+
+        endpoints.MapAssetTypes();
+        endpoints.MapAssetStatuses();
+        endpoints.MapAssets();
+
+        return endpoints;
+    }
+
+    /// <summary>
+    /// Applies the assets migrations.
+    /// </summary>
+    /// <remarks>
+    /// The host calls this at startup in development; production applies migrations as a
+    /// deliberate deployment step. The reference data does not travel with them — see
+    /// <c>AssetsReferenceDataSeeder</c>, which the same deployment step must also run.
+    /// </remarks>
+    /// <param name="services">A scoped service provider.</param>
+    /// <param name="cancellationToken">Cancels the migration.</param>
+    public static async Task MigrateAssetsAsync(
+        this IServiceProvider services,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        var context = services.GetRequiredService<AssetsDbContext>();
+        await context.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);
+    }
+}

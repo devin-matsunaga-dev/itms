@@ -1,4 +1,5 @@
 using System.Net;
+using Itms.Modules.Assets.Seeding;
 using Itms.Modules.Helpdesk.Seeding;
 using Itms.Modules.Identity.Seeding;
 using Itms.TestSupport;
@@ -98,14 +99,14 @@ public sealed class IdentityWebFixture : IAsyncLifetime
         // Every module the host registers, not just Identity: the fixture boots the whole
         // composition root, so a schema left out here would leave one suite's rows behind
         // for the next one. WP-0.6 added "directory"; WP-0.7 added "audit"; WP-1.1 added
-        // "helpdesk".
+        // "helpdesk"; WP-2.1 added "assets".
         //
         // Respawn truncates, which is why the audit table's append-only trigger does not
         // block the reset: the trigger covers UPDATE and DELETE, and TRUNCATE needs table
         // ownership rather than write access.
         _respawner = await PostgresDatabase.CreateRespawnerAsync(
             _dataSource,
-            ["identity", "messaging", "directory", "helpdesk", "audit"],
+            ["identity", "messaging", "directory", "helpdesk", "assets", "audit"],
             cancellationToken);
     }
 
@@ -151,6 +152,11 @@ public sealed class IdentityWebFixture : IAsyncLifetime
         await using var scope = Services.CreateAsyncScope();
         await DevelopmentIdentitySeeder.SeedAsync(scope.ServiceProvider, cancellationToken);
         await HelpdeskReferenceDataSeeder.SeedAsync(scope.ServiceProvider, cancellationToken);
+
+        // A truncate empties assets.asset_types and assets.asset_statuses, and every asset
+        // test reads them. STATUS.md makes this the standing obligation of any module that
+        // adds reference data.
+        await AssetsReferenceDataSeeder.SeedAsync(scope.ServiceProvider, cancellationToken);
     }
 
     /// <inheritdoc />

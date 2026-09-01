@@ -1,3 +1,28 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- The Assets module: the equipment records ARCHITECTURE.md §1 calls the backbone,
+       and the reference data they are classified by (SPEC.md §3). It references the
+       shared framework because it owns endpoints, and Itms.Contracts because it audits
+       through IAuditWriter and reads users, departments, and locations through the
+       lookup interfaces. It references no other module, and the architecture tests
+       assert it. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="FluentValidation" />
+    <!-- Design-time only: `dotnet ef migrations` needs it, the shipped app does not. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Itms.Platform\Itms.Platform.csproj" />
+    <ProjectReference Include="..\..\Itms.Contracts\Itms.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>

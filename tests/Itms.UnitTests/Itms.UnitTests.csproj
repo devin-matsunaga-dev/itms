@@ -38,6 +38,10 @@
          rely on, the SLA-target invariant, and the immutability of a priority code —
          all pure, none of it needing a database. -->
     <ProjectReference Include="..\..\src\Modules\Itms.Modules.Helpdesk\Itms.Modules.Helpdesk.csproj" />
+    <!-- WP-2.1: the asset tag's immutability and shape rules, the normalisation the unique
+         indexes rely on, and the reference-data entities are all pure and need no
+         database. -->
+    <ProjectReference Include="..\..\src\Modules\Itms.Modules.Assets\Itms.Modules.Assets.csproj" />
     <!-- WP-0.7: the event-to-entry mapping, the diff bounds, and the coverage guard that
          keeps every domain event audited are all pure and need no database. -->
     <ProjectReference Include="..\..\src\Modules\Itms.Modules.Audit\Itms.Modules.Audit.csproj" />

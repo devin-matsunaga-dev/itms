@@ -32,6 +32,10 @@
     <!-- WP-1.1: the reference data is asserted over the wire — the role boundary, the
          409s the unique indexes stand behind, and that the seed migration actually ran. -->
     <ProjectReference Include="..\..\src\Modules\Itms.Modules.Helpdesk\Itms.Modules.Helpdesk.csproj" />
+    <!-- WP-2.1: the asset tag's uniqueness and the per-manufacturer serial rule are both
+         partial unique indexes; the 409 they stand behind is only demonstrable against a
+         real PostgreSQL. -->
+    <ProjectReference Include="..\..\src\Modules\Itms.Modules.Assets\Itms.Modules.Assets.csproj" />
     <!-- WP-0.7: the audit spine is asserted against the real table — the trigger that
          refuses an UPDATE cannot be demonstrated any other way. -->
     <ProjectReference Include="..\..\src\Modules\Itms.Modules.Audit\Itms.Modules.Audit.csproj" />

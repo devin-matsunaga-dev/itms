@@ -2785,6 +2785,791 @@
           { }
         ]
       }
+    },
+    "/api/v1/asset-types": {
+      "get": {
+        "tags": [
+          "Asset types"
+        ],
+        "summary": "Lists asset types in picker order, optionally including retired ones.",
+        "operationId": "ListAssetTypes",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfAssetTypeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Asset types"
+        ],
+        "summary": "Creates an asset type.",
+        "operationId": "CreateAssetType",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssetTypeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetTypeResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/asset-types/{id}": {
+      "get": {
+        "tags": [
+          "Asset types"
+        ],
+        "summary": "Reads one asset type.",
+        "operationId": "GetAssetType",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetTypeResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Asset types"
+        ],
+        "summary": "Replaces an asset type's name, description, and order. Existing assets follow the rename.",
+        "operationId": "UpdateAssetType",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAssetTypeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetTypeResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/asset-types/{id}/deactivate": {
+      "post": {
+        "tags": [
+          "Asset types"
+        ],
+        "summary": "Retires an asset type. Existing assets keep resolving it.",
+        "operationId": "DeactivateAssetType",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/asset-types/{id}/reactivate": {
+      "post": {
+        "tags": [
+          "Asset types"
+        ],
+        "summary": "Brings a retired asset type back into use.",
+        "operationId": "ReactivateAssetType",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/asset-statuses": {
+      "get": {
+        "tags": [
+          "Asset statuses"
+        ],
+        "summary": "Lists asset statuses in picker order, optionally including retired ones.",
+        "operationId": "ListAssetStatuses",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfAssetStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Asset statuses"
+        ],
+        "summary": "Creates an asset status.",
+        "operationId": "CreateAssetStatus",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssetStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetStatusResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/asset-statuses/{id}": {
+      "get": {
+        "tags": [
+          "Asset statuses"
+        ],
+        "summary": "Reads one asset status.",
+        "operationId": "GetAssetStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Asset statuses"
+        ],
+        "summary": "Replaces an asset status's name, description, and order. The code is immutable.",
+        "operationId": "UpdateAssetStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAssetStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/asset-statuses/{id}/deactivate": {
+      "post": {
+        "tags": [
+          "Asset statuses"
+        ],
+        "summary": "Retires an asset status. Existing assets keep resolving it.",
+        "operationId": "DeactivateAssetStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/asset-statuses/{id}/reactivate": {
+      "post": {
+        "tags": [
+          "Asset statuses"
+        ],
+        "summary": "Brings a retired asset status back into use.",
+        "operationId": "ReactivateAssetStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/assets/{id}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Reads one asset.",
+        "operationId": "GetAsset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/assets": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Records a new asset. The tag is unique and cannot be changed afterwards.",
+        "operationId": "CreateAsset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
     }
   },
   "components": {
@@ -2806,6 +3591,303 @@
           }
         },
         "description": "The body of `POST /api/v1/tickets/{id}/comments`."
+      },
+      "AssetResponse": {
+        "required": [
+          "id",
+          "assetTag",
+          "name",
+          "serialNumber",
+          "barcode",
+          "manufacturer",
+          "model",
+          "assetTypeId",
+          "assetTypeName",
+          "assetStatusId",
+          "assetStatusCode",
+          "assetStatusName",
+          "assignedToUserId",
+          "assignedToUserName",
+          "departmentId",
+          "departmentName",
+          "locationId",
+          "locationPath",
+          "purchaseDate",
+          "warrantyExpiresAt",
+          "vendor",
+          "cost",
+          "notes",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The asset's id.",
+            "format": "uuid"
+          },
+          "assetTag": {
+            "type": "string",
+            "description": "The identifier on the physical label. Unique and immutable."
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "A human label, or `null`."
+          },
+          "serialNumber": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The manufacturer's serial, where it has one."
+          },
+          "barcode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "A second scannable identifier, where the organisation uses one."
+          },
+          "manufacturer": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who made it."
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What they call it."
+          },
+          "assetTypeId": {
+            "type": "string",
+            "description": "What kind of thing it is.",
+            "format": "uuid"
+          },
+          "assetTypeName": {
+            "type": "string",
+            "description": "That type's current name."
+          },
+          "assetStatusId": {
+            "type": "string",
+            "description": "Where it is in its life.",
+            "format": "uuid"
+          },
+          "assetStatusCode": {
+            "type": "string",
+            "description": "That status's immutable code — what a client keys colours and rules off."
+          },
+          "assetStatusName": {
+            "type": "string",
+            "description": "That status's current name."
+          },
+          "assignedToUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who holds it. Always null until WP-2.2 adds assignment.",
+            "format": "uuid"
+          },
+          "assignedToUserName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Their cached display name."
+          },
+          "departmentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The department that owns it.",
+            "format": "uuid"
+          },
+          "departmentName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "That department's cached name."
+          },
+          "locationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Where it is.",
+            "format": "uuid"
+          },
+          "locationPath": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "That location's cached full path."
+          },
+          "purchaseDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was bought.",
+            "format": "date"
+          },
+          "warrantyExpiresAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the warranty runs out.",
+            "format": "date"
+          },
+          "vendor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who it was bought from."
+          },
+          "cost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "What it cost, in the deployment's own currency — there is only one.",
+            "format": "double"
+          },
+          "notes": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Anything else worth recording."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the record was created (UTC).",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When it was last changed (UTC).",
+            "format": "date-time"
+          }
+        },
+        "description": "An asset as the API renders it."
+      },
+      "AssetStatusResponse": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "description",
+          "sortOrder",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The status's id. What an asset stores.",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Its stable machine identifier. Never changes, unlike the name."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its display name."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What it means, or `null`."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Where it sits in a picker.",
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "False once retired."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was created (UTC).",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When it was last changed (UTC).",
+            "format": "date-time"
+          }
+        },
+        "description": "An asset status as the API renders it."
+      },
+      "AssetTypeResponse": {
+        "required": [
+          "id",
+          "name",
+          "description",
+          "sortOrder",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The type's id. What an asset stores, and what a rename does not change.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its display name."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What belongs in it, or `null`."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Where it sits in a picker.",
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "False once retired."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was created (UTC).",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When it was last changed (UTC).",
+            "format": "date-time"
+          }
+        },
+        "description": "An asset type as the API renders it."
       },
       "AssignTicketRequest": {
         "required": [
@@ -2925,6 +4007,194 @@
           }
         },
         "description": "The body of `POST /api/v1/tickets/{id}/status-changes`."
+      },
+      "CreateAssetRequest": {
+        "required": [
+          "assetTag",
+          "assetTypeId",
+          "assetStatusId",
+          "name",
+          "serialNumber",
+          "barcode",
+          "manufacturer",
+          "model",
+          "departmentId",
+          "locationId",
+          "purchaseDate",
+          "warrantyExpiresAt",
+          "vendor",
+          "cost",
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "assetTag": {
+            "type": "string",
+            "description": "The identifier on the physical label. Required, unique, and immutable once set."
+          },
+          "assetTypeId": {
+            "type": "string",
+            "description": "What kind of thing it is. Required.",
+            "format": "uuid"
+          },
+          "assetStatusId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Where it is in its life. Optional: omitted, the asset starts in the seeded\n`in-stock` status.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "A human label, or `null`."
+          },
+          "serialNumber": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The manufacturer's serial, where it has one."
+          },
+          "barcode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "A second scannable identifier, where the organisation uses one."
+          },
+          "manufacturer": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who made it."
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What they call it."
+          },
+          "departmentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The department that owns it.",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Where it is.",
+            "format": "uuid"
+          },
+          "purchaseDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was bought.",
+            "format": "date"
+          },
+          "warrantyExpiresAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the warranty runs out.",
+            "format": "date"
+          },
+          "vendor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who it was bought from."
+          },
+          "cost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "What it cost, in the deployment's own currency — there is only one.",
+            "format": "double"
+          },
+          "notes": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Anything else worth recording."
+          }
+        },
+        "description": "The fields a new asset is recorded from."
+      },
+      "CreateAssetStatusRequest": {
+        "required": [
+          "code",
+          "name",
+          "description",
+          "sortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Its stable machine identifier. Set once and never changed."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its display name."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What it means, or `null`."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Where it sits in a picker.",
+            "format": "int32"
+          }
+        },
+        "description": "The fields a new asset status is created from."
+      },
+      "CreateAssetTypeRequest": {
+        "required": [
+          "name",
+          "description",
+          "sortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Its display name."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What belongs in it, or `null`."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Where it sits in a picker.",
+            "format": "int32"
+          }
+        },
+        "description": "The fields a new asset type is created from."
       },
       "CreateDepartmentRequest": {
         "required": [
@@ -3349,6 +4619,92 @@
           }
         },
         "description": "The body of `POST /api/v1/locations/{id}/move`."
+      },
+      "PagedResultOfAssetStatusResponse": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetStatusResponse"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
+      },
+      "PagedResultOfAssetTypeResponse": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetTypeResponse"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
       },
       "PagedResultOfDepartmentResponse": {
         "required": [
@@ -4698,6 +6054,60 @@
         },
         "description": "What a ticket looks like immediately after a status change."
       },
+      "UpdateAssetStatusRequest": {
+        "required": [
+          "name",
+          "description",
+          "sortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Its new display name."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What it means, or `null` to clear it."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Where it sits in a picker.",
+            "format": "int32"
+          }
+        },
+        "description": "The fields an asset status is edited to."
+      },
+      "UpdateAssetTypeRequest": {
+        "required": [
+          "name",
+          "description",
+          "sortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Its new display name."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What belongs in it, or `null` to clear it."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Where it sits in a picker.",
+            "format": "int32"
+          }
+        },
+        "description": "The fields an asset type is edited to."
+      },
       "UpdateDepartmentRequest": {
         "required": [
           "name",
@@ -4900,6 +6310,15 @@
     },
     {
       "name": "Tickets"
+    },
+    {
+      "name": "Asset types"
+    },
+    {
+      "name": "Asset statuses"
+    },
+    {
+      "name": "Assets"
     }
   ]
 }
