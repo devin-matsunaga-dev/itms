@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Controller, useForm, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft } from 'lucide-react'
+import { Info, Paperclip } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
@@ -16,12 +16,19 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ApiError } from '@/lib/api/client'
 import { hasAnyRole, Roles } from '@/lib/roles'
 import type { CreateTicketRequest } from '@/lib/api/types'
 import { useCurrentUser } from '@/features/auth/hooks/use-current-user'
+import { DepartmentPicker } from '../components/department-picker'
 import { useCreateTicket } from '../hooks/use-ticket'
-import { useAssignableUsers, useDepartments, useTicketCategories, useTicketPriorities } from '../hooks/use-tickets'
+import {
+  useAssignableUsers,
+  useDepartments,
+  useTicketCategories,
+  useTicketPriorities,
+} from '../hooks/use-tickets'
 import {
   descriptionMaxLength,
   emptyNewTicket,
@@ -41,19 +48,19 @@ const formFields = [
 ] as const
 
 /**
- * Raising a ticket (WP-1.10).
+ * Raising a ticket.
  *
  * A route rather than a dialog: the address is linkable, and DESIGN.md §4 puts a long
  * form in section cards on a page. The button that reaches it lives in the Tickets page
  * header and in that screen's empty state — WP-0.8 moved ticket creation off the sidebar
- * and rewrote DESIGN.md §3 and §4 to say so, and WP-1.10's own "New Ticket button in the
- * sidebar" is the superseded wording.
+ * and rewrote DESIGN.md §3 and §4 to say so.
  *
- * **Two fields are offered only to somebody who works the queue.** A User files for
- * themselves: the requester defaults to the caller and the department to the requester's
- * own account, so an end user is not asked a question their record already answers. That
- * is a courtesy and not the enforcement — a User naming somebody else is refused with a
- * 403 rather than quietly coerced (WP-1.5), and would be if this form were hand-crafted.
+ * **The requester field is shown to everybody and editable by nobody but staff.** WP-1.10
+ * hid it from an end user entirely; showing it read-only as "their name (you)" says the
+ * same thing out loud, which is better than a form that quietly has different fields for
+ * different people. The tooltip explains why it is fixed. None of that is the enforcement
+ * — a User naming somebody else is refused with 403 (WP-1.5) and would be if this form
+ * were hand-crafted.
  */
 export function NewTicketPage(): React.JSX.Element {
   const navigate = useNavigate()
@@ -115,33 +122,34 @@ export function NewTicketPage(): React.JSX.Element {
   )
 
   const errors = form.formState.errors
+  // "You" while the account is still loading, rather than the "you (you)" that naming a
+  // person we do not have yet would produce.
+  const me =
+    currentUser === null || currentUser === undefined
+      ? 'You'
+      : `${currentUser.displayName} (you)`
 
   return (
     <>
       <PageHeader
         title="New ticket"
-        subtitle="Describe the problem. A technician picks it up from the queue."
-        actions={
-          <Button variant="outline" render={<Link to="/tickets" />}>
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Queue
-          </Button>
-        }
+        subtitle="Create a new service request. Provide as much detail as possible."
+        back={{ to: '/tickets', label: 'Back to tickets' }}
       />
 
       <form
         noValidate
-        className="flex max-w-3xl flex-col gap-5"
+        className="flex flex-col gap-5"
         onSubmit={(event) => {
           void form.handleSubmit(onSubmit)(event)
         }}
       >
-        <section className="flex flex-col gap-5 rounded-card border border-border bg-surface p-5 shadow-card">
+        <FormSection title="Request details">
           <Field label="Title" htmlFor="ticket-subject" required error={errors.subject?.message}>
             <Input
               id="ticket-subject"
               maxLength={subjectMaxLength}
-              placeholder="One line saying what is wrong"
+              placeholder="Briefly describe the issue"
               aria-invalid={errors.subject !== undefined}
               {...form.register('subject')}
             />
@@ -157,14 +165,31 @@ export function NewTicketPage(): React.JSX.Element {
               id="ticket-description"
               rows={6}
               maxLength={descriptionMaxLength}
-              placeholder="What happened, what you expected, and anything already tried"
+              placeholder="Describe what happened, what you expected, and any troubleshooting steps you already tried."
               aria-invalid={errors.description !== undefined}
               {...form.register('description')}
             />
           </Field>
-        </section>
 
-        <section className="flex flex-col gap-5 rounded-card border border-border bg-surface p-5 shadow-card">
+          {/*
+            A statement, not a control. The API attaches only to a ticket that already
+            exists (WP-1.7), so attaching here would mean create-then-upload: two requests
+            that can half-fail and leave a ticket whose files silently did not arrive.
+            Saying where the affordance is beats a link that does nothing, which WP-0.8
+            settled, and beats a half-failing one.
+          */}
+          <p className="flex items-start gap-2 text-copy text-muted-foreground">
+            <Paperclip className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>
+              Attachments are added on the ticket itself.
+              <span className="block text-caption">
+                Create the ticket first, then attach files from its page.
+              </span>
+            </span>
+          </p>
+        </FormSection>
+
+        <FormSection title="Ticket details">
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <Field label="Category" htmlFor="ticket-category" required error={errors.categoryId?.message}>
               <Controller
@@ -206,66 +231,94 @@ export function NewTicketPage(): React.JSX.Element {
               />
             </Field>
 
-            {worksTheQueue ? (
-              <>
-                <Field label="Requester" htmlFor="ticket-requester" error={errors.requesterId?.message}>
-                  <Controller
-                    control={form.control}
-                    name="requesterId"
-                    render={({ field }) => (
-                      <FormSelect
-                        id="ticket-requester"
-                        placeholder="Me"
-                        value={field.value}
-                        invalid={errors.requesterId !== undefined}
-                        options={(people.data ?? []).map((person) => ({
-                          value: person.id,
-                          label: person.displayName,
-                        }))}
-                        onValueChange={field.onChange}
-                      />
-                    )}
-                  />
-                </Field>
+            <Field
+              label="Requester"
+              htmlFor="ticket-requester"
+              error={errors.requesterId?.message}
+              hint={
+                worksTheQueue
+                  ? 'Leave this as yourself, or file the ticket on somebody else’s behalf.'
+                  : 'A ticket is always raised in your own name. Only a technician can file one for somebody else.'
+              }
+            >
+              {worksTheQueue ? (
+                <Controller
+                  control={form.control}
+                  name="requesterId"
+                  render={({ field }) => (
+                    <FormSelect
+                      id="ticket-requester"
+                      placeholder={me}
+                      value={field.value}
+                      invalid={errors.requesterId !== undefined}
+                      options={[
+                        { value: '', label: me },
+                        ...(people.data ?? [])
+                          .filter((person) => person.id !== currentUser?.id)
+                          .map((person) => ({ value: person.id, label: person.displayName })),
+                      ]}
+                      onValueChange={field.onChange}
+                    />
+                  )}
+                />
+              ) : (
+                // Shown rather than hidden, so the form reads the same for everybody and
+                // says why the field is fixed instead of leaving a gap where it was.
+                <Input id="ticket-requester" readOnly value={me} className="bg-canvas" />
+              )}
+            </Field>
 
-                <Field
-                  label="Department"
-                  htmlFor="ticket-department"
-                  error={errors.departmentId?.message}
-                >
-                  <Controller
-                    control={form.control}
-                    name="departmentId"
-                    render={({ field }) => (
-                      <FormSelect
-                        id="ticket-department"
-                        placeholder="The requester's own"
-                        value={field.value}
-                        invalid={errors.departmentId !== undefined}
-                        options={(departments.data ?? []).map((department) => ({
-                          value: department.id,
-                          label: department.name,
-                        }))}
-                        onValueChange={field.onChange}
-                      />
-                    )}
+            <Field label="Department" htmlFor="ticket-department" error={errors.departmentId?.message}>
+              <Controller
+                control={form.control}
+                name="departmentId"
+                render={({ field }) => (
+                  <DepartmentPicker
+                    id="ticket-department"
+                    departments={departments.data ?? []}
+                    value={field.value}
+                    invalid={errors.departmentId !== undefined}
+                    onValueChange={field.onChange}
                   />
-                </Field>
-              </>
-            ) : null}
+                )}
+              />
+            </Field>
           </div>
-        </section>
+        </FormSection>
 
         <div className="flex items-center justify-end gap-3">
           <Button variant="outline" type="button" render={<Link to="/tickets" />}>
             Cancel
           </Button>
           <Button type="submit" disabled={create.isPending}>
-            {create.isPending ? 'Raising…' : 'Raise ticket'}
+            {create.isPending ? 'Creating…' : 'Create ticket'}
           </Button>
         </div>
       </form>
     </>
+  )
+}
+
+/**
+ * One section of the form (DESIGN.md §4: long forms use section cards, not accordions).
+ *
+ * The heading is the card's own label — uppercase, tracked, in `primary` — which is what
+ * makes two stacked cards read as two parts of one form rather than two unrelated panels.
+ */
+function FormSection({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <section className="rounded-card border border-border bg-surface p-5 shadow-card">
+      <h2 className="text-label font-semibold tracking-[0.06em] text-primary uppercase">
+        {title}
+      </h2>
+      <div className="mt-5 flex flex-col gap-5">{children}</div>
+    </section>
   )
 }
 
@@ -274,21 +327,53 @@ interface FieldProps {
   htmlFor: string
   required?: boolean
   error?: string
+  /** Explains a field whose behaviour is not obvious, behind an info icon. */
+  hint?: string
   children: React.ReactNode
 }
 
 /** DESIGN.md §4, Forms: label above, error below, required marked in `danger`. */
-function Field({ label, htmlFor, required, error, children }: FieldProps): React.JSX.Element {
+function Field({
+  label,
+  htmlFor,
+  required,
+  error,
+  hint,
+  children,
+}: FieldProps): React.JSX.Element {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={htmlFor} className="text-field-label font-medium text-heading">
-        {label}
-        {required === true ? (
-          <span className="text-danger" aria-hidden="true">
-            *
-          </span>
-        ) : null}
-      </Label>
+      {/*
+        The hint's button is a sibling of the label, never inside it: a <label> labels
+        whatever control it wraps, so nesting the button here would make "Requester" the
+        accessible name of an info icon as well as of the field.
+      */}
+      <div className="flex items-center gap-1.5">
+        <Label htmlFor={htmlFor} className="text-field-label font-medium text-heading">
+          {label}
+          {required === true ? (
+            <span className="text-danger" aria-label="required">
+              *
+            </span>
+          ) : null}
+        </Label>
+        {hint === undefined ? null : (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label={`About the ${label.toLowerCase()} field`}
+                  className="flex rounded-full text-muted-foreground transition-colors hover:text-heading focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                />
+              }
+            >
+              <Info className="size-3.5" aria-hidden="true" />
+            </TooltipTrigger>
+            <TooltipContent>{hint}</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
       {children}
       {error === undefined ? null : (
         <p role="alert" className="text-caption text-danger">

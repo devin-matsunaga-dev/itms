@@ -117,6 +117,10 @@ Ticket detail with header pills, properties panel, comment/note composer with a 
 *Added with WP-1.11, for the two things that mockup needs and the API could not answer.* Free-text queue search over ticket number, subject, and requester name, applied **after** `TicketScope`; a scope-wide counters endpoint behind the KPI row and the view counts; a `dueBefore` filter so the "Due today" tile opens the tickets it counted. Hoists the `ILIKE` escaping into `Itms.Platform`.
 **Done when:** a User's search never surfaces a ticket they did not raise, and every counter equals the total of the list its tile links to.
 
+### WP-1.13 — New ticket form: mockup pass `[UI]`
+*Added after WP-1.12, against a second mockup.* Bring the create form to the supplied design: a back link above the title, labelled section cards, the requester shown read-only to an end user with the reason in a tooltip, a searchable department picker, and an attachment hint rather than a control the API cannot support.
+**Done when:** the form matches the mockup, and every field a role cannot change is shown with its reason rather than hidden.
+
 🏁 **Phase 1 gate.** Tag `v0.2-phase1`.
 
 ---

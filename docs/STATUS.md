@@ -6,7 +6,7 @@
 **Phase:** 1 — Helpdesk **complete**. Phase 0 and Phase 1 both await their gate walkthroughs and the `v0.1-phase0` / `v0.2-phase1` tags.
 **Current WP:** `WP-2.1 — Asset domain & lifecycle` — **not before the Phase 1 gate**
 **Branch:** `feat/wp-2.1-asset-domain`
-**Last completed:** `WP-1.12 — Queue search & counters` (2026-09-01)
+**Last completed:** `WP-1.13 — New ticket form: mockup pass` (2026-09-01)
 **Last updated:** 2026-09-01
 
 > **Phase 1 is complete, including the two packages added against the human's mockup** (WP-1.11's table rebuild and WP-1.12's search and counters). Both are in `WORK_PACKAGES.md` now. What remains before Phase 2 is the gate itself: the walkthrough, the root README, and the tag.
@@ -20,7 +20,7 @@
 | Phase | Packages | Done | Tag |
 |---|---|---|---|
 | 0 — Foundation | 0.1 – 0.9 | 9 / 9 | *gate pending* |
-| 1 — Helpdesk | 1.1 – 1.12 | 12 / 12 | *gate pending* |
+| 1 — Helpdesk | 1.1 – 1.13 | 13 / 13 | *gate pending* |
 | 2 — Assets & directory | 2.1 – 2.7 | 0 / 7 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
@@ -313,14 +313,26 @@
 - **The `dueBefore` filter and the "Due today" tile trust the client's day boundary.** The browser sends the last instant of its own local day, because that is what a person means; the server falls back to the end of its UTC day when nothing is sent, which is right for a service account and wrong for a person. A screen must always send it, and the one on this queue does.
 - **Nothing in this package was seen in a browser.** The headless Chromium on this machine still cannot start (`libnspr4.so`, needs sudo). The KPI row, the search box, the chip counts, and both colour schemes are the manual checklist.
 
+### Noticed during WP-1.13
+
+- **`shadcn add combobox` tried to overwrite `button.tsx`, `input.tsx`, and `textarea.tsx`, and `--yes` does not decline those prompts — it hangs on them.** WP-1.10 lost `button.tsx`'s restyling to exactly this and STATUS has warned about it since. The working invocation is `yes N | npm exec -- shadcn add <component>`, followed by `git status src/components/ui/` to confirm. All three restyled primitives survived this time. **Put that pipe in the command every time.**
+- **The attachment affordance is a sentence, not a control**, at the human's direction. The mockup draws "Add attachment" as a link with a caption saying files are added after creation, which is a control and an explanation of why it cannot work. The API attaches only to a ticket that already exists (WP-1.7), so a real control means create-then-upload: two requests that can half-fail and leave a ticket whose files silently did not arrive. **If that changes, the honest shape is a queued file list uploaded after the create succeeds, reporting each failure by name** — and the create page then has to handle a ticket that exists with an attachment that does not.
+- **The requester field is now shown to everybody, read-only for an end user**, where WP-1.10 hid it. **A consequence worth knowing: the department picker is now shown to an end user too**, and is editable — the server has never restricted `departmentId` by role, only `requesterId`, so this is allowed. It means a User can file against a department other than their own. That is probably right (somebody reporting a fault in another department's area) but nobody has said so out loud, and `WP-5.8` is where it would be restricted if it turns out to be wrong.
+- **`PageHeader` gained a `back` slot and both ticket screens use it.** The detail screen's "Queue" button is gone. Any later screen reached from a list — an asset, a user, a KB article — should use the same slot rather than inventing a header button, and `DESIGN.md` §3 now says so. The wording is one constant shared by the two screens; a third destination gets its own.
+- **The department picker is a combobox and every other picker on the form is a select.** Deliberate: department is the one list that grows without bound (SPEC.md §5's hierarchy is an estate), while categories and priorities are eight and four and administered. If a third field ever needs search, the pattern is `department-picker.tsx` and it should be generalised rather than copied.
+- **`input-group.tsx` arrived as a dependency of the combobox** and nothing else uses it. It is shadcn's own composition primitive; leaving it is cheaper than fighting the generator, and a later `shadcn add` of anything input-shaped will want it.
+- **A third `only-export-components` lint warning now exists**, in shadcn's generated `combobox.tsx` (it exports `useComboboxAnchor` beside the components). Same category as the two already recorded for `badge.tsx` and `button.tsx` — shadcn's own pattern, and editing it would fight the next `shadcn add`.
+- **The client is one 781 kB chunk**, up from 738 kB. Six packages have now recorded `React.lazy` per route as owed. Phase 1 is over and every package still adds to a bundle nobody is splitting. **This should be claimed at the Phase 1 gate.**
+- **Nothing here was seen in a browser.** The headless Chromium still cannot start (`libnspr4.so`, needs sudo). The mockup comparison, the tooltip, the combobox's keyboard behaviour, and both colour schemes are the manual checklist.
+
 ## Known issues
 
 - none
 
 ## Environment notes
 
-- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.12: **695 unit, 52 architecture, 439 integration** (the integration run is about 109 s, of which the 50,000-ticket volume test is roughly half) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
-- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 262 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
+- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.13: **695 unit, 52 architecture, 439 integration** (unchanged — WP-1.13 touched no server code) (the integration run is about 109 s, of which the 50,000-ticket volume test is roughly half) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
+- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 265 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
 - **`aspire run` now also starts `web-client`.** It runs `npm install` first (an Aspire installer resource) and then `npm run dev`, waits for `web-host`, and is published on an external endpoint — the dashboard prints its URL. The Vite dev server proxies `/api` to the host, so the browser sees one origin.
 - **The colour scheme is remembered per browser** under `localStorage["itms.theme"]`, and follows the operating system until the viewer picks a mode. Clearing site data returns it to the system preference. There is no server-side or per-account theme setting, and none is planned.
 - **Node 24 LTS and npm 11 are what the client is built with.** `node -v` should report v24.x; the lockfile is committed and `npm ci` is the reproducible install.

@@ -148,7 +148,7 @@ describe('NewTicketPage', () => {
     const person = userEvent.setup()
     renderForm()
 
-    await person.click(await screen.findByRole('button', { name: /raise ticket/i }))
+    await person.click(await screen.findByRole('button', { name: /create ticket/i }))
 
     expect(await screen.findByText('Enter a title for the ticket.')).toBeInTheDocument()
     expect(screen.getByText('Describe what is wrong.')).toBeInTheDocument()
@@ -157,22 +157,56 @@ describe('NewTicketPage', () => {
     expect(createTicket).not.toHaveBeenCalled()
   })
 
-  it('does not ask an end user a question their own account already answers', async () => {
+  it('shows an end user their own name as the requester, and will not let them change it', async () => {
     fetchCurrentUser.mockResolvedValue(endUser)
     renderForm()
 
-    expect(await screen.findByLabelText(/^Title/)).toBeInTheDocument()
-    // The requester defaults to the caller and the department to their own account; a
-    // User naming somebody else is refused with 403 rather than coerced (WP-1.5).
-    expect(screen.queryByLabelText('Requester')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Department')).not.toBeInTheDocument()
+    // Shown rather than hidden, so the form reads the same for everybody and says why the
+    // field is fixed. Not the enforcement — a User naming somebody else is refused with a
+    // 403 (WP-1.5) and would be if this form were hand-crafted.
+    const requester = await screen.findByLabelText('Requester')
+    // Awaited: the field renders immediately and the name arrives with /auth/me.
+    await waitFor(() => {
+      expect(requester).toHaveValue('Mark Reyes (you)')
+    })
+    expect(requester).toHaveAttribute('readonly')
   })
 
-  it('offers the requester and the department to somebody working the queue', async () => {
+  it('lets somebody working the queue file on another person’s behalf', async () => {
     renderForm()
 
-    expect(await screen.findByLabelText('Requester')).toBeInTheDocument()
+    // Re-queried inside the wait, not captured before it: the field starts as the
+    // read-only box and is replaced by a real control once /auth/me says the caller works
+    // the queue, so a reference taken early points at a detached element.
+    await waitFor(() => {
+      expect(screen.getByLabelText('Requester')).not.toHaveAttribute('readonly')
+    })
     expect(screen.getByLabelText('Department')).toBeInTheDocument()
+  })
+
+  it('explains the requester field rather than leaving it unexplained', async () => {
+    renderForm()
+
+    expect(
+      await screen.findByRole('button', { name: /about the requester field/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('says where attachments go instead of offering a control that cannot work', async () => {
+    // The API attaches only to a ticket that already exists (WP-1.7).
+    renderForm()
+
+    expect(await screen.findByText(/attachments are added on the ticket itself/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add attachment/i })).not.toBeInTheDocument()
+  })
+
+  it('offers a way back to the queue from the header', async () => {
+    renderForm()
+
+    expect(await screen.findByRole('link', { name: /back to tickets/i })).toHaveAttribute(
+      'href',
+      '/tickets',
+    )
   })
 
   it('maps a server field error back onto the field that caused it', async () => {
@@ -253,5 +287,5 @@ async function submitWithPickers(person: ReturnType<typeof userEvent.setup>): Pr
   await person.click(screen.getByLabelText(/^Priority/))
   await person.click(await screen.findByRole('option', { name: 'High' }))
 
-  await person.click(screen.getByRole('button', { name: /raise ticket/i }))
+  await person.click(screen.getByRole('button', { name: /create ticket/i }))
 }

@@ -91,6 +91,8 @@ The **date block** is deliberately quiet: two right-aligned caption lines — da
 
 **Page header.** Title 28/600 `heading` ("Welcome back, John" on the dashboard, plain page name elsewhere) with a one-line `body` subtitle under it. Right side: the screen's own actions, and nothing else — the date lives in the topbar.
 
+A screen reached *from* a list — a record, a create form — carries a **back link above the title**: a left arrow and "Back to <the list>", 14/500 `primary`. It sits above the title rather than among the actions because it is not one; the actions are things done to the thing on screen, and leaving is not one of them. One wording per destination, shared by every screen that returns there.
+
 ## 4. Component patterns
 
 **KPI card.** White card, left `48px` soft-tinted rounded tile holding a 22px icon, then uppercase label and the figure. Delta line below: `▲` in `success` or `▼` in `danger`, the number, then the comparison phrase in `muted`. Sentiment is semantic, not directional — fewer overdue tickets is green even though the arrow points down. Tint per card: open `primary-soft`, unassigned `#EEF2FF`, overdue `#FEE9E9`, SLA `primary-soft`.
@@ -126,6 +128,10 @@ The **identifying column is two lines**: the identifier (ticket number, asset ta
 **Page actions.** The primary action for a screen sits in that screen's page header, left of the date block, as a primary button with a leading icon — **New Ticket** on Tickets, and the same pattern for the create action on Assets, Users, and Knowledge Base. An empty state offers the same action a second time; those are the only two places it appears.
 
 **Forms.** Labels above inputs, 13/500 `heading`. Inputs 40px, 8px radius, `border`, `primary` focus ring at 2px with 2px offset. Errors 12/400 `danger` below the field. Required marked with an asterisk in `danger`. Long forms use section cards, not accordions.
+
+Each section card opens with a **section label**: 11/600 uppercase tracked, in `primary`. It is what makes two stacked cards read as two parts of one form rather than two unrelated panels.
+
+A field whose behaviour is not obvious carries an **info button beside its label** — a 14px outline icon in `muted`, with the explanation in a tooltip. It is a sibling of the `<label>` and never inside it: a label labels whatever control it wraps, so nesting the button would make the field's name the accessible name of the icon too. A field that is fixed for the person reading it is shown **read-only with the reason in that tooltip**, not hidden — a form that quietly has different fields for different people is harder to trust than one that says why.
 
 **Empty, loading, error.** Skeleton shimmer inside the card's own shape — never a centered spinner in a card. Empty states get an outlined icon, a plain sentence saying what would appear here, and the primary action button ("Create the first ticket"). Errors state what failed and offer a retry; they don't apologize.
 

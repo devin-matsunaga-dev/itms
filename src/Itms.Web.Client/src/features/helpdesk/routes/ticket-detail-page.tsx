@@ -1,12 +1,11 @@
 import { useCallback } from 'react'
-import { Link, Navigate, useParams } from 'react-router'
-import { ArrowLeft, MessagesSquare, Ticket } from 'lucide-react'
+import { Navigate, useParams } from 'react-router'
+import { MessagesSquare, Ticket } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/layout/page-header'
 import { Panel } from '@/components/common/panel'
 import { EmptyState } from '@/components/common/empty-state'
 import { ErrorState } from '@/components/common/error-state'
-import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api/client'
 import { useNow } from '@/lib/use-now'
 import { hasAnyRole, Roles } from '@/lib/roles'
@@ -169,7 +168,7 @@ export function TicketDetailPage(): React.JSX.Element {
   if (detail.isPending) {
     return (
       <>
-        <PageHeader title="Ticket" subtitle="Loading…" actions={<BackToQueue />} />
+        <PageHeader title="Ticket" subtitle="Loading…" back={backToTickets} />
         <TicketDetailSkeleton />
       </>
     )
@@ -180,7 +179,7 @@ export function TicketDetailPage(): React.JSX.Element {
 
     return (
       <>
-        <PageHeader title="Ticket" subtitle="" actions={<BackToQueue />} />
+        <PageHeader title="Ticket" subtitle="" back={backToTickets} />
         {missing ? (
           // 404 covers three cases on purpose (WP-1.5): no such ticket, a deleted one,
           // and somebody else's. Telling them apart would let any account walk the id
@@ -210,12 +209,8 @@ export function TicketDetailPage(): React.JSX.Element {
       <PageHeader
         title={ticket.subject}
         subtitle={`${ticket.number} · Raised by ${ticket.requesterName} · ${formatDateTime(ticket.createdAt)}`}
-        actions={
-          <>
-            <BackToQueue />
-            <TicketTransitionButtons ticket={ticket} busy={busy} onMove={onMove} />
-          </>
-        }
+        back={backToTickets}
+        actions={<TicketTransitionButtons ticket={ticket} busy={busy} onMove={onMove} />}
       />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
@@ -255,11 +250,5 @@ export function TicketDetailPage(): React.JSX.Element {
   )
 }
 
-function BackToQueue(): React.JSX.Element {
-  return (
-    <Button variant="outline" render={<Link to="/tickets" />}>
-      <ArrowLeft className="size-4" aria-hidden="true" />
-      Queue
-    </Button>
-  )
-}
+/** One wording for leaving a ticket, shared with the create form. */
+const backToTickets = { to: '/tickets', label: 'Back to tickets' }
