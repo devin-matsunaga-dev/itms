@@ -18,6 +18,8 @@ interface TicketTableProps {
   preferences: TicketTablePreferences
   onSort: (column: TicketSort) => void
   onOpen: (ticket: TicketListItem) => void
+  /** The toolbar, rendered as this card's header — it describes the list it sits on. */
+  toolbar?: React.ReactNode
 }
 
 /**
@@ -43,13 +45,15 @@ export function TicketTable({
   preferences,
   onSort,
   onOpen,
+  toolbar,
 }: TicketTableProps): React.JSX.Element {
   const shows = (id: TicketColumnId): boolean => isVisible(preferences, id)
   const compact = preferences.density === 'compact'
-  const cell = compact ? 'px-4 py-1.5' : 'px-4 py-3'
+  const cell = compact ? 'px-4 py-1.5' : 'px-4 py-2.5'
 
   return (
     <div className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
+      {toolbar}
       <Table className="text-cell">
         <TableHeader>
           <TableRow className="border-border hover:bg-transparent">

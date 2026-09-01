@@ -1,97 +1,91 @@
 import { describe, expect, it } from 'vitest'
-import { defaultTicketQuery } from './ticket-query'
-import { applyView, isViewActive, ticketViews, viewFilters } from './ticket-views'
+import { applyMyTickets, clearMyTickets, isMyTickets, myTicketsFilters } from './ticket-views'
+import { defaultTicketQuery, type TicketQuery } from './ticket-query'
 
 const me = '11111111-1111-1111-1111-111111111111'
-const technician = { currentUserId: me, worksTheQueue: true }
+const staff = { currentUserId: me, worksTheQueue: true }
 const endUser = { currentUserId: me, worksTheQueue: false }
 
-describe('the built-in views', () => {
-  it('offers exactly the three WP-1.9 names', () => {
-    expect(ticketViews.map((view) => view.id)).toEqual(['mine', 'unassigned', 'overdue'])
+const query = (overrides: Partial<TicketQuery> = {}): TicketQuery => ({
+  ...defaultTicketQuery,
+  ...overrides,
+})
+
+describe('myTicketsFilters', () => {
+  it('means "assigned to me" for somebody who works the queue', () => {
+    expect(myTicketsFilters(staff)).toMatchObject({ assigneeId: me, requesterId: null })
+  })
+
+  it('means "raised by me" for an end user, who holds nothing', () => {
+    // Same words, same usefulness — rather than a preset permanently empty for one role.
+    expect(myTicketsFilters(endUser)).toMatchObject({ requesterId: me, assigneeId: null })
+  })
+
+  it('clears the unassigned question either way, because one null cannot mean both', () => {
+    expect(myTicketsFilters(staff).unassigned).toBe(false)
+    expect(myTicketsFilters(endUser).unassigned).toBe(false)
   })
 })
 
-describe('"My tickets"', () => {
-  it('means the ones assigned to a technician', () => {
-    expect(viewFilters('mine', technician)).toMatchObject({ assigneeId: me, requesterId: null })
+describe('applyMyTickets', () => {
+  it('returns to the first page, because page four of a different question may not exist', () => {
+    expect(applyMyTickets(query({ page: 4 }), staff).page).toBe(1)
   })
 
-  it('means the ones an end user raised, since they hold no assignments', () => {
-    // The same words and the same usefulness across roles, rather than a preset that is
-    // permanently empty for one of the three.
-    expect(viewFilters('mine', endUser)).toMatchObject({ requesterId: me, assigneeId: null })
+  it('leaves the ordering and the page size alone', () => {
+    const narrowed = applyMyTickets(query({ sort: 'DueAt', pageSize: 100 }), staff)
+
+    expect(narrowed.sort).toBe('DueAt')
+    expect(narrowed.pageSize).toBe(100)
   })
 
-  it('clears the other side of the filter when the role changes what it means', () => {
-    const asTechnician = applyView(defaultTicketQuery, 'mine', technician)
-    expect(asTechnician.requesterId).toBeNull()
-
-    const asEndUser = applyView(defaultTicketQuery, 'mine', endUser)
-    expect(asEndUser.assigneeId).toBeNull()
+  it('keeps the other filters, so it narrows rather than replaces', () => {
+    expect(applyMyTickets(query({ priorityId: 'pri-high' }), staff).priorityId).toBe('pri-high')
   })
 })
 
-describe('"Unassigned"', () => {
-  it('asks the unassigned question rather than filtering on an absent assignee', () => {
-    const query = applyView({ ...defaultTicketQuery, assigneeId: me }, 'unassigned', technician)
+describe('clearMyTickets', () => {
+  it('takes the view off and leaves everything else standing', () => {
+    const on = applyMyTickets(query({ priorityId: 'pri-high' }), staff)
+    const off = clearMyTickets(on, staff)
 
-    expect(query.unassigned).toBe(true)
-    expect(query.assigneeId).toBeNull()
+    expect(off.assigneeId).toBeNull()
+    expect(off.priorityId).toBe('pri-high')
+  })
+
+  it('clears the field that role actually filters on', () => {
+    const on = applyMyTickets(query(), endUser)
+
+    expect(clearMyTickets(on, endUser).requesterId).toBeNull()
   })
 })
 
-describe('"Overdue"', () => {
-  it('is the breached resolution SLA the API already filters on', () => {
-    expect(applyView(defaultTicketQuery, 'overdue', technician).slaState).toBe('Breached')
-  })
-})
-
-describe('applyView', () => {
-  it('returns to the first page, like any other filter change', () => {
-    const query = applyView({ ...defaultTicketQuery, page: 7 }, 'overdue', technician)
-
-    expect(query.page).toBe(1)
+describe('isMyTickets', () => {
+  it('is false for an untouched queue', () => {
+    expect(isMyTickets(query(), staff)).toBe(false)
   })
 
-  it('keeps the ordering somebody chose', () => {
-    const query = applyView(
-      { ...defaultTicketQuery, sort: 'Number', direction: 'Descending' },
-      'overdue',
-      technician,
-    )
-
-    expect(query.sort).toBe('Number')
-    expect(query.direction).toBe('Descending')
-  })
-})
-
-describe('isViewActive', () => {
-  it('reads the URL rather than any state of its own', () => {
-    expect(isViewActive(defaultTicketQuery, 'overdue', technician)).toBe(false)
-    expect(
-      isViewActive({ ...defaultTicketQuery, slaState: 'Breached' }, 'overdue', technician),
-    ).toBe(true)
+  it('is true once the address says what the view would say', () => {
+    expect(isMyTickets(applyMyTickets(query(), staff), staff)).toBe(true)
   })
 
-  it('stays active when the view is narrowed further', () => {
-    // Somebody who picks "My tickets" and then filters to Critical is still looking at
-    // their tickets; the chip going dark would say otherwise.
-    const query = applyView(defaultTicketQuery, 'mine', technician)
+  it('stays true when the view is narrowed further', () => {
+    // A subset test, not an equality one: somebody who picked their own tickets and then
+    // narrowed to Critical is still looking at their tickets.
+    const narrowed = { ...applyMyTickets(query(), staff), priorityId: 'pri-critical' }
 
-    expect(isViewActive({ ...query, priorityId: 'critical' }, 'mine', technician)).toBe(true)
+    expect(isMyTickets(narrowed, staff)).toBe(true)
   })
 
-  it('recognises two views at once', () => {
-    const query = applyView(applyView(defaultTicketQuery, 'mine', technician), 'overdue', technician)
-
-    expect(isViewActive(query, 'mine', technician)).toBe(true)
-    expect(isViewActive(query, 'overdue', technician)).toBe(true)
+  it('is false when somebody else’s tickets are being shown', () => {
+    expect(isMyTickets(query({ assigneeId: 'somebody-else' }), staff)).toBe(false)
   })
 
-  it('does not read a technician’s view as active for an end user', () => {
-    const query = applyView(defaultTicketQuery, 'mine', technician)
+  it('reads the field that role filters on, not the other', () => {
+    // A technician's own queue is an assignee filter; an end user's is a requester one.
+    const theirs = applyMyTickets(query(), endUser)
 
-    expect(isViewActive(query, 'mine', endUser)).toBe(false)
+    expect(isMyTickets(theirs, endUser)).toBe(true)
+    expect(isMyTickets(theirs, staff)).toBe(false)
   })
 })

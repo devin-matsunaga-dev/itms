@@ -63,6 +63,10 @@
   --text-card-title--line-height: 22px;
   --text-kpi: 30px;
   --text-kpi--line-height: 36px;
+  /* The dense KPI figure (DESIGN.md §4). A KPI row embedded above a working list
+     competes with it for height in a way the dashboard's does not. */
+  --text-kpi-dense: 24px;
+  --text-kpi-dense--line-height: 30px;
   --text-label: 11px;
   --text-label--line-height: 16px;
   --text-label--letter-spacing: 0.06em;

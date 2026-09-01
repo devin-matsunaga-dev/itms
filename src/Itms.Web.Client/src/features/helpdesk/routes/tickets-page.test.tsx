@@ -399,14 +399,34 @@ describe('TicketsPage — the URL is the state', () => {
   })
 })
 
-describe('TicketsPage — the built-in views', () => {
-  it('offers the three WP-1.9 names', async () => {
+describe('TicketsPage — the “My tickets” view', () => {
+  it('offers one view, not three — the KPI tiles answer the other two', async () => {
+    // WP-1.12's Unassigned and Overdue tiles link to exactly the queries those two chips
+    // wrote, one row above. Two ways to ask the same question is one too many.
     renderQueue()
-    const views = await screen.findByRole('group', { name: /saved views/i })
 
-    expect(within(views).getByRole('button', { name: /my tickets/i })).toBeInTheDocument()
-    expect(within(views).getByRole('button', { name: /^unassigned/i })).toBeInTheDocument()
-    expect(within(views).getByRole('button', { name: /^overdue/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /my tickets/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^unassigned/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^overdue/i })).not.toBeInTheDocument()
+  })
+
+  it('turns the view off again without disturbing the other filters', async () => {
+    const person = userEvent.setup()
+    renderQueue('/tickets?priorityId=pri-high&sort=Priority&direction=Ascending&pageSize=25')
+    await screen.findByText('TKT-0001')
+
+    const mine = screen.getByRole('button', { name: /my tickets/i })
+    await person.click(mine)
+    await waitFor(() => {
+      expect(address()).toContain(`assigneeId=${me}`)
+    })
+
+    await person.click(screen.getByRole('button', { name: /my tickets/i }))
+
+    await waitFor(() => {
+      expect(address()).not.toContain('assigneeId')
+    })
+    expect(address()).toContain('priorityId=pri-high')
   })
 
   it('writes a technician’s "My tickets" as an assignee filter', async () => {
@@ -436,43 +456,32 @@ describe('TicketsPage — the built-in views', () => {
     expect(address()).not.toContain('assigneeId')
   })
 
-  it('writes "Unassigned" as the unassigned question, not an empty assignee', async () => {
-    const person = userEvent.setup()
-    renderQueue()
-    await screen.findByText('TKT-0001')
-
-    await person.click(screen.getByRole('button', { name: /^unassigned/i }))
+  it('reads the view as selected from the address alone', async () => {
+    renderQueue(
+      `/tickets?assigneeId=${me}&sort=Priority&direction=Ascending&pageSize=25`,
+    )
 
     await waitFor(() => {
-      expect(address()).toContain('unassigned=true')
-    })
-  })
-
-  it('writes "Overdue" as the breached resolution SLA', async () => {
-    const person = userEvent.setup()
-    renderQueue()
-    await screen.findByText('TKT-0001')
-
-    await person.click(screen.getByRole('button', { name: /^overdue/i }))
-
-    await waitFor(() => {
-      expect(address()).toContain('slaState=Breached')
-    })
-  })
-
-  it('reads a view as selected from the address alone', async () => {
-    renderQueue('/tickets?slaState=Breached&sort=Priority&direction=Ascending&pageSize=25')
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /^overdue/i })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: /my tickets/i })).toHaveAttribute(
         'aria-pressed',
         'true',
       )
     })
-    expect(screen.getByRole('button', { name: /^unassigned/i })).toHaveAttribute(
-      'aria-pressed',
-      'false',
+  })
+
+  it('stays selected when the view is narrowed further', async () => {
+    // A subset test: somebody looking at their own Critical tickets is still looking at
+    // their own tickets.
+    renderQueue(
+      `/tickets?assigneeId=${me}&priorityId=pri-high&sort=Priority&direction=Ascending&pageSize=25`,
     )
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /my tickets/i })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+    })
   })
 })
 

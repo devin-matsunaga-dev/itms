@@ -59,12 +59,16 @@ export interface TicketTablePreferences {
 /**
  * What a reader who has never chosen sees.
  *
- * `category` is hidden by default: it is the one column of the nine that a technician
- * triaging a queue almost never sorts or scans by, and nine columns already wrap at the
- * 1280px floor DESIGN.md §6 sets.
+ * Two are hidden by default. `category` is the one column of the nine a technician
+ * triaging a queue almost never scans by. `created` is hidden because the row already
+ * says it: the identifying column's caption reads "Created 3h ago", so an Age column
+ * puts the same fact on the same row twice — which is what it did from WP-1.11 until
+ * somebody looked at a real screen. Both are one click away in the Columns menu, and
+ * turning `created` on is the right move for anybody who runs the table compact, since
+ * compact is what drops the caption.
  */
 export const defaultPreferences: TicketTablePreferences = {
-  hidden: ['category'],
+  hidden: ['category', 'created'],
   density: 'comfortable',
 }
 

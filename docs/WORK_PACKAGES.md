@@ -129,6 +129,10 @@ Ticket detail with header pills, properties panel, comment/note composer with a 
 *Added after WP-1.14.* Putting a ticket on hold requires a reason, the exact mirror of the resolution rule: required and non-blank for `Waiting`, rejected for every other destination. Stored on the ticket while it is parked and cleared on resuming, so a second hold records itself; surfaced in the detail header and in the timeline beside the status move.
 **Done when:** a technician cannot park a ticket without saying why, the reason reads in the activity beside the status change, and holding twice for the same reason is recorded twice.
 
+### WP-1.16 — Queue density `[UI]`
+*Added after WP-1.15.* Give the ticket list back the vertical space the header stack was taking: drop the Unassigned and Overdue chips the KPI tiles made redundant, move "My tickets" into the filter bar, merge the search into that same card, make the toolbar the table's own header, and add a dense KPI variant for a row that sits above a working list.
+**Done when:** the header stack is under 300px at the 1280px floor and no two controls on the screen ask the same question.
+
 🏁 **Phase 1 gate.** Tag `v0.2-phase1`.
 
 ---

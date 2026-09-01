@@ -41,6 +41,8 @@ export function TicketKpiRow({ counters, dayEnd }: TicketKpiRowProps): React.JSX
           tint={tile.tint}
           tone={tile.tone}
           to={`/tickets?${tile.query}`}
+          // Above a working list: every pixel here is a ticket somebody cannot see.
+          dense
         />
       ))}
     </div>

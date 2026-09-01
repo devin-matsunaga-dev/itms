@@ -577,3 +577,15 @@
 - Chose to render a Hold entry as a value rather than a from→to pair, as Resolution already is, because "— → waiting on the vendor" reads as a bug; a cleared hold reads as "lifted" (WP-1.15, 2026-09-01)
 - Chose to supply a default reason inside three test suites' own move helpers rather than at every call site, because none of those tests is about the reason and `TicketHoldEndpointTests` posts its own body so the refusal is still asserted (WP-1.15, 2026-09-01)
 - Chose to write no backfill for tickets already parked when the migration runs, because Phase 1 has not shipped and no such ticket exists; recorded in STATUS.md in case that changes before the gate (WP-1.15, 2026-09-01)
+
+## WP-1.16 — Queue density
+
+- Chose to delete the Unassigned and Overdue view chips, at the human's direction, because WP-1.12's KPI tiles link to exactly the queries those chips wrote and two ways to ask one question a row apart is one too many (WP-1.16, 2026-09-01)
+- Chose to collapse `ticket-views.ts` from a three-view abstraction to a single `myTickets` helper rather than leave a general mechanism with one member, and to delete `ticket-view-chips.tsx` outright (WP-1.16, 2026-09-01)
+- Chose to put "My tickets" in the filter bar rather than keep a row for it, because it narrows the queue exactly as the selects beside it do and a row of its own cost fifty pixels to say so (WP-1.16, 2026-09-01)
+- Chose to merge the search into the filter bar's card, because they are one job — narrowing the queue — and two cards with a gap and two sets of padding between them cost about seventy pixels on a screen whose point is the list underneath (WP-1.16, 2026-09-01)
+- Chose to render the toolbar as the table card's own header strip rather than a floating row above it, because it describes the list it sits on (WP-1.16, 2026-09-01)
+- Chose to add a `dense` KPI variant — 40px tile, 18px icon, 24/700 figure — at the human's direction, and to amend `DESIGN.md` §4 rather than override the existing spec, because a dashboard's KPI row is the screen while a queue's is a summary above the thing somebody came to read; the dashboard keeps the 48px tile and the 30px figure (WP-1.16, 2026-09-01)
+- Chose a new `--text-kpi-dense` step in the type scale over reusing an existing size or writing a raw pixel value, because DESIGN.md §2 says every type step is a token and a one-off would be the first exception (WP-1.16, 2026-09-01)
+- Chose to hide the Age column by default, because the identifying column's caption already reads "Created 3h ago" and the two had been saying the same thing on every row since WP-1.11; it stays in the Columns menu, where it is the right choice for anybody running the table compact (WP-1.16, 2026-09-01)
+- Chose to tighten the row to `py-2.5` rather than change the density default, because the compact toggle already exists for anybody who wants the maximum and a default that dropped the caption would take the created date away from everybody (WP-1.16, 2026-09-01)

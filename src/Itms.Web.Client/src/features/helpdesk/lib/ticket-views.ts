@@ -1,84 +1,62 @@
 /**
- * The three built-in queue views WP-1.9 names: My tickets, Unassigned, Overdue.
+ * The "My tickets" filter — the one saved view the queue still has.
  *
- * They are presets, not a fourth concept: each one writes the filter parameters somebody
- * could have set by hand, so a view is an ordinary linkable URL and there is no server
- * state, no per-account storage, and nothing that can disagree with the filter bar. A
- * view reads as selected when the URL already says what it would say.
+ * WP-1.9 shipped three chips: My tickets, Unassigned, Overdue. WP-1.12 then gave the
+ * screen a KPI row whose Unassigned and Overdue tiles link to *exactly* those two
+ * queries, so two of the three chips were a second way to ask a question already on
+ * screen, one row above. They are gone; this is what is left, and it lives in the filter
+ * bar rather than on a row of its own.
+ *
+ * It is still a preset rather than a fourth concept: it writes filter parameters somebody
+ * could have set by hand, so it is an ordinary linkable URL with no server state, nothing
+ * per-account, and nothing that can disagree with the filter bar beside it.
  */
 
 import type { TicketQuery } from './ticket-query'
 import { withFilters } from './ticket-query'
 
-/** The identifiers the chips are keyed and tested by. */
-export type TicketViewId = 'mine' | 'unassigned' | 'overdue'
-
-export interface TicketView {
-  readonly id: TicketViewId
-  readonly label: string
-  /** What the chip promises, for its tooltip and its accessible description. */
-  readonly description: string
-}
-
-export const ticketViews: readonly TicketView[] = [
-  { id: 'mine', label: 'My tickets', description: 'Tickets that are your responsibility.' },
-  { id: 'unassigned', label: 'Unassigned', description: 'Tickets nobody is holding yet.' },
-  { id: 'overdue', label: 'Overdue', description: 'Tickets past their resolution target.' },
-]
-
-/**
- * What a view means for the person looking at it.
- *
- * "My tickets" is role-sensitive on purpose. A Technician or an Admin works a queue, so
- * theirs are the ones assigned to them; an end user has no assignments at all, so theirs
- * are the ones they raised. Same words, same usefulness, rather than a preset that is
- * permanently empty for one of the three roles.
- */
-export function viewFilters(
-  view: TicketViewId,
-  options: { currentUserId: string; worksTheQueue: boolean },
-): Partial<TicketQuery> {
-  switch (view) {
-    case 'mine':
-      return options.worksTheQueue
-        ? { assigneeId: options.currentUserId, unassigned: false, requesterId: null }
-        : { requesterId: options.currentUserId, assigneeId: null, unassigned: false }
-
-    case 'unassigned':
-      return { unassigned: true, assigneeId: null, requesterId: null }
-
-    case 'overdue':
-      return { slaState: 'Breached' }
-  }
-}
-
-/** The query a view produces from where the queue currently stands. */
-export function applyView(
-  query: TicketQuery,
-  view: TicketViewId,
-  options: { currentUserId: string; worksTheQueue: boolean },
-): TicketQuery {
-  return withFilters(query, viewFilters(view, options))
+/** Who is asking, which is what "mine" means. */
+export interface ViewerOptions {
+  readonly currentUserId: string
+  /** True for a Technician or an Admin. */
+  readonly worksTheQueue: boolean
 }
 
 /**
- * True when the queue already satisfies a view.
+ * What "my tickets" means for the person looking at it.
  *
- * Deliberately a subset test rather than an equality test: somebody who picks "My
- * tickets" and then narrows it to Critical is still looking at their tickets, and the
- * chip going dark at that point would say otherwise.
+ * Role-sensitive on purpose. A Technician or an Admin works a queue, so theirs are the
+ * ones assigned to them; an end user has no assignments at all, so theirs are the ones
+ * they raised. Same words, same usefulness, rather than a preset that is permanently
+ * empty for one of the three roles.
  */
-export function isViewActive(
-  query: TicketQuery,
-  view: TicketViewId,
-  options: { currentUserId: string; worksTheQueue: boolean },
-): boolean {
-  const wanted = viewFilters(view, options)
+export function myTicketsFilters(options: ViewerOptions): Partial<TicketQuery> {
+  return options.worksTheQueue
+    ? { assigneeId: options.currentUserId, unassigned: false, requesterId: null }
+    : { requesterId: options.currentUserId, assigneeId: null, unassigned: false }
+}
 
-  return Object.entries(wanted).every(([key, value]) => {
-    if (value === null || value === false) {
-      return true
-    }
-    return query[key as keyof TicketQuery] === value
-  })
+/** The query "my tickets" produces from where the queue currently stands. */
+export function applyMyTickets(query: TicketQuery, options: ViewerOptions): TicketQuery {
+  return withFilters(query, myTicketsFilters(options))
+}
+
+/** The query with "my tickets" taken back off, leaving every other filter alone. */
+export function clearMyTickets(query: TicketQuery, options: ViewerOptions): TicketQuery {
+  return withFilters(query, options.worksTheQueue ? { assigneeId: null } : { requesterId: null })
+}
+
+/**
+ * True when the address already says what "my tickets" would say.
+ *
+ * A subset test rather than an equality one: somebody who picked their own tickets and
+ * then narrowed to Critical is still looking at their tickets, and the control going dark
+ * would say otherwise.
+ */
+export function isMyTickets(query: TicketQuery, options: ViewerOptions): boolean {
+  const filters = myTicketsFilters(options)
+
+  return (Object.keys(filters) as (keyof TicketQuery)[]).every(
+    (key) => query[key] === filters[key],
+  )
 }

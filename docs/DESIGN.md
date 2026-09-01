@@ -95,7 +95,9 @@ A screen reached *from* a list — a record, a create form — carries a **back 
 
 ## 4. Component patterns
 
-**KPI card.** White card, left `48px` soft-tinted rounded tile holding a 22px icon, then uppercase label and the figure. Delta line below: `▲` in `success` or `▼` in `danger`, the number, then the comparison phrase in `muted`. Sentiment is semantic, not directional — fewer overdue tickets is green even though the arrow points down. Tint per card: open `primary-soft`, unassigned `#EEF2FF`, overdue `#FEE9E9`, SLA `primary-soft`.
+**KPI card.** White card, left `48px` soft-tinted rounded tile holding a 22px icon, then uppercase label and the figure. The whole card is a link to the list its figure counted — a number nobody can open is one they have to reproduce by hand.
+
+A **dense variant** — `40px` tile, 18px icon, 24/700 figure, `16px` padding — is for a KPI row that sits *above a working list* rather than on a dashboard of its own. The dashboard's row is the screen; a queue's row is a summary above the thing somebody came to read, and every pixel it takes is a row they cannot see. Same tints, same figures, same link. Delta line below: `▲` in `success` or `▼` in `danger`, the number, then the comparison phrase in `muted`. Sentiment is semantic, not directional — fewer overdue tickets is green even though the arrow points down. Tint per card: open `primary-soft`, unassigned `#EEF2FF`, overdue `#FEE9E9`, SLA `primary-soft`.
 
 **Panel card.** Header row: 18px icon in `primary` + title 15/600, right-aligned control — either a "View All" `primary` 13/500 link, or a period `Select` ("This Week") plus a kebab `DropdownMenu`. Body has no internal header rule; separation comes from spacing.
 

@@ -33,6 +33,19 @@ describe('toggleColumn', () => {
   })
 })
 
+describe('defaultPreferences', () => {
+  it('hides the Age column, because the row caption already says it', () => {
+    // From WP-1.11 until WP-1.16 the same fact was on every row twice: "Created 3h ago"
+    // under the ticket number, and an Age column at the far end.
+    expect(isVisible(defaultPreferences, 'created')).toBe(false)
+  })
+
+  it('still offers Age in the menu, for anybody running the table compact', () => {
+    // Compact drops the caption, which is what makes the column worth having again.
+    expect(ticketColumns.map((column) => column.id)).toContain('created')
+  })
+})
+
 describe('readPreferences', () => {
   it('gives a reader who has chosen nothing the defaults', () => {
     expect(readPreferences()).toEqual(defaultPreferences)

@@ -55,6 +55,10 @@ interface TicketToolbarProps {
  * Columns and density are per-browser preferences rather than URL state, for the reason
  * `ticket-columns.ts` sets out: they describe how one person reads, not which rows are
  * being shown, and a link should carry the second and not the first.
+ *
+ * It renders as the table card's own header rather than a floating row above it: it
+ * describes the list, so it belongs on the list — and a row of its own cost a card gap on
+ * a screen whose whole point is how many tickets fit.
  */
 export function TicketToolbar({
   total,
@@ -71,7 +75,7 @@ export function TicketToolbar({
   const compact = preferences.density === 'compact'
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2.5">
       <p className="text-copy text-body tabular" aria-live="polite">
         {total === 1 ? '1 ticket' : `${String(total)} tickets`}
       </p>

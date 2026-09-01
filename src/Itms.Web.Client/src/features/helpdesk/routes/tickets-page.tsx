@@ -16,7 +16,6 @@ import { TicketPagination } from '../components/ticket-pagination'
 import { TicketTable } from '../components/ticket-table'
 import { TicketTableSkeleton } from '../components/ticket-table-skeleton'
 import { TicketToolbar } from '../components/ticket-toolbar'
-import { TicketViewChips } from '../components/ticket-view-chips'
 import { useTablePreferences } from '../hooks/use-table-preferences'
 import {
   useAssignableUsers,
@@ -36,7 +35,7 @@ import {
   withFilters,
   type TicketQuery,
 } from '../lib/ticket-query'
-import { applyView, isViewActive, type TicketViewId } from '../lib/ticket-views'
+import { applyMyTickets, clearMyTickets, isMyTickets } from '../lib/ticket-views'
 
 /**
  * The ticket queue (WP-1.9).
@@ -111,25 +110,22 @@ export function TicketsPage(): React.JSX.Element {
     [navigate, query],
   )
 
-  const onSelectView = useCallback(
-    (view: TicketViewId) => {
-      if (currentUser === null || currentUser === undefined) {
-        return
-      }
-      navigate(applyView(query, view, { currentUserId: currentUser.id, worksTheQueue }))
-    },
-    [currentUser, navigate, query, worksTheQueue],
+  const viewer = useMemo(
+    () =>
+      currentUser === null || currentUser === undefined
+        ? null
+        : { currentUserId: currentUser.id, worksTheQueue },
+    [currentUser, worksTheQueue],
   )
 
-  const activeViews = useMemo<TicketViewId[]>(() => {
-    if (currentUser === null || currentUser === undefined) {
-      return []
+  const mine = viewer !== null && isMyTickets(query, viewer)
+
+  const onToggleMine = useCallback(() => {
+    if (viewer === null) {
+      return
     }
-    const options = { currentUserId: currentUser.id, worksTheQueue }
-    return (['mine', 'unassigned', 'overdue'] as const).filter((view) =>
-      isViewActive(query, view, options),
-    )
-  }, [currentUser, query, worksTheQueue])
+    navigate(mine ? clearMyTickets(query, viewer) : applyMyTickets(query, viewer))
+  }, [mine, navigate, query, viewer])
 
   // WP-1.9 fixed both of these in the frame and had them raise a toast naming this
   // package. They navigate now; nothing else about the table changed.
@@ -168,27 +164,6 @@ export function TicketsPage(): React.JSX.Element {
       <div className="flex flex-col gap-5">
         <TicketKpiRow counters={counters.data ?? null} dayEnd={dayEnd} />
 
-        <TicketViewChips
-          activeViews={activeViews}
-          counts={
-            counters.data === undefined
-              ? null
-              : {
-                  mine: counters.data.mine,
-                  unassigned: counters.data.unassigned,
-                  overdue: counters.data.overdue,
-                }
-          }
-          onSelect={onSelectView}
-        />
-
-        <TicketSearch
-          value={query.search}
-          onChange={(search) => {
-            onFilterChange({ search })
-          }}
-        />
-
         <TicketFilters
           query={query}
           categories={categories.data ?? []}
@@ -200,6 +175,17 @@ export function TicketsPage(): React.JSX.Element {
           onClear={() => {
             navigate(clearedFilters(query))
           }}
+          mine={mine}
+          mineCount={counters.data?.mine}
+          onToggleMine={onToggleMine}
+          search={
+            <TicketSearch
+              value={query.search}
+              onChange={(search) => {
+                onFilterChange({ search })
+              }}
+            />
+          }
         />
 
         {tickets.isPending ? (
@@ -238,19 +224,6 @@ export function TicketsPage(): React.JSX.Element {
           />
         ) : (
           <>
-            <TicketToolbar
-              total={tickets.data.total}
-              sort={query.sort}
-              direction={query.direction}
-              refreshing={tickets.isFetching}
-              preferences={preferences}
-              onSortChange={onSortChange}
-              onRefresh={() => {
-                void tickets.refetch()
-              }}
-              onToggleColumn={toggle}
-              onDensityChange={setDensity}
-            />
             <TicketTable
               tickets={tickets.data.items}
               query={query}
@@ -258,6 +231,21 @@ export function TicketsPage(): React.JSX.Element {
               preferences={preferences}
               onSort={onSort}
               onOpen={openTicket}
+              toolbar={
+                <TicketToolbar
+                  total={tickets.data.total}
+                  sort={query.sort}
+                  direction={query.direction}
+                  refreshing={tickets.isFetching}
+                  preferences={preferences}
+                  onSortChange={onSortChange}
+                  onRefresh={() => {
+                    void tickets.refetch()
+                  }}
+                  onToggleColumn={toggle}
+                  onDensityChange={setDensity}
+                />
+              }
             />
             <TicketPagination
               page={query.page}

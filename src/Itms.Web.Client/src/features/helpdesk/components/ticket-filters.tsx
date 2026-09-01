@@ -39,6 +39,13 @@ interface TicketFiltersProps {
   showAssignee: boolean
   onChange: (changes: Partial<TicketQuery>) => void
   onClear: () => void
+  /** The search box, rendered inside this card — they are one job, not two. */
+  search: React.ReactNode
+  /** True when the queue is already narrowed to the viewer's own tickets. */
+  mine: boolean
+  /** How many those are, scope-wide, or undefined while the counters load. */
+  mineCount: number | undefined
+  onToggleMine: () => void
 }
 
 /**
@@ -64,12 +71,42 @@ export function TicketFilters({
   showAssignee,
   onChange,
   onClear,
+  search,
+  mine,
+  mineCount,
+  onToggleMine,
 }: TicketFiltersProps): React.JSX.Element {
   const assigneeValue = query.unassigned ? nobody : (query.assigneeId ?? any)
   const advanced = advancedFilterCount(query)
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface p-4 shadow-card">
+    <div className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4 shadow-card">
+      {/*
+        The search and the filters are one card because they are one job — narrowing the
+        queue. Two cards with a gap and two sets of padding between them cost about
+        seventy pixels of a screen whose whole point is the list underneath.
+      */}
+      {search}
+
+      <div className="flex flex-wrap items-center gap-3">
+      <Button
+        variant={mine ? 'default' : 'outline'}
+        aria-pressed={mine}
+        onClick={onToggleMine}
+      >
+        My tickets
+        {mineCount === undefined ? null : (
+          <span
+            className={cn(
+              'ml-1 inline-flex min-w-5 justify-center rounded-full px-1.5 tabular',
+              mine ? 'bg-white/20 text-white' : 'bg-canvas text-muted-foreground',
+            )}
+          >
+            {mineCount}
+          </span>
+        )}
+      </Button>
+
       <Select
         multiple
         items={statusOrder.map((status) => ({ label: statusLabels[status], value: status }))}
@@ -223,6 +260,7 @@ export function TicketFilters({
           Clear all
         </Button>
       ) : null}
+      </div>
     </div>
   )
 }

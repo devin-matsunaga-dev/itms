@@ -6,7 +6,7 @@
 **Phase:** 1 — Helpdesk **complete**. Phase 0 and Phase 1 both await their gate walkthroughs and the `v0.1-phase0` / `v0.2-phase1` tags.
 **Current WP:** `WP-2.1 — Asset domain & lifecycle` — **not before the Phase 1 gate**
 **Branch:** `feat/wp-2.1-asset-domain`
-**Last completed:** `WP-1.15 — Hold reason` (2026-09-01)
+**Last completed:** `WP-1.16 — Queue density` (2026-09-01)
 **Last updated:** 2026-09-01
 
 > **Phase 1 is complete, including the two packages added against the human's mockup** (WP-1.11's table rebuild and WP-1.12's search and counters). Both are in `WORK_PACKAGES.md` now. What remains before Phase 2 is the gate itself: the walkthrough, the root README, and the tag.
@@ -20,7 +20,7 @@
 | Phase | Packages | Done | Tag |
 |---|---|---|---|
 | 0 — Foundation | 0.1 – 0.9 | 9 / 9 | *gate pending* |
-| 1 — Helpdesk | 1.1 – 1.15 | 15 / 15 | *gate pending* |
+| 1 — Helpdesk | 1.1 – 1.16 | 16 / 16 | *gate pending* |
 | 2 — Assets & directory | 2.1 – 2.7 | 0 / 7 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
@@ -343,14 +343,24 @@
 - **Nothing clears `hold_reason` for tickets parked before this migration.** The column is added nullable and backfills nothing, so a ticket already sitting in Waiting shows no reason until it is resumed and held again. There are no such tickets in any real deployment yet — Phase 1 has not shipped — so no backfill was written. If that stops being true before the gate, one is a single `UPDATE`.
 - **The hold reason is visible to the requester**, deliberately: WP-1.5 widened the timeline to them and "waiting on the vendor" is exactly what they most want to know. It is therefore **not** the place for anything internal — that is what an internal note is for, and the composer is right there on the same screen.
 
+### Noticed during WP-1.16
+
+- **Two of WP-1.9's three view chips were redundant the moment WP-1.12 shipped the KPI row, and nobody noticed for two packages.** The Unassigned and Overdue tiles link to exactly the queries those chips wrote, one row above them. The chips are gone, `ticket-view-chips.tsx` with them, and `ticket-views.ts` collapsed from a three-view abstraction to the one helper that survives. **The general lesson: a package that adds a way to ask a question should check whether the screen already has one** — WP-1.12 added the tiles without looking at the chips directly beneath.
+- **The Age column duplicated the row's own caption from WP-1.11 until now.** The identifying column reads "Created 3h ago" and an Age column sat at the far right saying the same thing. Age is hidden by default now and still one click away in the Columns menu — which is the right move for anybody running the table compact, since compact is what drops the caption.
+- **The queue header stack cost about 470px before the first row; it is now roughly 280.** Four structural changes did it: the chips row went, the search merged into the filter bar card, the toolbar became the table card's own header strip, and the KPI cards took the new dense variant. Roughly three more tickets visible at the 1280px floor. **None of it came from shrinking type below the scale** — `text-kpi-dense` is a new 24px step in `DESIGN.md` §2's scale, not an override of an existing one.
+- **`KpiCard` now has a `dense` prop, and `WP-5.2`'s dashboard should not use it.** The distinction is deliberate and written into `DESIGN.md` §4: a dashboard's KPI row *is* the screen, while a queue's is a summary above the thing somebody came to read. The dashboard keeps the 48px tile and the 30px figure.
+- **The filter bar is now three stacked concerns in one card** — search, the "My tickets" toggle, and the narrowing controls. That is right at eight controls and would not be at twelve. The next filter added is the point to ask whether the card wants a second row rather than a wider wrap.
+- **The row is still three lines tall in the comfortable density.** `py-3` became `py-2.5`, which is 8px a row, but the caption line is what makes the row 76px rather than 52px. Anybody who wants the maximum number of tickets on screen should use the compact toggle, which drops the caption — and should then turn the Age column back on. **Nobody has been told that**; the Columns menu does not explain it and probably should.
+- **Still unseen in a browser.** The headless Chromium cannot start on this machine (`libnspr4.so`, needs sudo), so the height claim above is measured from the markup rather than from a rendered page. **Comparing it against the screenshot that prompted this package is the first item on the manual checklist.**
+
 ## Known issues
 
 - none
 
 ## Environment notes
 
-- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.15: **708 unit, 52 architecture, 453 integration** (the integration run is about 109 s, of which the 50,000-ticket volume test is roughly half) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
-- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 276 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
+- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.16: **708 unit, 52 architecture, 453 integration** (unchanged — WP-1.16 touched no server code) (the integration run is about 109 s, of which the 50,000-ticket volume test is roughly half) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
+- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 279 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
 - **`aspire run` now also starts `web-client`.** It runs `npm install` first (an Aspire installer resource) and then `npm run dev`, waits for `web-host`, and is published on an external endpoint — the dashboard prints its URL. The Vite dev server proxies `/api` to the host, so the browser sees one origin.
 - **The colour scheme is remembered per browser** under `localStorage["itms.theme"]`, and follows the operating system until the viewer picks a mode. Clearing site data returns it to the system preference. There is no server-side or per-account theme setting, and none is planned.
 - **Node 24 LTS and npm 11 are what the client is built with.** `node -v` should report v24.x; the lockfile is committed and `npm ci` is the reproducible install.
