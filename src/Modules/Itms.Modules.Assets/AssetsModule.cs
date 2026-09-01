@@ -1,4 +1,6 @@
 using FluentValidation;
+using Itms.Contracts.Lookups;
+using Itms.Modules.Assets.Contracts;
 using Itms.Modules.Assets.Features.AssetStatuses;
 using Itms.Modules.Assets.Features.AssetStatuses.CreateAssetStatus;
 using Itms.Modules.Assets.Features.AssetStatuses.GetAssetStatus;
@@ -111,6 +113,13 @@ public static class AssetsModule
         services.TryAddScoped<IValidator<CreateAssetRequest>, CreateAssetValidator>();
         services.TryAddScoped<IValidator<AssignAssetRequest>, AssignAssetValidator>();
         services.TryAddScoped<IValidator<AssetLifecycleRequest>, AssetLifecycleRequestValidator>();
+
+        // This module's reference count for the directory screens: how much equipment
+        // sits in a department or a room
+        // (WP-2.4). TryAddEnumerable rather than TryAddScoped, because every module that
+        // holds such a reference registers one and Directory reads all of them.
+        services.TryAddEnumerable(
+            ServiceDescriptor.Scoped<IDirectoryUsageLookup, AssetDirectoryUsageLookup>());
 
         return services;
     }

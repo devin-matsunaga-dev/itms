@@ -1,8 +1,10 @@
 using Itms.Modules.Directory.Features.Departments.CreateDepartment;
 using Itms.Modules.Directory.Features.Departments.GetDepartment;
+using Itms.Modules.Directory.Features.Departments.GetDepartmentUsage;
 using Itms.Modules.Directory.Features.Departments.ListDepartments;
 using Itms.Modules.Directory.Features.Departments.SetDepartmentStatus;
 using Itms.Modules.Directory.Features.Departments.UpdateDepartment;
+using Itms.Modules.Directory.Features.Usage;
 using Itms.Platform.Http;
 using Itms.Platform.Identity;
 using Itms.Platform.Paging;
@@ -32,6 +34,7 @@ internal static class DepartmentEndpoints
         var group = endpoints.MapGroup(RoutePrefix).WithTags("Departments");
 
         MapReads(group);
+        MapAdminReads(group);
         MapWrites(group);
     }
 
@@ -71,6 +74,35 @@ internal static class DepartmentEndpoints
             .WithName("GetDepartment")
             .WithSummary("Reads one department.")
             .Produces<DepartmentResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+    }
+
+    /// <summary>
+    /// The usage read, Admin only for the same reason as the location one: it counts
+    /// people and equipment, not just names.
+    /// </summary>
+    private static void MapAdminReads(RouteGroupBuilder group)
+    {
+        group
+            .MapGroup(string.Empty)
+            .RequireAuthorization(ItmsPolicies.Admin)
+            .MapGet("/{id:guid}/usage", async (
+                Guid id,
+                GetDepartmentUsageHandler handler,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await handler.HandleAsync(id, cancellationToken).ConfigureAwait(false);
+                return result.ToOk();
+            })
+            .WithName("GetDepartmentUsage")
+            .WithSummary("Reports what a department still holds, before it is retired.")
+            .WithDescription(
+                "Informational only. A department is retired rather than deleted, and retirement is " +
+                "never refused — a department with three hundred tickets against it is exactly the " +
+                "one that must be retired rather than removed, so that every one of them keeps " +
+                "resolving.")
+            .Produces<DepartmentUsageResponse>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
 

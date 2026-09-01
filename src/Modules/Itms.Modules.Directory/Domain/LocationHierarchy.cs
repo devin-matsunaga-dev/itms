@@ -60,4 +60,27 @@ public static class LocationHierarchy
     /// <summary>Whether <paramref name="kind"/> may sit at the root of the tree.</summary>
     /// <param name="kind">The kind to check.</param>
     public static bool CanBeRoot(LocationKind kind) => kind == RootKind;
+
+    /// <summary>
+    /// Every kind that may be the direct parent of a <paramref name="childKind"/>.
+    /// </summary>
+    /// <param name="childKind">The kind being placed.</param>
+    /// <returns>The permitted parent kinds, lowest rank first.</returns>
+    /// <remarks>
+    /// The rank comparison cannot be translated to SQL — rank is a function, not a column
+    /// — so a query that wants "parents that could adopt a Room" resolves the set here
+    /// and matches on <c>kind IN (…)</c> instead. Answering it in memory is also what
+    /// keeps the rule in one place: a picker that filtered client-side would be a second
+    /// copy of the hierarchy, and the two would drift.
+    /// </remarks>
+    public static IReadOnlyList<LocationKind> KindsThatCanContain(LocationKind childKind)
+    {
+        // Throws for an undeclared kind, which is the same refusal CanContain would give.
+        _ = RankOf(childKind);
+
+        return [.. Enum.GetValues<LocationKind>()
+            .Where(candidate => CanContain(candidate, childKind))
+            .OrderBy(RankOf)
+            .ThenBy(candidate => candidate)];
+    }
 }

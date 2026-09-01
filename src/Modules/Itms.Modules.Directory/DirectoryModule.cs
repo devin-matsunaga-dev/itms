@@ -4,6 +4,7 @@ using Itms.Modules.Directory.Contracts;
 using Itms.Modules.Directory.Features.Departments;
 using Itms.Modules.Directory.Features.Departments.CreateDepartment;
 using Itms.Modules.Directory.Features.Departments.GetDepartment;
+using Itms.Modules.Directory.Features.Departments.GetDepartmentUsage;
 using Itms.Modules.Directory.Features.Departments.ListDepartments;
 using Itms.Modules.Directory.Features.Departments.SetDepartmentStatus;
 using Itms.Modules.Directory.Features.Departments.UpdateDepartment;
@@ -11,9 +12,13 @@ using Itms.Modules.Directory.Features.Locations;
 using Itms.Modules.Directory.Features.Locations.CreateLocation;
 using Itms.Modules.Directory.Features.Locations.DeleteLocation;
 using Itms.Modules.Directory.Features.Locations.GetLocation;
+using Itms.Modules.Directory.Features.Locations.GetLocationAncestors;
+using Itms.Modules.Directory.Features.Locations.GetLocationUsage;
 using Itms.Modules.Directory.Features.Locations.ListLocations;
+using Itms.Modules.Directory.Features.Locations.ListRootLocations;
 using Itms.Modules.Directory.Features.Locations.MoveLocation;
 using Itms.Modules.Directory.Features.Locations.UpdateLocation;
+using Itms.Modules.Directory.Features.Usage;
 using Itms.Modules.Directory.Persistence;
 using Itms.Platform.Data;
 using Microsoft.AspNetCore.Routing;
@@ -54,6 +59,7 @@ public static class DirectoryModule
         services.TryAddScoped<CreateDepartmentHandler>();
         services.TryAddScoped<UpdateDepartmentHandler>();
         services.TryAddScoped<SetDepartmentStatusHandler>();
+        services.TryAddScoped<GetDepartmentUsageHandler>();
 
         services.TryAddScoped<ListLocationsHandler>();
         services.TryAddScoped<GetLocationHandler>();
@@ -61,6 +67,14 @@ public static class DirectoryModule
         services.TryAddScoped<UpdateLocationHandler>();
         services.TryAddScoped<MoveLocationHandler>();
         services.TryAddScoped<DeleteLocationHandler>();
+        services.TryAddScoped<ListRootLocationsHandler>();
+        services.TryAddScoped<GetLocationAncestorsHandler>();
+        services.TryAddScoped<GetLocationUsageHandler>();
+
+        // Fans the usage question out over whatever IDirectoryUsageLookup implementations
+        // the composition root registered. Directory names no module here and takes an
+        // empty set without complaint (ARCHITECTURE.md §3 rule 2).
+        services.TryAddScoped<DirectoryUsageReader>();
 
         services.TryAddScoped<IValidator<CreateDepartmentRequest>, CreateDepartmentValidator>();
         services.TryAddScoped<IValidator<UpdateDepartmentRequest>, UpdateDepartmentValidator>();

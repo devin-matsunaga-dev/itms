@@ -71,4 +71,49 @@ public sealed class LocationHierarchyTests
     [Fact]
     public void An_undeclared_kind_is_rejected_rather_than_silently_ranked() =>
         Should.Throw<ArgumentOutOfRangeException>(() => LocationHierarchy.RankOf((LocationKind)99));
+
+    /// <summary>
+    /// The set form of the rule, which is what the picker's <c>adoptableFor</c> filter
+    /// resolves before it hits the database. It has to agree with
+    /// <see cref="LocationHierarchy.CanContain"/> exactly, or the picker offers a parent
+    /// the server then refuses with a 409 the user could not have predicted.
+    /// </summary>
+    [Fact]
+    public void The_set_of_possible_parents_agrees_with_the_pairwise_rule()
+    {
+        foreach (var child in Enum.GetValues<LocationKind>())
+        {
+            var permitted = LocationHierarchy.KindsThatCanContain(child);
+
+            foreach (var parent in Enum.GetValues<LocationKind>())
+            {
+                permitted.Contains(parent).ShouldBe(LocationHierarchy.CanContain(parent, child));
+            }
+        }
+    }
+
+    [Fact]
+    public void A_room_may_hang_off_any_level_above_it() =>
+        LocationHierarchy.KindsThatCanContain(LocationKind.Room).ShouldBe(
+            [LocationKind.Organization, LocationKind.Site, LocationKind.Building, LocationKind.Floor, LocationKind.Area]);
+
+    /// <summary>An organisation is a root and nothing contains it, so its set is empty.</summary>
+    [Fact]
+    public void Nothing_can_contain_an_organization() =>
+        LocationHierarchy.KindsThatCanContain(LocationKind.Organization).ShouldBeEmpty();
+
+    /// <summary>Lowest rank first, so a picker rendering the set reads top-down.</summary>
+    [Fact]
+    public void The_set_is_ordered_from_the_top_of_the_tree_downwards()
+    {
+        var permitted = LocationHierarchy.KindsThatCanContain(LocationKind.Room);
+        var ranks = permitted.Select(LocationHierarchy.RankOf).ToArray();
+
+        ranks.ShouldBe(ranks.Order());
+    }
+
+    [Fact]
+    public void An_undeclared_kind_has_no_set_of_parents_either() =>
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => LocationHierarchy.KindsThatCanContain((LocationKind)99));
 }

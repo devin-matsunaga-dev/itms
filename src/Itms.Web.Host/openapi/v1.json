@@ -549,6 +549,65 @@
         ]
       }
     },
+    "/api/v1/departments/{id}/usage": {
+      "get": {
+        "tags": [
+          "Departments"
+        ],
+        "summary": "Reports what a department still holds, before it is retired.",
+        "description": "Informational only. A department is retired rather than deleted, and retirement is never refused — a department with three hundred tickets against it is exactly the one that must be retired rather than removed, so that every one of them keeps resolving.",
+        "operationId": "GetDepartmentUsage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentUsageResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
     "/api/v1/departments/{id}/deactivate": {
       "post": {
         "tags": [
@@ -637,6 +696,7 @@
           "Locations"
         ],
         "summary": "Lists locations in path order, optionally within one parent or one subtree.",
+        "description": "A cascading picker uses this with ?parentId to read one level at a time, and with ?adoptableFor to see only the nodes that could legally hold what is being placed. ?parentId is a filter, not a null check: omitting it lists the whole tree rather than the roots, which GET /api/v1/locations/roots returns.",
         "operationId": "ListLocations",
         "parameters": [
           {
@@ -664,6 +724,13 @@
           },
           {
             "name": "kind",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LocationKind"
+            }
+          },
+          {
+            "name": "adoptableFor",
             "in": "query",
             "schema": {
               "$ref": "#/components/schemas/LocationKind"
@@ -915,7 +982,8 @@
         "tags": [
           "Locations"
         ],
-        "summary": "Deletes a location that has no children. A location with children is refused with 409.",
+        "summary": "Deletes a location that has no children and that nothing references.",
+        "description": "Refused with 409 in two cases: directory.location_has_children when the node still has a subtree, and directory.location_in_use when assets, tickets, or users still reference it. GET /api/v1/locations/{id}/usage reports both ahead of the click.",
         "operationId": "DeleteLocation",
         "parameters": [
           {
@@ -944,6 +1012,183 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/locations/roots": {
+      "get": {
+        "tags": [
+          "Locations"
+        ],
+        "summary": "Lists the top level of the tree — the first select of a cascading picker.",
+        "operationId": "ListRootLocations",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "adoptableFor",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LocationKind"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfLocationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/locations/{id}/ancestors": {
+      "get": {
+        "tags": [
+          "Locations"
+        ],
+        "summary": "Reads the root-to-node chain, so a picker can preselect every level in one call.",
+        "description": "Ordered root first and including the node itself, so the chain of a root node is that node alone and is never empty.",
+        "operationId": "GetLocationAncestors",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LocationResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/locations/{id}/usage": {
+      "get": {
+        "tags": [
+          "Locations"
+        ],
+        "summary": "Reports what a location still holds, before a delete is offered.",
+        "description": "canDelete is advisory: DELETE re-checks both the child count and the references, because either can change between the two calls.",
+        "operationId": "GetLocationUsage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationUsageResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5366,6 +5611,44 @@
         },
         "description": "A department as the API renders it."
       },
+      "DepartmentUsageResponse": {
+        "required": [
+          "departmentId",
+          "name",
+          "isActive",
+          "references",
+          "totalReferences"
+        ],
+        "type": "object",
+        "properties": {
+          "departmentId": {
+            "type": "string",
+            "description": "The department reported on.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its display name."
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "False once retired."
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageCountResponse"
+            },
+            "description": "The per-module counts, ordered by entity name. Modules reporting zero are included."
+          },
+          "totalReferences": {
+            "type": "integer",
+            "description": "The sum of IReadOnlyList&lt;UsageCountResponse&gt; DepartmentUsageResponse.References.",
+            "format": "int32"
+          }
+        },
+        "description": "What a department still holds."
+      },
       "HttpValidationProblemDetails": {
         "type": "object",
         "properties": {
@@ -5503,6 +5786,55 @@
           }
         },
         "description": "A location as the API renders it."
+      },
+      "LocationUsageResponse": {
+        "required": [
+          "locationId",
+          "name",
+          "path",
+          "childCount",
+          "references",
+          "totalReferences",
+          "canDelete"
+        ],
+        "type": "object",
+        "properties": {
+          "locationId": {
+            "type": "string",
+            "description": "The location reported on.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its own name."
+          },
+          "path": {
+            "type": "string",
+            "description": "Its full display path, so the answer names the room unambiguously."
+          },
+          "childCount": {
+            "type": "integer",
+            "description": "How many locations sit directly beneath it. Kept separate from\nIReadOnlyList&lt;UsageCountResponse&gt; LocationUsageResponse.References because it is Directory's own count and it blocks a delete\nfor a different reason — a subtree, rather than a reference from elsewhere.",
+            "format": "int32"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageCountResponse"
+            },
+            "description": "The per-module counts, ordered by entity name so the breakdown does not reshuffle\nbetween reads. A module reporting zero is included: \"no assets here\" is an answer\nthe screen shows, and an absent row would be indistinguishable from a module that\nhas not been asked."
+          },
+          "totalReferences": {
+            "type": "integer",
+            "description": "The sum of IReadOnlyList&lt;UsageCountResponse&gt; LocationUsageResponse.References, so a caller deciding whether to offer a delete reads one number.",
+            "format": "int32"
+          },
+          "canDelete": {
+            "type": "boolean",
+            "description": "True when the location has no children and nothing references it. This is advisory —\nthe `DELETE` endpoint re-checks both, because the answer can change between the\ntwo calls."
+          }
+        },
+        "description": "What a location still holds, which is what an administrator is shown before being\noffered a delete."
       },
       "LoginRequest": {
         "required": [
@@ -7228,6 +7560,25 @@
           }
         },
         "description": "The body of `PUT /api/v1/ticket-priorities/{id}`."
+      },
+      "UsageCountResponse": {
+        "required": [
+          "entityName",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "entityName": {
+            "type": "string",
+            "description": "What was counted, in lower-case plural — `assets`, `tickets`, `users`."
+          },
+          "count": {
+            "type": "integer",
+            "description": "How many of them reference the entry.",
+            "format": "int32"
+          }
+        },
+        "description": "One module's count of references to a directory entry, as the API renders it."
       },
       "UserSummary": {
         "required": [

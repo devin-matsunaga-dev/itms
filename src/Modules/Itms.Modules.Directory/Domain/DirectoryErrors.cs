@@ -61,4 +61,23 @@ internal static class DirectoryErrors
         Error.Conflict(
             "directory.location_has_children",
             $"'{name}' still contains {childCount} location{(childCount == 1 ? string.Empty : "s")}. Delete or move them first.");
+
+    /// <summary>
+    /// The second refusal a delete can hit: the node is a leaf, but rows in other modules
+    /// still point at it.
+    /// </summary>
+    /// <remarks>
+    /// A distinct code from <see cref="LocationHasChildren"/> because the two need
+    /// different actions — one is "empty the subtree", the other is "move the equipment
+    /// and the people" — and a client that showed one message for both would be telling
+    /// an administrator to go and look in the wrong place. The breakdown is in the message
+    /// because a bare "it is in use" sends them hunting; <c>GET /locations/{id}/usage</c>
+    /// is the same figures ahead of the click.
+    /// </remarks>
+    /// <param name="name">The location's own name.</param>
+    /// <param name="breakdown">The per-module counts, already rendered — "3 assets and 1 user".</param>
+    public static Error LocationInUse(string name, string breakdown) =>
+        Error.Conflict(
+            "directory.location_in_use",
+            $"'{name}' is still referenced by {breakdown}. Move or reassign them first.");
 }

@@ -159,6 +159,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/departments/{id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reports what a department still holds, before it is retired.
+         * @description Informational only. A department is retired rather than deleted, and retirement is never refused — a department with three hundred tickets against it is exactly the one that must be retired rather than removed, so that every one of them keeps resolving.
+         */
+        get: operations["GetDepartmentUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/departments/{id}/deactivate": {
         parameters: {
             query?: never;
@@ -200,7 +220,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Lists locations in path order, optionally within one parent or one subtree. */
+        /**
+         * Lists locations in path order, optionally within one parent or one subtree.
+         * @description A cascading picker uses this with ?parentId to read one level at a time, and with ?adoptableFor to see only the nodes that could legally hold what is being placed. ?parentId is a filter, not a null check: omitting it lists the whole tree rather than the roots, which GET /api/v1/locations/roots returns.
+         */
         get: operations["ListLocations"];
         put?: never;
         /** Creates a location under a parent, or a root organisation. */
@@ -223,8 +246,68 @@ export interface paths {
         /** Renames a location and rewrites the paths of everything beneath it. */
         put: operations["UpdateLocation"];
         post?: never;
-        /** Deletes a location that has no children. A location with children is refused with 409. */
+        /**
+         * Deletes a location that has no children and that nothing references.
+         * @description Refused with 409 in two cases: directory.location_has_children when the node still has a subtree, and directory.location_in_use when assets, tickets, or users still reference it. GET /api/v1/locations/{id}/usage reports both ahead of the click.
+         */
         delete: operations["DeleteLocation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/roots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists the top level of the tree — the first select of a cascading picker. */
+        get: operations["ListRootLocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{id}/ancestors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reads the root-to-node chain, so a picker can preselect every level in one call.
+         * @description Ordered root first and including the node itself, so the chain of a root node is that node alone and is never empty.
+         */
+        get: operations["GetLocationAncestors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/{id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reports what a location still holds, before a delete is offered.
+         * @description canDelete is advisory: DELETE re-checks both the child count and the references, because either can change between the two calls.
+         */
+        get: operations["GetLocationUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1422,6 +1505,25 @@ export interface components {
              */
             updatedAt: string;
         };
+        /** @description What a department still holds. */
+        DepartmentUsageResponse: {
+            /**
+             * Format: uuid
+             * @description The department reported on.
+             */
+            departmentId: string;
+            /** @description Its display name. */
+            name: string;
+            /** @description False once retired. */
+            isActive: boolean;
+            /** @description The per-module counts, ordered by entity name. Modules reporting zero are included. */
+            references: components["schemas"]["UsageCountResponse"][];
+            /**
+             * Format: int32
+             * @description The sum of IReadOnlyList&lt;UsageCountResponse&gt; DepartmentUsageResponse.References.
+             */
+            totalReferences: number;
+        };
         HttpValidationProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -1488,6 +1590,46 @@ export interface components {
              * @description When it was last changed (UTC).
              */
             updatedAt: string;
+        };
+        /**
+         * @description What a location still holds, which is what an administrator is shown before being
+         *     offered a delete.
+         */
+        LocationUsageResponse: {
+            /**
+             * Format: uuid
+             * @description The location reported on.
+             */
+            locationId: string;
+            /** @description Its own name. */
+            name: string;
+            /** @description Its full display path, so the answer names the room unambiguously. */
+            path: string;
+            /**
+             * Format: int32
+             * @description How many locations sit directly beneath it. Kept separate from
+             *     IReadOnlyList&lt;UsageCountResponse&gt; LocationUsageResponse.References because it is Directory's own count and it blocks a delete
+             *     for a different reason — a subtree, rather than a reference from elsewhere.
+             */
+            childCount: number;
+            /**
+             * @description The per-module counts, ordered by entity name so the breakdown does not reshuffle
+             *     between reads. A module reporting zero is included: "no assets here" is an answer
+             *     the screen shows, and an absent row would be indistinguishable from a module that
+             *     has not been asked.
+             */
+            references: components["schemas"]["UsageCountResponse"][];
+            /**
+             * Format: int32
+             * @description The sum of IReadOnlyList&lt;UsageCountResponse&gt; LocationUsageResponse.References, so a caller deciding whether to offer a delete reads one number.
+             */
+            totalReferences: number;
+            /**
+             * @description True when the location has no children and nothing references it. This is advisory —
+             *     the `DELETE` endpoint re-checks both, because the answer can change between the
+             *     two calls.
+             */
+            canDelete: boolean;
         };
         /** @description Credentials offered at sign-in. */
         LoginRequest: {
@@ -2550,6 +2692,16 @@ export interface components {
              */
             resolutionTargetMinutes: number;
         };
+        /** @description One module's count of references to a directory entry, as the API renders it. */
+        UsageCountResponse: {
+            /** @description What was counted, in lower-case plural — `assets`, `tickets`, `users`. */
+            entityName: string;
+            /**
+             * Format: int32
+             * @description How many of them reference the entry.
+             */
+            count: number;
+        };
         /**
          * @description The fields another module is allowed to know about a user. It carries no
          *     credential state of any kind — that never leaves Identity.
@@ -3027,6 +3179,53 @@ export interface operations {
             };
         };
     };
+    GetDepartmentUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepartmentUsageResponse"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     DeactivateDepartment: {
         parameters: {
             query?: never;
@@ -3106,6 +3305,7 @@ export interface operations {
                 parentId?: string;
                 rootId?: string;
                 kind?: components["schemas"]["LocationKind"];
+                adoptableFor?: components["schemas"]["LocationKind"];
                 page?: number;
                 pageSize?: number;
             };
@@ -3336,6 +3536,125 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListRootLocations: {
+        parameters: {
+            query?: {
+                search?: string;
+                adoptableFor?: components["schemas"]["LocationKind"];
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfLocationResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetLocationAncestors: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationResponse"][];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetLocationUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationUsageResponse"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

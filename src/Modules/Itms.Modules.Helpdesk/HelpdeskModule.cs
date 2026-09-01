@@ -1,5 +1,7 @@
 using FluentValidation;
+using Itms.Contracts.Lookups;
 using Itms.Modules.Helpdesk.Configuration;
+using Itms.Modules.Helpdesk.Contracts;
 using Itms.Modules.Helpdesk.Features.TicketAttachments;
 using Itms.Modules.Helpdesk.Features.TicketAttachments.DownloadTicketAttachment;
 using Itms.Modules.Helpdesk.Features.TicketAttachments.ListTicketAttachments;
@@ -123,6 +125,13 @@ public static class HelpdeskModule
         services.TryAddScoped<IValidator<CreateTicketRequest>, CreateTicketValidator>();
         services.TryAddScoped<IValidator<AssignTicketRequest>, AssignTicketValidator>();
         services.TryAddScoped<IValidator<AddTicketCommentRequest>, AddTicketCommentValidator>();
+
+        // This module's reference count for the directory screens: how many tickets are
+        // filed against a department
+        // (WP-2.4). TryAddEnumerable rather than TryAddScoped, because every module that
+        // holds such a reference registers one and Directory reads all of them.
+        services.TryAddEnumerable(
+            ServiceDescriptor.Scoped<IDirectoryUsageLookup, TicketDirectoryUsageLookup>());
 
         return services;
     }

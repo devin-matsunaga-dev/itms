@@ -100,6 +100,13 @@ public static class IdentityModule
         // never sees ItmsUser (ARCHITECTURE.md §3 rule 2).
         services.TryAddScoped<IUserLookup, UserLookupService>();
 
+        // This module's reference count for the directory screens: how many accounts sit
+        // in a department or at a location
+        // (WP-2.4). TryAddEnumerable rather than TryAddScoped, because every module that
+        // holds such a reference registers one and Directory reads all of them.
+        services.TryAddEnumerable(
+            ServiceDescriptor.Scoped<IDirectoryUsageLookup, UserDirectoryUsageLookup>());
+
         return services;
     }
 
