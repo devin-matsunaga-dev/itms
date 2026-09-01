@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label'
 import type { TicketDetail, UserSummary } from '@/lib/api/types'
 import { formatDateTime, formatDuration } from '@/lib/datetime'
 import { canChangeAssignee } from '../lib/ticket-assignment'
-import { PriorityLabel } from './priority-dot'
+import { PriorityLabel } from './priority-pill'
 import { TicketAssigneeControl } from './ticket-assignee-control'
 
 interface TicketPropertiesProps {

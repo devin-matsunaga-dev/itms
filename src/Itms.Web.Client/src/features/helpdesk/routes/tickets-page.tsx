@@ -7,13 +7,15 @@ import { ErrorState } from '@/components/common/error-state'
 import { Button } from '@/components/ui/button'
 import { useNow } from '@/lib/use-now'
 import { hasAnyRole, Roles } from '@/lib/roles'
-import type { TicketListItem, TicketSort } from '@/lib/api/types'
+import type { SortDirection, TicketListItem, TicketSort } from '@/lib/api/types'
 import { useCurrentUser } from '@/features/auth/hooks/use-current-user'
 import { TicketFilters } from '../components/ticket-filters'
 import { TicketPagination } from '../components/ticket-pagination'
 import { TicketTable } from '../components/ticket-table'
 import { TicketTableSkeleton } from '../components/ticket-table-skeleton'
+import { TicketToolbar } from '../components/ticket-toolbar'
 import { TicketViewChips } from '../components/ticket-view-chips'
+import { useTablePreferences } from '../hooks/use-table-preferences'
 import {
   useAssignableUsers,
   useDepartments,
@@ -54,6 +56,7 @@ export function TicketsPage(): React.JSX.Element {
   const worksTheQueue = hasAnyRole(roles, [Roles.admin, Roles.technician])
 
   const tickets = useTickets(query)
+  const { preferences, toggle, setDensity } = useTablePreferences()
   const categories = useTicketCategories()
   const priorities = useTicketPriorities()
   const departments = useDepartments()
@@ -87,6 +90,13 @@ export function TicketsPage(): React.JSX.Element {
             : 'Descending'
 
       navigate({ ...query, sort: column, direction, page: 1 })
+    },
+    [navigate, query],
+  )
+
+  const onSortChange = useCallback(
+    (sort: TicketSort, direction: SortDirection) => {
+      navigate({ ...query, sort, direction, page: 1 })
     },
     [navigate, query],
   )
@@ -188,7 +198,7 @@ export function TicketsPage(): React.JSX.Element {
               sameTicketQuery(query, defaultTicketQuery)
                 ? { label: 'Create the first ticket', onClick: newTicket }
                 : {
-                    label: 'Clear filters',
+                    label: 'Clear all',
                     onClick: () => {
                       navigate(clearedFilters(query))
                     },
@@ -197,10 +207,24 @@ export function TicketsPage(): React.JSX.Element {
           />
         ) : (
           <>
+            <TicketToolbar
+              total={tickets.data.total}
+              sort={query.sort}
+              direction={query.direction}
+              refreshing={tickets.isFetching}
+              preferences={preferences}
+              onSortChange={onSortChange}
+              onRefresh={() => {
+                void tickets.refetch()
+              }}
+              onToggleColumn={toggle}
+              onDensityChange={setDensity}
+            />
             <TicketTable
               tickets={tickets.data.items}
               query={query}
               now={now}
+              preferences={preferences}
               onSort={onSort}
               onOpen={openTicket}
             />

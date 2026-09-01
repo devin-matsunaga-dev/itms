@@ -4,10 +4,12 @@
 
 **Project:** Unified IT Management System (ITMS)
 **Phase:** 1 — Helpdesk **complete**. Phase 0 and Phase 1 both await their gate walkthroughs and the `v0.1-phase0` / `v0.2-phase1` tags.
-**Current WP:** `WP-2.1 — Asset domain & lifecycle`
-**Branch:** `feat/wp-2.1-asset-domain`
-**Last completed:** `WP-1.10 — Helpdesk UI: detail & create` (2026-09-01)
+**Current WP:** `WP-1.12 — Queue search & counters`
+**Branch:** `feat/wp-1.12-queue-search-counters`
+**Last completed:** `WP-1.11 — Ticket queue visual rebuild` (2026-09-01)
 **Last updated:** 2026-09-01
+
+> **WP-1.11 and WP-1.12 are additions to Phase 1**, agreed after WP-1.10 against a mockup the human supplied. WP-1.11 rebuilt the queue's table treatment; WP-1.12 adds the two things that mockup needs and the API cannot yet answer — free-text queue search, and ticket counters with deltas for the KPI row and the view counts. **Phase 2 does not open until both are done and the Phase 1 gate is walked.**
 
 > **Do not open WP-2.1 before the Phase 1 gate.** Every package in Phase 1 is built and green, and the gate walkthrough — log in → create ticket → assign → resolve, in a browser — is now doable end to end for the first time. It is WP-1.10's manual checklist. The two Phase 0 items owed at its gate (the root README, and the seeder-in-production gap recorded against WP-6.6) are still owed.
 
@@ -18,7 +20,7 @@
 | Phase | Packages | Done | Tag |
 |---|---|---|---|
 | 0 — Foundation | 0.1 – 0.9 | 9 / 9 | *gate pending* |
-| 1 — Helpdesk | 1.1 – 1.10 | 10 / 10 | *gate pending* |
+| 1 — Helpdesk | 1.1 – 1.12 | 11 / 12 | *gate pending* |
 | 2 — Assets & directory | 2.1 – 2.7 | 0 / 7 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
@@ -285,14 +287,28 @@
 - **No end-to-end test, by decision.** `CONVENTIONS.md` reserves Playwright for a handful of critical paths and the Phase 1 gate walkthrough is the first real one — but this machine's headless Chromium still cannot start (`libnspr4.so` missing, and installing it needs sudo), so an E2E suite written here would be written and never run. The walkthrough is WP-1.10's numbered manual checklist instead. When a machine can run it, that checklist is the script.
 - **Every screen still has to be looked at in both colour schemes by a person.** `DESIGN.md` §5 makes a colour that only works in one mode a bug, and the detail and create screens introduce several new soft fills — the `violet` resolution block, the `warning` wash on an internal note and on the composer, and the dialog's `heading/25` backdrop. Vitest asserts none of it. It is on the manual checklist.
 
+### Noticed during WP-1.11
+
+- **The KPI row and the free-text search box are drawn in the mockup and are deliberately absent from the screen.** Both need endpoints that do not exist: counters with deltas (the mockup's 24 Open ↑12%, 6 Unassigned, 3 Overdue, 5 Due today, and the counts beside each view) and a search over ticket number, subject, and requester. `WP-1.12` owns both. Rendering either now would have been a dead control, which WP-0.8 settled is worse than an absent one. **`Due today` additionally has no filter behind it** — the queue can filter by SLA state and by a created-date range, but not by "resolution due inside today" — so WP-1.12 owns a server-side filter as well as a count, or that fourth tile changes to something the API can answer.
+- **`shadcn add popover` touched only the file it was asked for.** WP-1.10 recorded that the same command silently rewrote `button.tsx` back to the stock theme; running `git status src/components/ui/` immediately afterwards is now the habit and it caught nothing this time. Keep doing it.
+- **The queue is the third place the DESIGN.md §4-versus-§6 conflict has been resolved the same way.** The status pill (WP-1.9), the priority pill, and now the SLA meter's caption all carry the semantic hue in a fill or a glyph and set their text in `heading`, because `warning` as 11px text reaches about 1.8:1 and `danger` about 3.8:1. **§4 has been rewritten to say so**, with the reasoning inline, so a fourth component does not have to rediscover it. If the human would rather have coloured text, that is one edit in three files plus an exception written into §6.
+- **Column visibility and density are the first per-browser preference outside the colour scheme.** They live in `localStorage["itms.tickets.table"]`, deliberately not in the URL: CONVENTIONS.md wants the address to carry *which rows*, and hidden columns describe how one person reads. Every read and write is guarded, because a private window or a browser blocking site data throws on access rather than returning empty. **Any later list screen wanting the same affordance should read `ticket-columns.ts` rather than invent a second storage key**, and at that point the shape wants hoisting to `src/lib/`.
+- **The toolbar's sort select and the sortable column headers are two doors to one thing.** Both write `sort` and `direction` in the URL and neither holds state, so they cannot disagree — but the select can only *name* six orderings, and a header click can produce one it cannot (priority descending, say). The trigger then reads "Custom". That is honest and slightly unsatisfying; the alternative is either a longer list or taking sorting off the headers, and neither is obviously better.
+- **`Age` and `Updated` are both relative and both now in the table.** The mockup shows only `Updated`; `Age` is kept because `TicketSort.CreatedAt` is the API's default ordering and a column somebody can sort by should be a column they can see. Both are hideable. If the queue feels wide, `Age` is the one to turn off — the created caption under the ticket number already says it.
+- **The `Filters` badge counts only what the popover contains.** Category, department, SLA state, and the date range (which counts once, because naming a from and a to is one constraint). It deliberately does not count `requesterId`, which has no control anywhere — a saved view sets it — so the badge always describes something the reader can open and clear. Somebody with "My tickets" active as an end user therefore sees no badge for it, which is right, but it does mean the badge is not a complete census of what is filtering the queue. `hasActiveFilters` is the function that means that, and it is what shows `Clear all`.
+- **The queue is still unmeasured in a browser** and the rows are taller now. WP-1.9 recorded that `useNow` re-renders every row every 30 seconds and that at 100 rows of nine columns that is 900 cells; each row now also carries a progress bar and two avatars. Still not measured. If it stutters, the fix remains moving the countdown into its own memoised cell rather than dropping the clock.
+- **The ticket number is still a `<button>`, not a link** — WP-1.10 recorded it and this package did not fix it, because `TicketTable`'s `onOpen` callback is what the tests drive and changing it is a contained change of its own. Middle-click and copy-link still do nothing on the queue's identifier, which DESIGN.md §4 calls a `primary` link.
+- **The client is one 734 kB chunk**, up from 715 kB. Five packages have now recorded `React.lazy` per route as owed. Phase 1 is over. This wants claiming rather than carrying into Phase 2, where every screen makes it worse.
+- **Nothing here was seen in a browser.** The queue's new treatment is asserted by 39 Vitest cases and was not rendered once — Docker runs, but the headless Chromium on this machine still cannot start (`libnspr4.so`, needs sudo). The mockup comparison and both colour schemes are the manual checklist.
+
 ## Known issues
 
 - none
 
 ## Environment notes
 
-- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.10: **684 unit, 52 architecture, 415 integration** (unchanged — WP-1.10 touched no server code) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
-- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 214 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
+- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.11: **684 unit, 52 architecture, 415 integration** (unchanged since WP-1.9 — neither WP-1.10 nor WP-1.11 touched server code) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
+- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 246 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
 - **`aspire run` now also starts `web-client`.** It runs `npm install` first (an Aspire installer resource) and then `npm run dev`, waits for `web-host`, and is published on an external endpoint — the dashboard prints its URL. The Vite dev server proxies `/api` to the host, so the browser sees one origin.
 - **The colour scheme is remembered per browser** under `localStorage["itms.theme"]`, and follows the operating system until the viewer picks a mode. Clearing site data returns it to the system preference. There is no server-side or per-account theme setting, and none is planned.
 - **Node 24 LTS and npm 11 are what the client is built with.** `node -v` should report v24.x; the lockfile is committed and `npm ci` is the reproducible install.

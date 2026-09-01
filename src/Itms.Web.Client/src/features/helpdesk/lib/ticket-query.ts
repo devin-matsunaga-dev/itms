@@ -251,3 +251,24 @@ function positiveInteger(value: string | null): number | null {
   const parsed = Number(value)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
+
+/**
+ * How many of the filters behind the "Filters" popover are set.
+ *
+ * Counts only what that popover actually contains, so the badge always describes
+ * something the reader can see and clear from the panel it sits on. Status, priority, and
+ * assignee are inline and speak for themselves; `requesterId` has no control at all — a
+ * saved view sets it — and counting it would put a number on the badge with nothing
+ * behind it to open.
+ *
+ * The date range counts once. Somebody who has named a from and a to has applied one
+ * constraint, not two.
+ */
+export function advancedFilterCount(query: TicketQuery): number {
+  return (
+    (query.categoryId === null ? 0 : 1) +
+    (query.departmentId === null ? 0 : 1) +
+    (query.slaState === null ? 0 : 1) +
+    (query.createdFrom === null && query.createdTo === null ? 0 : 1)
+  )
+}

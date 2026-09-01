@@ -175,6 +175,7 @@ const address = () => screen.getByTestId('address').textContent ?? ''
 const path = () => screen.getByTestId('path').textContent ?? ''
 
 beforeEach(() => {
+  window.localStorage.clear()
   fetchTickets.mockReset()
   fetchCurrentUser.mockReset()
   fetchAssignableUsers.mockReset()
@@ -246,8 +247,9 @@ describe('TicketsPage — the queue', () => {
     renderQueue('/tickets?status=Closed&sort=Priority&direction=Ascending&pageSize=25')
 
     expect(await screen.findByText('No tickets match these filters')).toBeInTheDocument()
-    // The filter bar's control, and the empty state offering the same way out again.
-    expect(screen.getAllByRole('button', { name: /clear filters/i })).toHaveLength(2)
+    // The filter bar's control, and the empty state offering the same way out again —
+    // in the same words, because it is the same action.
+    expect(screen.getAllByRole('button', { name: /clear all/i })).toHaveLength(2)
   })
 
   it('opens the detail screen for the ticket whose number was clicked', async () => {
@@ -376,7 +378,7 @@ describe('TicketsPage — the URL is the state', () => {
     renderQueue('/tickets?status=New&page=3&sort=Priority&direction=Ascending&pageSize=25')
     await screen.findByText('TKT-0001')
 
-    await person.click(screen.getByRole('button', { name: /clear filters/i }))
+    await person.click(screen.getAllByRole('button', { name: /clear all/i })[0] as HTMLElement)
 
     await waitFor(() => {
       expect(address()).not.toContain('page=3')
@@ -481,5 +483,164 @@ describe('TicketsPage — what each role is offered', () => {
     await screen.findByText('TKT-0001')
     expect(screen.queryByLabelText('Assignee')).not.toBeInTheDocument()
     expect(fetchAssignableUsers).not.toHaveBeenCalled()
+  })
+})
+
+describe('TicketsPage — the table treatment', () => {
+  it('leads a row with the number over the subject and how long ago it was raised', async () => {
+    renderQueue()
+
+    const row = (await screen.findByText('TKT-0001')).closest('tr')
+    const cells = within(row as HTMLElement)
+
+    expect(cells.getByRole('button', { name: 'TKT-0001' })).toBeInTheDocument()
+    expect(cells.getByText('Laptop will not connect to Wi-Fi')).toBeInTheDocument()
+    expect(cells.getByText(/^Created /)).toBeInTheDocument()
+  })
+
+  it('states the priority in words as well as in a hue', async () => {
+    // DESIGN.md §6: a queue that says "critical" only in red says nothing to somebody
+    // who cannot see red. The arrow is aria-hidden; the name is the accessible content.
+    renderQueue()
+
+    const row = (await screen.findByText('TKT-0001')).closest('tr')
+    expect(within(row as HTMLElement).getByText('High')).toBeInTheDocument()
+  })
+
+  it('renders the SLA as a meter that reports where it stands', async () => {
+    renderQueue()
+
+    const meter = await screen.findByRole('progressbar', { name: /resolution sla/i })
+    expect(meter).toHaveAttribute('aria-valuenow')
+    expect(meter).toHaveAccessibleName(/on track/i)
+  })
+
+  it('says how many tickets the query matched', async () => {
+    fetchTickets.mockResolvedValue(page([ticket()], 32))
+    renderQueue()
+
+    expect(await screen.findByText('32 tickets')).toBeInTheDocument()
+  })
+
+  it('counts one ticket in the singular', async () => {
+    fetchTickets.mockResolvedValue(page([ticket()], 1))
+    renderQueue()
+
+    expect(await screen.findByText('1 ticket')).toBeInTheDocument()
+  })
+})
+
+describe('TicketsPage — the reader’s own layout', () => {
+  it('hides a column the reader turns off, and remembers it', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+
+    expect(await screen.findByRole('columnheader', { name: /department/i })).toBeInTheDocument()
+
+    await person.click(screen.getByRole('button', { name: /columns/i }))
+    await person.click(await screen.findByRole('checkbox', { name: 'Department' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('columnheader', { name: /department/i })).not.toBeInTheDocument()
+    })
+
+    // Column choices are a per-browser preference, not URL state — they describe how one
+    // person reads rather than which rows are shown, so they must not travel in a link.
+    expect(address()).not.toContain('department')
+    expect(window.localStorage.getItem('itms.tickets.table')).toContain('department')
+  })
+
+  it('starts from what the browser already remembers', async () => {
+    window.localStorage.setItem(
+      'itms.tickets.table',
+      JSON.stringify({ hidden: ['assignee'], density: 'comfortable' }),
+    )
+    renderQueue()
+
+    expect(await screen.findByRole('columnheader', { name: /requester/i })).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: /assignee/i })).not.toBeInTheDocument()
+  })
+
+  it('packs the rows down and drops the created caption when asked', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+
+    const density = await screen.findByRole('switch', { name: /compact rows/i })
+    expect(density).toHaveAttribute('aria-checked', 'false')
+
+    await person.click(density)
+
+    expect(density).toHaveAttribute('aria-checked', 'true')
+    await waitFor(() => {
+      expect(screen.queryByText(/^Created /)).not.toBeInTheDocument()
+    })
+  })
+})
+
+describe('TicketsPage — the toolbar’s ordering', () => {
+  it('reports the ordering the address is carrying', async () => {
+    renderQueue()
+
+    expect(await screen.findByLabelText('Sort')).toHaveTextContent('Priority')
+  })
+
+  it('writes both the column and the direction when an ordering is chosen', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+
+    await person.click(await screen.findByLabelText('Sort'))
+    await person.click(await screen.findByRole('option', { name: 'Due soonest' }))
+
+    await waitFor(() => {
+      expect(lastQuery().sort).toBe('DueAt')
+    })
+    expect(lastQuery().direction).toBe('Ascending')
+    expect(address()).toContain('sort=DueAt')
+  })
+
+  it('says the ordering is custom when a column header produced one it cannot name', async () => {
+    // Priority descending is reachable from the header and is not on the select's list.
+    renderQueue('/tickets?sort=Priority&direction=Descending&pageSize=25')
+
+    expect(await screen.findByLabelText('Sort')).toHaveTextContent('Custom')
+  })
+})
+
+describe('TicketsPage — the filter popover', () => {
+  it('keeps the three common filters on the bar', async () => {
+    renderQueue()
+
+    expect(await screen.findByLabelText('Status')).toBeInTheDocument()
+    expect(screen.getByLabelText('Priority')).toBeInTheDocument()
+    expect(await screen.findByLabelText('Assignee')).toBeInTheDocument()
+  })
+
+  it('counts the filters it is hiding, so nothing is out of sight and unaccounted for', async () => {
+    renderQueue(
+      '/tickets?categoryId=cat-network&departmentId=dep-it&slaState=Breached&sort=Priority&direction=Ascending&pageSize=25',
+    )
+
+    const filters = await screen.findByRole('button', { name: /filters/i })
+    expect(filters).toHaveTextContent('3')
+  })
+
+  it('carries no badge when only the inline filters are set', async () => {
+    renderQueue('/tickets?priorityId=pri-high&sort=Priority&direction=Ascending&pageSize=25')
+
+    const filters = await screen.findByRole('button', { name: /filters/i })
+    expect(filters).not.toHaveTextContent('1')
+  })
+
+  it('writes a filter chosen inside the popover straight to the URL', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+
+    await person.click(await screen.findByRole('button', { name: /filters/i }))
+    await person.click(await screen.findByLabelText('Category'))
+    await person.click(await screen.findByRole('option', { name: 'Network' }))
+
+    await waitFor(() => {
+      expect(address()).toContain('categoryId=cat-network')
+    })
   })
 })

@@ -1,7 +1,9 @@
-import { X } from 'lucide-react'
+import { SlidersHorizontal } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -12,6 +14,7 @@ import {
 import type { Department, TicketCategory, TicketPriority, UserSummary } from '@/lib/api/types'
 import { slaLabels, slaStateOrder, statusLabels, statusOrder } from '../lib/ticket-display'
 import {
+  advancedFilterCount,
   dayEnd,
   dayStart,
   hasActiveFilters,
@@ -38,12 +41,18 @@ interface TicketFiltersProps {
 }
 
 /**
- * The queue's filter bar.
+ * The queue's filter bar: the three a technician reaches for constantly, and the rest
+ * behind a popover.
  *
- * Every control writes straight through to the URL — there is no draft state and no
- * "apply" button, so what the address says and what the table shows cannot come apart.
- * The filters offered are exactly the ones WP-1.5 shipped on the endpoint; there is no
- * free-text search, deliberately, because the API has none (global search is WP-4.2).
+ * WP-1.9 laid all eight out inline and recorded that they wrap into two rows at the
+ * 1280px floor DESIGN.md §6 sets, and that a ninth would want a popover rather than a
+ * third row. This is that popover, pulled forward — the row is now three controls and a
+ * button whose badge says how many of the others are set, so nothing is hidden without
+ * being counted.
+ *
+ * Every control still writes straight through to the URL. There is no draft state and no
+ * "apply" button, inside the popover or outside it, so what the address says and what the
+ * table shows cannot come apart.
  */
 export function TicketFilters({
   query,
@@ -56,146 +65,156 @@ export function TicketFilters({
   onClear,
 }: TicketFiltersProps): React.JSX.Element {
   const assigneeValue = query.unassigned ? nobody : (query.assigneeId ?? any)
+  const advanced = advancedFilterCount(query)
 
   return (
-    <div className="flex flex-wrap items-end gap-4 rounded-card border border-border bg-surface p-5 shadow-card">
-      <Field label="Status" htmlFor="filter-status">
-        <Select
-          multiple
-          items={statusOrder.map((status) => ({ label: statusLabels[status], value: status }))}
-          value={[...query.status]}
-          onValueChange={(value: string[]) => {
-            onChange({ status: value.filter(isKnownStatus) })
-          }}
-        >
-          <SelectTrigger id="filter-status" size="default" className="w-44">
-            <SelectValue>
-              {(value: string[]) =>
-                value.length === 0
-                  ? 'Any status'
-                  : value.length === 1
-                    ? statusLabels[value[0] as keyof typeof statusLabels]
-                    : `${String(value.length)} statuses`
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {statusOrder.map((status) => (
-              <SelectItem key={status} value={status}>
-                {statusLabels[status]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
+    <div className="flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface p-4 shadow-card">
+      <Select
+        multiple
+        items={statusOrder.map((status) => ({ label: statusLabels[status], value: status }))}
+        value={[...query.status]}
+        onValueChange={(value: string[]) => {
+          onChange({ status: value.filter(isKnownStatus) })
+        }}
+      >
+        <SelectTrigger id="filter-status" size="default" className="w-40" aria-label="Status">
+          <SelectValue>
+            {(value: string[]) =>
+              value.length === 0
+                ? 'Status'
+                : value.length === 1
+                  ? statusLabels[value[0] as keyof typeof statusLabels]
+                  : `${String(value.length)} statuses`
+            }
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {statusOrder.map((status) => (
+            <SelectItem key={status} value={status}>
+              {statusLabels[status]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-      <Field label="Priority" htmlFor="filter-priority">
-        <SingleSelect
-          id="filter-priority"
-          placeholder="Any priority"
-          value={query.priorityId ?? any}
-          onValueChange={(value) => {
-            onChange({ priorityId: value === any ? null : value })
-          }}
-          options={priorities.map((priority) => ({ value: priority.id, label: priority.name }))}
-          anyLabel="Any priority"
-        />
-      </Field>
-
-      <Field label="Category" htmlFor="filter-category">
-        <SingleSelect
-          id="filter-category"
-          placeholder="Any category"
-          value={query.categoryId ?? any}
-          onValueChange={(value) => {
-            onChange({ categoryId: value === any ? null : value })
-          }}
-          options={categories.map((category) => ({ value: category.id, label: category.name }))}
-          anyLabel="Any category"
-        />
-      </Field>
+      <InlineSelect
+        id="filter-priority"
+        label="Priority"
+        value={query.priorityId ?? any}
+        onValueChange={(value) => {
+          onChange({ priorityId: value === any ? null : value })
+        }}
+        options={priorities.map((priority) => ({ value: priority.id, label: priority.name }))}
+      />
 
       {showAssignee ? (
-        <Field label="Assignee" htmlFor="filter-assignee">
-          <SingleSelect
-            id="filter-assignee"
-            placeholder="Anyone"
-            value={assigneeValue}
-            onValueChange={(value) => {
-              // "No filter on the assignee" and "only the ones nobody holds" are
-              // different questions, and one null cannot mean both (WP-1.5).
-              if (value === nobody) {
-                onChange({ assigneeId: null, unassigned: true })
-                return
-              }
-              onChange({ assigneeId: value === any ? null : value, unassigned: false })
-            }}
-            options={[
-              { value: nobody, label: 'Unassigned' },
-              ...assignees.map((user) => ({ value: user.id, label: user.displayName })),
-            ]}
-            anyLabel="Anyone"
-          />
-        </Field>
+        <InlineSelect
+          id="filter-assignee"
+          label="Assignee"
+          value={assigneeValue}
+          onValueChange={(value) => {
+            // "No filter on the assignee" and "only the ones nobody holds" are different
+            // questions, and one null cannot mean both (WP-1.5).
+            if (value === nobody) {
+              onChange({ assigneeId: null, unassigned: true })
+              return
+            }
+            onChange({ assigneeId: value === any ? null : value, unassigned: false })
+          }}
+          options={[
+            { value: nobody, label: 'Unassigned' },
+            ...assignees.map((user) => ({ value: user.id, label: user.displayName })),
+          ]}
+        />
       ) : null}
 
-      <Field label="Department" htmlFor="filter-department">
-        <SingleSelect
-          id="filter-department"
-          placeholder="Any department"
-          value={query.departmentId ?? any}
-          onValueChange={(value) => {
-            onChange({ departmentId: value === any ? null : value })
-          }}
-          options={departments.map((department) => ({
-            value: department.id,
-            label: department.name,
-          }))}
-          anyLabel="Any department"
-        />
-      </Field>
+      <Popover>
+        <PopoverTrigger
+          render={<Button variant="outline" className={cn(advanced > 0 && 'border-primary')} />}
+        >
+          <SlidersHorizontal className="size-4" aria-hidden="true" />
+          Filters
+          {advanced > 0 ? (
+            <span className="ml-1 inline-flex size-5 items-center justify-center rounded-full bg-primary text-label font-semibold text-white tabular">
+              {advanced}
+            </span>
+          ) : null}
+        </PopoverTrigger>
 
-      <Field label="Resolution SLA" htmlFor="filter-sla">
-        <SingleSelect
-          id="filter-sla"
-          placeholder="Any state"
-          value={query.slaState ?? any}
-          onValueChange={(value) => {
-            onChange({ slaState: value === any ? null : (value as TicketQuery['slaState']) })
-          }}
-          options={slaStateOrder.map((state) => ({ value: state, label: slaLabels[state] }))}
-          anyLabel="Any state"
-        />
-      </Field>
+        <PopoverContent align="start" className="w-80">
+          <PopoverTitle>More filters</PopoverTitle>
 
-      <Field label="Raised from" htmlFor="filter-created-from">
-        <Input
-          id="filter-created-from"
-          type="date"
-          className="w-40"
-          value={toDateInput(query.createdFrom)}
-          onChange={(event) => {
-            onChange({ createdFrom: dayStart(event.target.value) })
-          }}
-        />
-      </Field>
+          <Field label="Category" htmlFor="filter-category">
+            <PanelSelect
+              id="filter-category"
+              placeholder="Any category"
+              value={query.categoryId ?? any}
+              onValueChange={(value) => {
+                onChange({ categoryId: value === any ? null : value })
+              }}
+              options={categories.map((category) => ({ value: category.id, label: category.name }))}
+              anyLabel="Any category"
+            />
+          </Field>
 
-      <Field label="Raised to" htmlFor="filter-created-to">
-        <Input
-          id="filter-created-to"
-          type="date"
-          className="w-40"
-          value={toDateInput(query.createdTo)}
-          onChange={(event) => {
-            onChange({ createdTo: dayEnd(event.target.value) })
-          }}
-        />
-      </Field>
+          <Field label="Department" htmlFor="filter-department">
+            <PanelSelect
+              id="filter-department"
+              placeholder="Any department"
+              value={query.departmentId ?? any}
+              onValueChange={(value) => {
+                onChange({ departmentId: value === any ? null : value })
+              }}
+              options={departments.map((department) => ({
+                value: department.id,
+                label: department.name,
+              }))}
+              anyLabel="Any department"
+            />
+          </Field>
+
+          <Field label="Resolution SLA" htmlFor="filter-sla">
+            <PanelSelect
+              id="filter-sla"
+              placeholder="Any state"
+              value={query.slaState ?? any}
+              onValueChange={(value) => {
+                onChange({ slaState: value === any ? null : (value as TicketQuery['slaState']) })
+              }}
+              options={slaStateOrder.map((state) => ({ value: state, label: slaLabels[state] }))}
+              anyLabel="Any state"
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Raised from" htmlFor="filter-created-from">
+              <Input
+                id="filter-created-from"
+                type="date"
+                value={toDateInput(query.createdFrom)}
+                onChange={(event) => {
+                  onChange({ createdFrom: dayStart(event.target.value) })
+                }}
+              />
+            </Field>
+
+            <Field label="Raised to" htmlFor="filter-created-to">
+              <Input
+                id="filter-created-to"
+                type="date"
+                value={toDateInput(query.createdTo)}
+                onChange={(event) => {
+                  onChange({ createdTo: dayEnd(event.target.value) })
+                }}
+              />
+            </Field>
+          </div>
+        </PopoverContent>
+      </Popover>
 
       {hasActiveFilters(query) ? (
-        <Button variant="ghost" onClick={onClear} className="text-body">
-          <X className="size-4" aria-hidden="true" />
-          Clear filters
+        <Button variant="link" className="ml-auto px-0" onClick={onClear}>
+          Clear all
         </Button>
       ) : null}
     </div>
@@ -221,25 +240,63 @@ function Field({
   )
 }
 
-interface SingleSelectProps {
+interface SelectProps {
   id: string
-  placeholder: string
   value: string
   onValueChange: (value: string) => void
   options: readonly { value: string; label: string }[]
-  /** The wording of the "no filter" option, which is always first. */
-  anyLabel: string
 }
 
-/** One filter select, with an explicit "no filter" option rather than a clearable empty. */
-function SingleSelect({
+/**
+ * One of the three filters that stay on the bar.
+ *
+ * The trigger reads as the filter's own name until something is chosen, so an untouched
+ * bar says "Status · Priority · Assignee" rather than three variations on "Any".
+ */
+function InlineSelect({
+  id,
+  label,
+  value,
+  onValueChange,
+  options,
+}: SelectProps & { label: string }): React.JSX.Element {
+  const all = [{ value: any, label: `Any ${label.toLowerCase()}` }, ...options]
+
+  return (
+    <Select
+      items={all}
+      value={value}
+      onValueChange={(next: string | null) => {
+        onValueChange(next ?? any)
+      }}
+    >
+      <SelectTrigger id={id} size="default" className="w-40" aria-label={label}>
+        <SelectValue>
+          {(current: string) =>
+            current === any ? label : (all.find((option) => option.value === current)?.label ?? label)
+          }
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {all.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+/** One filter inside the popover, where a label sits above it and the width is fixed. */
+function PanelSelect({
   id,
   placeholder,
   value,
   onValueChange,
   options,
   anyLabel,
-}: SingleSelectProps): React.JSX.Element {
+}: SelectProps & { placeholder: string; anyLabel: string }): React.JSX.Element {
   const all = [{ value: any, label: anyLabel }, ...options]
 
   return (
@@ -250,7 +307,7 @@ function SingleSelect({
         onValueChange(next ?? any)
       }}
     >
-      <SelectTrigger id={id} size="default" className="w-44">
+      <SelectTrigger id={id} size="default" className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 import type { TicketDetail } from '@/lib/api/types'
 import { formatDateTime, formatDuration, parseTimestamp } from '@/lib/datetime'
 import { slaLabels, slaTones } from '../lib/ticket-display'
-import { PriorityLabel } from './priority-dot'
+import { PriorityLabel } from './priority-pill'
 import { StatusPill } from './status-pill'
 
 interface TicketDetailHeaderProps {

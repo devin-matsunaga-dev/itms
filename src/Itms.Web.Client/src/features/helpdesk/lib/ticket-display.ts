@@ -91,6 +91,69 @@ export function priorityDot(code: string): string {
   return priorityDots[code.toLowerCase()] ?? 'bg-muted-foreground'
 }
 
+/**
+ * The pill treatment for a priority: a soft fill and an arrow in the full hue.
+ *
+ * The arrow is a second encoding of the same fact, which DESIGN.md §6 wants — a queue
+ * that says "critical" only in red says nothing to somebody who cannot see red, and the
+ * label alone cannot carry the hue at AA (the reasoning at the top of this file). The
+ * direction reads as severity: two chevrons up for Critical, one for High, a dash for
+ * Medium, one down for Low.
+ */
+export type PriorityArrow = 'up-double' | 'up' | 'flat' | 'down'
+
+export interface PriorityTone extends Tone {
+  readonly arrow: PriorityArrow
+  /** The arrow's colour — the full hue, which only a 14px glyph has to carry. */
+  readonly icon: string
+}
+
+const priorityTones: Record<string, PriorityTone> = {
+  critical: {
+    fill: 'bg-critical/12 dark:bg-critical/15',
+    dot: 'bg-critical',
+    icon: 'text-critical',
+    arrow: 'up-double',
+  },
+  high: {
+    fill: 'bg-danger/12 dark:bg-danger/15',
+    dot: 'bg-danger',
+    icon: 'text-danger',
+    arrow: 'up',
+  },
+  medium: {
+    fill: 'bg-warning/12 dark:bg-warning/15',
+    dot: 'bg-warning',
+    icon: 'text-warning',
+    arrow: 'flat',
+  },
+  low: {
+    fill: 'bg-success/12 dark:bg-success/15',
+    dot: 'bg-success',
+    icon: 'text-success',
+    arrow: 'down',
+  },
+}
+
+/**
+ * The pill treatment for a priority code.
+ *
+ * Keyed on the immutable `code` (WP-1.1) rather than the name, so renaming "High" moves
+ * the word and not the hue. A priority an administrator adds beyond the seeded four has
+ * no colour in the design system and takes `muted` with a flat arrow — it reads as
+ * unmapped rather than as somebody else's severity.
+ */
+export function priorityTone(code: string): PriorityTone {
+  return (
+    priorityTones[code.toLowerCase()] ?? {
+      fill: 'bg-muted-foreground/12 dark:bg-muted-foreground/15',
+      dot: 'bg-muted-foreground',
+      icon: 'text-muted-foreground',
+      arrow: 'flat',
+    }
+  )
+}
+
 /** What each SLA state is called on screen. */
 export const slaLabels: Record<SlaState, string> = {
   Pending: 'On track',

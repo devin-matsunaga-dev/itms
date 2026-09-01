@@ -99,9 +99,23 @@ The **date block** is deliberately quiet: two right-aligned caption lines — da
 
 **Donut.** Thick ring (~26px stroke), center holds the total 26/700 `heading` with a 12/400 `muted` word under it. Legend sits to the right as a three-column grid: colored 8px dot + label (left), count (right-aligned), percent (right-aligned `muted`). Never render percentages inside the ring. Segment colors come from the semantic map.
 
-**Data table.** Header 11/600 uppercase tracked `muted`, single `border` rule beneath. Rows 44px, no zebra striping, `canvas` tint on hover, 1px `border` between rows. First column is the identifier (ticket number, asset tag) rendered as a `primary` link. Priority and status render as dot+label or pill, never as bare text. Numeric and age columns right-aligned and muted. Row click opens the detail page; row actions live in a trailing kebab.
+**Data table.** Header 11/600 uppercase tracked `muted`, single `border` rule beneath. No zebra striping, `canvas` tint on hover, 1px `border` between rows. Numeric and age columns right-aligned and muted. Row click opens the detail page.
 
-**Status pill.** Soft background at ~12% of the semantic hue, text at full hue, 6px radius, 11/600, no border. Use pills in detail headers and dense list cells; use dot+label in legends and priority columns.
+The **identifying column is two lines**: the identifier (ticket number, asset tag) as a `primary` link, the title beneath it in `heading`, and a 12/400 `muted` caption under that saying how long ago the record was raised. That is what buys the row its width — the title stops competing with eight other columns, and age stops needing a column at the far end where nobody reads it. A row is 44px when the caption is suppressed and grows to fit when it is not.
+
+**Row density and column choice belong to the reader**, not to the URL. Filters, sorting, and paging are linkable state (§6) because they describe *which rows*; which columns are drawn and how tightly they pack describe how one person reads, and are remembered per browser. A "Columns" popover lists every optional column; the identifying column is never optional.
+
+**Status pill.** Soft background at ~12% of the semantic hue, a 6px dot in the full hue, and the label in `heading`. 6px radius, 11/600, no border.
+
+> This is a deliberate departure from an earlier reading of this section, decided at WP-1.9 and not to be "corrected" back. §6 makes AA contrast on status pills non-negotiable in **both** colour schemes, and the label cannot carry the semantic hue and clear it: `warning` (#F5B22D) reaches about 1.8:1 against a 12% wash of itself, `neutral-chart` is worse, and `danger` as text reaches about 3.8:1. The hue still identifies the status — it is carried by the fill and the dot rather than by the letterforms. The same rule governs the priority pill and the SLA meter's caption.
+
+**Priority pill.** The same soft fill, with a **direction arrow** in the full hue and the name in `heading`: two chevrons up for Critical, one arrow up for High, a dash for Medium, one arrow down for Low. Three encodings of one fact — fill, hue, and direction — because §6 forbids relying on colour alone and the arrow is what survives greyscale and a red-green deficiency both. Keyed on the priority's immutable code, so a rename moves the word and not the hue; an unmapped code takes `muted` and a flat arrow.
+
+**SLA meter.** A 6px full-round track in `border` with a fill at the state's hue, over a 12/400 caption reading `42m left` or `Overdue 1h`. The caption sets in `heading`, never in the hue, for the contrast reason above. A parked clock is measured at the instant it was parked and says `· paused`; a finished clock shows a full bar and the state's word instead of a countdown.
+
+**Person cell.** A 24px round tile of initials in `primary-soft` over `primary`, then the name in `body`. The tile is decorative and hidden from assistive technology — the name is always beside it and is never abbreviated. There are no uploaded avatars in this system.
+
+**Filter bar.** The three filters a person reaches for constantly stay inline; the rest sit behind a `Filters` button whose badge counts how many of them are set, so nothing is hidden without being counted. Every control writes straight through to the URL — no draft state, no "apply" button, inside the popover or outside it. `Clear all` sits at the end of the bar and is the same words the empty state uses.
 
 **Alert / activity list row.** 36px circular soft-tinted icon (down-arrow `danger`, triangle `warning`, up-arrow `success`, info `info`) + title 14/500 `heading` + subtext 12/400 `muted` (device location or hostname), right column with absolute time 12/400 `muted` above relative time 12/500 in the severity hue. Rows separated by `border`, no card-in-card.
 
