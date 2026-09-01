@@ -53,26 +53,42 @@ internal sealed class UserLookupService(ItmsIdentityDbContext database) : IUserL
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// <para>
+    /// <b>A blank term lists rather than refuses.</b> It used to return nothing, which made
+    /// every picker in the product permanently empty: the client opens one by asking for
+    /// <c>?limit=200</c> with no term at all, so an assignee could never be chosen, a
+    /// ticket could never leave <c>New</c>, and an administrator could not file on somebody
+    /// else's behalf. Nothing caught it because every integration test assigned through the
+    /// API with an id it already had, and every component test mocked the fetch — no test
+    /// asked this endpoint the question the client actually asks it.
+    /// </para>
+    /// <para>
+    /// Listing is also what the contract says: <c>IUserLookup.SearchAsync</c> is documented
+    /// "for requester and assignee pickers", and a picker's first state is the list, not an
+    /// empty box waiting to be typed into.
+    /// </para>
+    /// </remarks>
     public async Task<IReadOnlyList<UserSummary>> SearchAsync(
         string term,
         int limit,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(term))
+        var query = database.Users.AsNoTracking().Where(user => user.IsActive);
+
+        if (!string.IsNullOrWhiteSpace(term))
         {
-            return [];
+            // Escaped, because an unescaped % or _ in a picker's search box would otherwise
+            // quietly turn into a wildcard scan of the whole table. The escaping lives in
+            // the shared kernel (WP-1.12); this was one of the two copies that put it there.
+            var pattern = SearchPattern.Containing(term);
+
+            query = query.Where(user =>
+                EF.Functions.ILike(user.DisplayName, pattern, SearchPattern.Escape) ||
+                EF.Functions.ILike(user.Email!, pattern, SearchPattern.Escape));
         }
 
-        // Escaped, because an unescaped % or _ in a picker's search box would otherwise
-        // quietly turn into a wildcard scan of the whole table. The escaping lives in the
-        // shared kernel (WP-1.12); this was one of the two copies that put it there.
-        var pattern = SearchPattern.Containing(term);
-
-        return await database.Users
-            .AsNoTracking()
-            .Where(user => user.IsActive &&
-                (EF.Functions.ILike(user.DisplayName, pattern, SearchPattern.Escape) ||
-                 EF.Functions.ILike(user.Email!, pattern, SearchPattern.Escape)))
+        return await query
             .OrderBy(user => user.DisplayName)
             .Take(Math.Clamp(limit, 1, MaxSearchResults))
             .Select(Projection())

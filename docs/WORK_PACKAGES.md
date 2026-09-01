@@ -121,6 +121,10 @@ Ticket detail with header pills, properties panel, comment/note composer with a 
 *Added after WP-1.12, against a second mockup.* Bring the create form to the supplied design: a back link above the title, labelled section cards, the requester shown read-only to an end user with the reason in a tooltip, a searchable department picker, and an attachment hint rather than a control the API cannot support.
 **Done when:** the form matches the mockup, and every field a role cannot change is shown with its reason rather than hidden.
 
+### WP-1.14 — Picker defects
+*Added after WP-1.13, from a defect found by hand: no ticket could change status.* A blank search term on `GET /api/v1/users` returned nothing, so every requester and assignee picker was empty. Fixes the lookup, documents the contract, filters the assignee pickers to people who can hold a ticket, and pins the client's own query string in an integration test.
+**Done when:** a ticket can be assigned and moved through its whole workflow in the browser, and a test fails if the picker query ever returns nothing again.
+
 🏁 **Phase 1 gate.** Tag `v0.2-phase1`.
 
 ---

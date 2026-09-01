@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { Department, TicketCategory, TicketPriority, UserSummary } from '@/lib/api/types'
+import { canHoldTickets } from '../lib/ticket-assignment'
 import { slaLabels, slaStateOrder, statusLabels, statusOrder } from '../lib/ticket-display'
 import {
   advancedFilterCount,
@@ -123,7 +124,12 @@ export function TicketFilters({
           }}
           options={[
             { value: nobody, label: 'Unassigned' },
-            ...assignees.map((user) => ({ value: user.id, label: user.displayName })),
+            // Only people who can hold a ticket, for the same reason the detail screen's
+            // picker filters: filtering the queue by somebody who can never be an assignee
+            // returns nothing, every time.
+            ...assignees
+              .filter(canHoldTickets)
+              .map((user) => ({ value: user.id, label: user.displayName })),
           ]}
         />
       ) : null}

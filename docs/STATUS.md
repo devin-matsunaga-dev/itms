@@ -6,7 +6,7 @@
 **Phase:** 1 — Helpdesk **complete**. Phase 0 and Phase 1 both await their gate walkthroughs and the `v0.1-phase0` / `v0.2-phase1` tags.
 **Current WP:** `WP-2.1 — Asset domain & lifecycle` — **not before the Phase 1 gate**
 **Branch:** `feat/wp-2.1-asset-domain`
-**Last completed:** `WP-1.13 — New ticket form: mockup pass` (2026-09-01)
+**Last completed:** `WP-1.14 — Picker defects` (2026-09-01)
 **Last updated:** 2026-09-01
 
 > **Phase 1 is complete, including the two packages added against the human's mockup** (WP-1.11's table rebuild and WP-1.12's search and counters). Both are in `WORK_PACKAGES.md` now. What remains before Phase 2 is the gate itself: the walkthrough, the root README, and the tag.
@@ -20,7 +20,7 @@
 | Phase | Packages | Done | Tag |
 |---|---|---|---|
 | 0 — Foundation | 0.1 – 0.9 | 9 / 9 | *gate pending* |
-| 1 — Helpdesk | 1.1 – 1.13 | 13 / 13 | *gate pending* |
+| 1 — Helpdesk | 1.1 – 1.14 | 14 / 14 | *gate pending* |
 | 2 — Assets & directory | 2.1 – 2.7 | 0 / 7 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
@@ -325,14 +325,22 @@
 - **The client is one 781 kB chunk**, up from 738 kB. Six packages have now recorded `React.lazy` per route as owed. Phase 1 is over and every package still adds to a bundle nobody is splitting. **This should be claimed at the Phase 1 gate.**
 - **Nothing here was seen in a browser.** The headless Chromium still cannot start (`libnspr4.so`, needs sudo). The mockup comparison, the tooltip, the combobox's keyboard behaviour, and both colour schemes are the manual checklist.
 
+### Noticed during WP-1.14
+
+- **Every picker in the product was empty from WP-0.5 to WP-1.14, and the product was unusable because of it.** `IUserLookup.SearchAsync` returned an empty list for a blank term; the client opens a picker by asking `GET /api/v1/users?limit=200` with no term. So the ticket assignee could never be chosen — and since `New` can only move to `Assigned` and a ticket is assigned by *assigning* it, **no ticket could ever change status through the interface.** The queue's assignee filter and the create form's requester picker were empty for the same reason. Fixed: a blank term now lists.
+- **The reason nothing caught it is the more important finding.** `RoleAuthorizationTests` has covered `GET /api/v1/users` since WP-0.5 — with `?search=a` on every single call. The client sends no term. **The suite asked a question the client never asks, and never asked the one it does.** Every component test compounded it by mocking `fetchAssignableUsers` outright. `UserDirectoryTests` now pins the exact query string the client sends, in a named constant, with a comment saying not to tidy it. **The general lesson for later packages: a mocked client call and a differently-shaped server test can both be green while the two never meet.** The seam is worth one integration test per picker-shaped endpoint.
+- **`MaxSearchResults` silently clamps the picker at 50.** The client asks for 200 and `UserLookupService` caps at 50, with no signal that the list is truncated. Harmless with three seeded accounts and wrong the day a deployment has sixty staff: a technician simply would not appear, with nothing to indicate why. The honest fixes are paging the picker or having the combobox search server-side as you type — the combobox WP-1.13 added for departments is the pattern. **`WP-5.8 — Administration` is the natural owner**, since it is where user management lands.
+- **The assignee picker and the queue's assignee filter now show only Technicians and Admins**, via `canHoldTickets`. The requester picker on the create form deliberately still lists everybody — anyone can have a ticket raised for them. That is the third caller of the "is this person staff" test WP-1.6 predicted; it is one exported function reusing `hasAnyRole`, not a third copy of the role check.
+- **A person who currently holds a ticket is kept in the picker even if they no longer pass the filter** — deactivated, or their staff role removed — because a select whose value names no item renders blank and the ticket would appear unassigned.
+
 ## Known issues
 
 - none
 
 ## Environment notes
 
-- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.13: **695 unit, 52 architecture, 439 integration** (unchanged — WP-1.13 touched no server code) (the integration run is about 109 s, of which the 50,000-ticket volume test is roughly half) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
-- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 265 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
+- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.14: **695 unit, 52 architecture, 446 integration** (the integration run is about 109 s, of which the 50,000-ticket volume test is roughly half) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
+- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 270 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
 - **`aspire run` now also starts `web-client`.** It runs `npm install` first (an Aspire installer resource) and then `npm run dev`, waits for `web-host`, and is published on an external endpoint — the dashboard prints its URL. The Vite dev server proxies `/api` to the host, so the browser sees one origin.
 - **The colour scheme is remembered per browser** under `localStorage["itms.theme"]`, and follows the operating system until the viewer picks a mode. Clearing site data returns it to the system preference. There is no server-side or per-account theme setting, and none is planned.
 - **Node 24 LTS and npm 11 are what the client is built with.** `node -v` should report v24.x; the lockfile is committed and `npm ci` is the reproducible install.

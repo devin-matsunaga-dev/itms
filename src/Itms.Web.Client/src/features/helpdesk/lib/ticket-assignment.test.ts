@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { UserSummary } from '@/lib/api/types'
-import { assigneeOptions, canChangeAssignee, canUnassign, unassignedValue } from './ticket-assignment'
+import {
+  assigneeOptions,
+  canChangeAssignee,
+  canHoldTickets,
+  canUnassign,
+  unassignedValue,
+} from './ticket-assignment'
 import { ticketDetail, technicianId } from '../test/ticket-fixtures'
 
 const mark: UserSummary = {
@@ -12,6 +18,36 @@ const mark: UserSummary = {
   isActive: true,
   roles: ['Technician'],
 }
+
+const uma: UserSummary = {
+  id: 'end-user',
+  displayName: 'Uma User',
+  email: 'user@itms.local',
+  departmentId: null,
+  locationId: null,
+  isActive: true,
+  roles: ['User'],
+}
+
+const avery: UserSummary = { ...mark, id: 'admin-1', displayName: 'Avery Admin', roles: ['Admin'] }
+
+describe('canHoldTickets', () => {
+  it('accepts a technician and an administrator', () => {
+    // Admin counts too, matching TicketScope.SeesEveryTicket — somebody working the queue
+    // is somebody the queue can be given to.
+    expect(canHoldTickets(mark)).toBe(true)
+    expect(canHoldTickets(avery)).toBe(true)
+  })
+
+  it('refuses an end user, whom the server refuses too', () => {
+    // AssignTicketHandler answers 400 helpdesk.assignee_not_technician for exactly this.
+    expect(canHoldTickets(uma)).toBe(false)
+  })
+
+  it('refuses somebody holding no role at all', () => {
+    expect(canHoldTickets({ ...uma, roles: [] })).toBe(false)
+  })
+})
 
 describe('canChangeAssignee', () => {
   it('is false for an end user, who follows their own ticket and hands it to nobody', () => {
@@ -45,6 +81,15 @@ describe('canUnassign', () => {
 })
 
 describe('assigneeOptions', () => {
+  it('does not offer somebody the server would refuse to assign', () => {
+    // The picker used to list every active account, so choosing an end user produced a
+    // 400 for a choice the interface had offered.
+    const options = assigneeOptions(ticketDetail(), [mark, uma])
+
+    expect(options.map((option) => option.label)).not.toContain('Uma User')
+    expect(options.map((option) => option.label)).toContain('Mark Reyes')
+  })
+
   it('offers Unassigned first when the ticket may be handed back', () => {
     const options = assigneeOptions(
       ticketDetail({ status: 'Assigned', assigneeId: technicianId, assigneeName: 'Mark Reyes' }),
@@ -74,5 +119,15 @@ describe('assigneeOptions', () => {
     )
 
     expect(options[0]).toEqual({ value: 'departed-technician', label: 'Ana Cruz' })
+  })
+
+  it('keeps a holder whose staff role was taken away, for the same reason', () => {
+    // Filtering the list must not erase the person currently on the ticket.
+    const options = assigneeOptions(
+      ticketDetail({ status: 'InProgress', assigneeId: uma.id, assigneeName: 'Uma User' }),
+      [mark, uma],
+    )
+
+    expect(options[0]).toEqual({ value: uma.id, label: 'Uma User' })
   })
 })

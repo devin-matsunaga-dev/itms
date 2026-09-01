@@ -12,6 +12,24 @@
  */
 
 import type { TicketDetail, UserSummary } from '@/lib/api/types'
+import { hasAnyRole, Roles } from '@/lib/roles'
+
+/**
+ * Whether a person can be given a ticket.
+ *
+ * `AssignTicketHandler` refuses anybody else with 400 `helpdesk.assignee_not_technician`
+ * (WP-1.6), reading the same role list off `UserSummary`. Offering an end user in the
+ * picker meant handing somebody a choice the server was always going to reject — the
+ * picker and the rule now read the same field.
+ *
+ * Admin counts as well as Technician, matching `TicketScope.SeesEveryTicket`: an
+ * administrator working the queue is somebody the queue can be given to.
+ *
+ * This is not the enforcement. The server refuses a hand-crafted request either way.
+ */
+export function canHoldTickets(user: UserSummary): boolean {
+  return hasAnyRole(user.roles, [Roles.admin, Roles.technician])
+}
 
 /** The "nobody holds it" option. An empty string is a legitimate id, so it is a sentinel. */
 export const unassignedValue = '__unassigned__'
@@ -46,9 +64,11 @@ export function canUnassign(ticket: TicketDetail): boolean {
 /**
  * The picker's options, in the order it offers them.
  *
+ * Only people who can actually hold a ticket are listed — see {@link canHoldTickets}.
+ *
  * The current holder is prepended when the directory no longer lists them — a technician
- * who has since been deactivated is out of the picker and still holding the ticket, and a
- * select whose value names no item renders blank.
+ * who has since been deactivated, or whose role was removed, is out of the picker and
+ * still holding the ticket, and a select whose value names no item renders blank.
  */
 export function assigneeOptions(
   ticket: TicketDetail,
@@ -56,7 +76,9 @@ export function assigneeOptions(
 ): AssigneeOption[] {
   const options: AssigneeOption[] = [
     ...(canUnassign(ticket) ? [{ value: unassignedValue, label: 'Unassigned' }] : []),
-    ...assignees.map((user) => ({ value: user.id, label: user.displayName })),
+    ...assignees
+      .filter(canHoldTickets)
+      .map((user) => ({ value: user.id, label: user.displayName })),
   ]
 
   if (
