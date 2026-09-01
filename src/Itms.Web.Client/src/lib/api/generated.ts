@@ -716,6 +716,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reads the asset list, filtered, sorted, and paged.
+         * @description Defaults to every asset by tag, ascending. Repeat assetStatusId or statusCode to ask for several statuses at once. warrantyExpiringInDays=N selects the warranties running out between today and N days from now, inclusive; adding warrantyExpired=true widens that to the union rather than narrowing it, which is the 'needs attention' list. Soft-deleted assets are never returned.
+         */
+        get: operations["ListAssets"];
+        put?: never;
+        /** Records a new asset. The tag is unique and cannot be changed afterwards. */
+        post: operations["CreateAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/{id}": {
         parameters: {
             query?: never;
@@ -750,23 +771,6 @@ export interface paths {
         get: operations["ListAssetHistory"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Records a new asset. The tag is unique and cannot be changed afterwards. */
-        post: operations["CreateAsset"];
         delete?: never;
         options?: never;
         head?: never;
@@ -915,6 +919,77 @@ export interface components {
             /** @description What the operator wants recorded against this move, or `null`. */
             note: null | string;
         };
+        /** @description One row of the asset list, as the API renders it. */
+        AssetListItemResponse: {
+            /**
+             * Format: uuid
+             * @description The asset's id.
+             */
+            id: string;
+            /** @description The identifier on the physical label. Unique and immutable. */
+            assetTag: string;
+            /** @description A human label, or `null` to fall back to make and model. */
+            name: null | string;
+            /** @description The manufacturer's serial, where it has one. */
+            serialNumber: null | string;
+            /** @description Who made it. */
+            manufacturer: null | string;
+            /** @description What they call it. */
+            model: null | string;
+            /**
+             * Format: uuid
+             * @description What kind of thing it is.
+             */
+            assetTypeId: string;
+            /** @description That type's name, as it reads now. */
+            assetTypeName: string;
+            /**
+             * Format: uuid
+             * @description Where it is in its life.
+             */
+            assetStatusId: string;
+            /** @description That status's stable key, for colour and for rules. */
+            assetStatusCode: string;
+            /** @description That status's name, as it reads now. */
+            assetStatusName: string;
+            /**
+             * Format: uuid
+             * @description Who currently holds it, or `null`.
+             */
+            assignedToUserId: null | string;
+            /** @description Their display name, cached at assignment. */
+            assignedToUserName: null | string;
+            /**
+             * Format: uuid
+             * @description The department that owns it, or `null`.
+             */
+            departmentId: null | string;
+            /** @description That department's cached name. */
+            departmentName: null | string;
+            /**
+             * Format: uuid
+             * @description Where it is, or `null`.
+             */
+            locationId: null | string;
+            /** @description That location's cached full path. */
+            locationPath: null | string;
+            /**
+             * Format: date
+             * @description When the warranty runs out, or `null` when none was recorded. The list
+             *     sorts and filters on this, so a row can render its own expiry state without a second call.
+             */
+            warrantyExpiresAt: null | string;
+            /**
+             * Format: date-time
+             * @description When the asset was recorded (UTC).
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description When it last changed (UTC).
+             */
+            updatedAt: string;
+        };
         /** @description An asset as the API renders it. */
         AssetResponse: {
             /**
@@ -1001,6 +1076,8 @@ export interface components {
              */
             updatedAt: string;
         };
+        /** @enum {unknown} */
+        AssetSort: "AssetTag" | "CreatedAt" | "UpdatedAt" | "WarrantyExpiresAt" | "Status" | null;
         /** @description An asset status as the API renders it. */
         AssetStatusResponse: {
             /**
@@ -1436,6 +1513,37 @@ export interface components {
         PagedResultOfAssetHistoryEntryResponse: {
             /** @description The items on this page. */
             items: components["schemas"]["AssetHistoryEntryResponse"][];
+            /**
+             * Format: int32
+             * @description The total number of matching items across all pages.
+             */
+            total: number;
+            /**
+             * Format: int32
+             * @description The 1-based page number this envelope represents.
+             */
+            page: number;
+            /**
+             * Format: int32
+             * @description The page size that was applied, after clamping.
+             */
+            pageSize: number;
+            /**
+             * Format: int32
+             * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
+             */
+            totalPages?: number;
+            /** @description True when a further page exists. */
+            hasNextPage?: boolean;
+        };
+        /**
+         * @description The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as
+         *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
+         *     object so the shape reaches OpenAPI and, from there, the generated client.
+         */
+        PagedResultOfAssetListItemResponse: {
+            /** @description The items on this page. */
+            items: components["schemas"]["AssetListItemResponse"][];
             /**
              * Format: int32
              * @description The total number of matching items across all pages.
@@ -5039,6 +5147,126 @@ export interface operations {
             };
         };
     };
+    ListAssets: {
+        parameters: {
+            query?: {
+                assetTypeId?: string;
+                assetStatusId?: string[];
+                statusCode?: string[];
+                departmentId?: string;
+                locationId?: string;
+                assignedToUserId?: string;
+                unassigned?: boolean;
+                warrantyExpiringInDays?: number;
+                warrantyExpired?: boolean;
+                search?: string;
+                sort?: components["schemas"]["AssetSort"];
+                direction?: components["schemas"]["SortDirection"];
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfAssetListItemResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAssetRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetAsset: {
         parameters: {
             query?: never;
@@ -5127,64 +5355,6 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    CreateAsset: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateAssetRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssetResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description No session cookie, or the session it named has expired or been revoked. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Conflict */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };

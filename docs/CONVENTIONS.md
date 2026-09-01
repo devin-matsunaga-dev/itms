@@ -98,7 +98,9 @@ The testing rules exist to keep the suite fast enough that it actually gets run 
 - No `Thread.Sleep` in tests. Poll with a timeout helper, or inject the clock. `IClock` exists in `Platform` precisely so time can be controlled.
 - Frontend: Vitest + Testing Library for component behavior. Playwright only for the handful of critical end-to-end paths (log in → create ticket → assign → resolve; alert → ticket). Do not build a large E2E suite in V1.
 - Every bug fixed gets a test that fails without the fix.
-- Target: the full `dotnet test` run stays under two minutes on a dev machine. If it drifts past that, fixing it is the next work package.
+- **Volume and performance tests are a separate category.** A test whose cost *is* its row count — WP-1.5's fifty-thousand-ticket queue measurement is the founding example — carries `[Trait("Category", "Volume")]` and is excluded from the ordinary run. Add the trait only when the row count is the point; a test that is merely slow is a test to fix, not a test to label.
+- **Two commands, and both are run.** The ordinary run is `dotnet test --filter-not-trait "Category=Volume"` — that is the one a developer repeats every package, and the one the two-minute target below applies to. The volume run is `dotnet test --project tests/Itms.IntegrationTests/Itms.IntegrationTests.csproj --filter-trait "Category=Volume"`. CI runs both, in separate steps, so excluding a suite from the inner loop never means quietly abandoning it.
+- Target: the ordinary `dotnet test` run stays under two minutes on a dev machine. If it drifts past that, fixing it is the next work package. The volume run has no such budget — it is measured against the thresholds its own assertions name.
 
 ## Security floor
 

@@ -66,6 +66,54 @@ public sealed record AssetDto(
     string? LocationPath,
     decimal? Cost);
 
+/// <summary>One row of the asset list as the suite reads it off the wire.</summary>
+/// <remarks>
+/// Narrower than <see cref="AssetDto"/> on purpose, because the list row is: cost, notes,
+/// barcode, vendor and the purchase date are on the detail read only. The warranty date is
+/// here because the list filters and sorts on it.
+/// </remarks>
+/// <param name="Id">The asset's id.</param>
+/// <param name="AssetTag">Its unique, immutable tag.</param>
+/// <param name="Name">A human label.</param>
+/// <param name="SerialNumber">The manufacturer's serial.</param>
+/// <param name="Manufacturer">Who made it.</param>
+/// <param name="Model">What they call it.</param>
+/// <param name="AssetTypeId">Its type.</param>
+/// <param name="AssetTypeName">That type's current name.</param>
+/// <param name="AssetStatusId">Its status.</param>
+/// <param name="AssetStatusCode">That status's immutable code.</param>
+/// <param name="AssetStatusName">That status's current name.</param>
+/// <param name="AssignedToUserId">Who currently holds it.</param>
+/// <param name="AssignedToUserName">Their cached display name.</param>
+/// <param name="DepartmentId">The department that owns it.</param>
+/// <param name="DepartmentName">That department's cached name.</param>
+/// <param name="LocationId">Where it is.</param>
+/// <param name="LocationPath">That location's cached full path.</param>
+/// <param name="WarrantyExpiresAt">When the warranty runs out.</param>
+/// <param name="CreatedAt">When it was recorded.</param>
+/// <param name="UpdatedAt">When it last changed.</param>
+public sealed record AssetListDto(
+    Guid Id,
+    string AssetTag,
+    string? Name,
+    string? SerialNumber,
+    string? Manufacturer,
+    string? Model,
+    Guid AssetTypeId,
+    string AssetTypeName,
+    Guid AssetStatusId,
+    string AssetStatusCode,
+    string AssetStatusName,
+    Guid? AssignedToUserId,
+    string? AssignedToUserName,
+    Guid? DepartmentId,
+    string? DepartmentName,
+    Guid? LocationId,
+    string? LocationPath,
+    DateOnly? WarrantyExpiresAt,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
+
 /// <summary>One line of an asset's timeline as the suite reads it off the wire.</summary>
 /// <param name="Id">The entry's id.</param>
 /// <param name="Kind">Which dimension moved — <c>Assignment</c> or <c>Status</c>.</param>
@@ -227,6 +275,54 @@ public static class AssetsClient
 
         var asset = await ApiClient.ReadAsync<AssetDto>(response, cancellationToken);
         return (asset, response.Headers.ETag?.ToString() ?? string.Empty);
+    }
+
+    /// <summary>Reads a page of the asset list.</summary>
+    /// <param name="client">The signed-in client.</param>
+    /// <param name="query">The query string, without its leading <c>?</c>. Empty for no filters.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The page envelope.</returns>
+    public static Task<PageDto<AssetListDto>> ListAssetsAsync(
+        HttpClient client,
+        string query,
+        CancellationToken cancellationToken) =>
+        ApiClient.ListAsync<AssetListDto>(
+            client,
+            string.IsNullOrEmpty(query) ? Assets : $"{Assets}?{query}",
+            cancellationToken);
+
+    /// <summary>The asset tags a list query returns, in the order it returned them.</summary>
+    /// <remarks>
+    /// Most of the list assertions are about <em>which</em> assets came back and in what
+    /// order, and comparing tag sequences says that in one line where comparing whole rows
+    /// says it in ten.
+    /// </remarks>
+    /// <param name="client">The signed-in client.</param>
+    /// <param name="query">The query string, without its leading <c>?</c>.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The tags on the page, in order.</returns>
+    public static async Task<IReadOnlyList<string>> TagsAsync(
+        HttpClient client,
+        string query,
+        CancellationToken cancellationToken)
+    {
+        var page = await ListAssetsAsync(client, query, cancellationToken);
+        return [.. page.Items.Select(asset => asset.AssetTag)];
+    }
+
+    /// <summary>Records an asset with the full field set, so a list test can shape one.</summary>
+    /// <param name="client">A technician or admin client.</param>
+    /// <param name="body">The create request body.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The created asset.</returns>
+    public static async Task<AssetDto> CreateDetailedAsync(
+        HttpClient client,
+        object body,
+        CancellationToken cancellationToken)
+    {
+        var response = await PostAssetAsync(client, body, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await ApiClient.ReadAsync<AssetDto>(response, cancellationToken);
     }
 
     /// <summary>Reads an asset's timeline, newest first.</summary>

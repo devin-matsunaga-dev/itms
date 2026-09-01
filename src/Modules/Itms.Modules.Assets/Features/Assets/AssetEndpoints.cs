@@ -3,6 +3,7 @@ using Itms.Modules.Assets.Features.AssetHistory.ListAssetHistory;
 using Itms.Modules.Assets.Features.Assets.AssignAsset;
 using Itms.Modules.Assets.Features.Assets.CreateAsset;
 using Itms.Modules.Assets.Features.Assets.GetAsset;
+using Itms.Modules.Assets.Features.Assets.ListAssets;
 using Itms.Modules.Assets.Features.Assets.RetireAsset;
 using Itms.Modules.Assets.Features.Assets.ReturnAssetToService;
 using Itms.Modules.Assets.Features.Assets.SendAssetForRepair;
@@ -31,10 +32,12 @@ namespace Itms.Modules.Assets.Features.Assets;
 /// which is why <c>AssignAssetHandler</c> asks Identity for no role.
 /// </para>
 /// <para>
-/// <b>The list is WP-2.3</b>, with the filtering, search, sorting, and paging that package
-/// names. The single-asset read exists so the create's <c>Location</c> header points
-/// somewhere, and the history read exists because a timeline nothing can read cannot be
-/// verified by a human.
+/// <b>Three reads.</b> The list is the whole surface WP-2.3 names — filtering by type,
+/// status, department, location, holder and warranty window, search, paging and sorting.
+/// The single-asset read came in with WP-2.1 so the create's <c>Location</c> header pointed
+/// somewhere, and the history read with WP-2.2, because a timeline nothing can read cannot
+/// be verified by a human. Only the single-asset read carries an <c>ETag</c>: a page of two
+/// hundred assets has two hundred versions and no one of them is the page's.
 /// </para>
 /// <para>
 /// <b>The four writes are the five lifecycle operations SPEC.md §3 names.</b> Assignment
@@ -61,6 +64,29 @@ internal static class AssetEndpoints
 
     private static void MapReads(RouteGroupBuilder group)
     {
+        group
+            .MapGet("/", async (
+                [AsParameters] ListAssetsQuery query,
+                ListAssetsHandler handler,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await handler.HandleAsync(query, cancellationToken).ConfigureAwait(false);
+                return result.ToOk();
+            })
+            .RequireAuthorization(ItmsPolicies.Technician)
+            .WithName("ListAssets")
+            .WithSummary("Reads the asset list, filtered, sorted, and paged.")
+            .WithDescription(
+                "Defaults to every asset by tag, ascending. Repeat assetStatusId or statusCode to "
+                + "ask for several statuses at once. warrantyExpiringInDays=N selects the warranties "
+                + "running out between today and N days from now, inclusive; adding "
+                + "warrantyExpired=true widens that to the union rather than narrowing it, which is "
+                + "the 'needs attention' list. Soft-deleted assets are never returned.")
+            .Produces<PagedResult<AssetListItemResponse>>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
         group
             .MapGet("/{id:guid}", async (
                 Guid id,

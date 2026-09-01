@@ -17,6 +17,7 @@ using Itms.Modules.Assets.Features.Assets;
 using Itms.Modules.Assets.Features.Assets.AssignAsset;
 using Itms.Modules.Assets.Features.Assets.CreateAsset;
 using Itms.Modules.Assets.Features.Assets.GetAsset;
+using Itms.Modules.Assets.Features.Assets.ListAssets;
 using Itms.Modules.Assets.Features.Assets.RetireAsset;
 using Itms.Modules.Assets.Features.Assets.ReturnAssetToService;
 using Itms.Modules.Assets.Features.Assets.SendAssetForRepair;
@@ -89,6 +90,7 @@ public static class AssetsModule
 
         services.TryAddScoped<CreateAssetHandler>();
         services.TryAddScoped<GetAssetHandler>();
+        services.TryAddScoped<ListAssetsHandler>();
         services.TryAddScoped<ListAssetHistoryHandler>();
 
         // The timeline writer and the transaction envelope every lifecycle operation shares.

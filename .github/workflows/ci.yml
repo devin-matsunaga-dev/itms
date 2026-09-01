@@ -58,8 +58,24 @@ jobs:
       # Unit, architecture, and integration suites. The integration assembly starts one
       # postgres:17.6 container through Testcontainers; the runner's Docker daemon is
       # what serves it, and the image pull is ~25s on a cold runner.
+      #
+      # Category=Volume is excluded here and run in the step below. CONVENTIONS.md
+      # §Testing draws that line: the ordinary run is the one a developer repeats every
+      # package and it is budgeted at two minutes, while a volume test's cost *is* its
+      # row count and cannot be made to fit. This is the command CONVENTIONS.md names.
       - name: Test
-        run: dotnet test --no-build --configuration Release
+        run: dotnet test --no-build --configuration Release --filter-not-trait "Category=Volume"
+
+      # Excluded from the ordinary run is not excluded from CI. A performance suite
+      # nobody runs is one that silently stops being true, so it runs here, in a step of
+      # its own, where a regression is still a red build. Scoped to the integration
+      # project because it is the only assembly carrying the trait, and an assembly with
+      # no matching test is an error rather than a pass.
+      - name: Volume and performance tests
+        run: >-
+          dotnet test --no-build --configuration Release
+          --project tests/Itms.IntegrationTests/Itms.IntegrationTests.csproj
+          --filter-trait "Category=Volume"
 
   frontend:
     name: Frontend — generate, lint, test, build

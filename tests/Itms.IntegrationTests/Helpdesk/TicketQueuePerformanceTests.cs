@@ -24,8 +24,18 @@ namespace Itms.IntegrationTests.Helpdesk;
 /// that only a structural mistake trips it. WP-6.4 owns the index review against the
 /// measured query set.
 /// </para>
+/// <para>
+/// <b>It is out of the ordinary run from WP-2.3</b>, behind the <c>Category=Volume</c>
+/// trait, at the human's direction. Seeding fifty thousand tickets was roughly half the
+/// integration suite's runtime and had put the whole run well past CONVENTIONS.md's
+/// two-minute budget — a budget that exists so the suite is actually run every package.
+/// <b>Excluded is not abandoned:</b> CI runs this category in a step of its own, and
+/// CONVENTIONS.md §Testing carries the command that runs it locally. Nothing about the
+/// assertions changed.
+/// </para>
 /// </remarks>
 [Collection(IdentityTestGroup.Name)]
+[Trait(VolumeTest.Name, VolumeTest.Value)]
 public sealed class TicketQueuePerformanceTests(IdentityWebFixture fixture) : IAsyncLifetime
 {
     /// <summary>The row count WP-1.5's criterion names.</summary>
