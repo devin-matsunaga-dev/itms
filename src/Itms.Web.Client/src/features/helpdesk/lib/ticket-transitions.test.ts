@@ -41,11 +41,23 @@ describe('transitionActions — which moves become buttons', () => {
     expect(from('Resolved')).toBe('Reopen')
   })
 
-  it('marks resolving as the one move that carries notes', () => {
-    const actions = transitionActions('InProgress', ['Waiting', 'Resolved'])
+  it('gives resolving and holding each their own note, and nothing else one', () => {
+    // Both are required non-blank by the server and rejected on any other destination, so
+    // the field the dialog collects has to match the destination exactly.
+    const actions = transitionActions('InProgress', ['Waiting', 'Resolved', 'Cancelled'])
 
-    expect(actions.find((action) => action.status === 'Resolved')?.requiresNotes).toBe(true)
-    expect(actions.find((action) => action.status === 'Waiting')?.requiresNotes).toBe(false)
+    expect(actions.find((action) => action.status === 'Resolved')?.note?.field).toBe(
+      'resolutionNotes',
+    )
+    expect(actions.find((action) => action.status === 'Waiting')?.note?.field).toBe('holdReason')
+    expect(actions.find((action) => action.status === 'Cancelled')?.note).toBeNull()
+  })
+
+  it('asks for a hold reason in the words the server refuses without', () => {
+    const hold = transitionActions('InProgress', ['Waiting'])[0]
+
+    expect(hold?.note?.required).toBe('Say what the ticket is waiting on.')
+    expect(hold?.note?.label).toBe('Reason for the hold')
   })
 
   it('marks the two one-way moves as needing confirmation, and cancelling as destructive', () => {

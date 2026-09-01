@@ -15,6 +15,9 @@ namespace Itms.UnitTests.Helpdesk;
 /// </remarks>
 public sealed class TicketTransitionTests
 {
+
+    /// <summary>A reason to park a ticket with, so the transition tests read consistently.</summary>
+    private const string HoldReason = "Waiting on the vendor.";
     private static readonly Guid Author = Guid.CreateVersion7();
     private static readonly Guid Technician = Guid.CreateVersion7();
 
@@ -53,7 +56,7 @@ public sealed class TicketTransitionTests
                 return ticket;
 
             case TicketStatus.Waiting:
-                ticket.Wait(_clock.UtcNow, Technician).IsSuccess.ShouldBeTrue();
+                ticket.Wait(HoldReason, _clock.UtcNow, Technician).IsSuccess.ShouldBeTrue();
                 return ticket;
 
             case TicketStatus.InProgress:
@@ -134,7 +137,7 @@ public sealed class TicketTransitionTests
         var notesBefore = ticket.ResolutionNotes;
 
         _clock.Advance(TimeSpan.FromHours(1));
-        var result = ticket.ChangeStatus(to, to == TicketStatus.Resolved ? "Done." : null, _clock.UtcNow, Author);
+        var result = ticket.ChangeStatus(to, to == TicketStatus.Resolved ? "Done." : null, to == TicketStatus.Waiting ? HoldReason : null, _clock.UtcNow, Author);
 
         result.IsFailure.ShouldBeTrue();
         result.Error!.Code.ShouldBe("helpdesk.illegal_transition");
@@ -154,7 +157,7 @@ public sealed class TicketTransitionTests
         var ticket = TicketIn(from);
 
         _clock.Advance(TimeSpan.FromHours(1));
-        var result = ticket.ChangeStatus(to, to == TicketStatus.Resolved ? "Done." : null, _clock.UtcNow, Author);
+        var result = ticket.ChangeStatus(to, to == TicketStatus.Resolved ? "Done." : null, to == TicketStatus.Waiting ? HoldReason : null, _clock.UtcNow, Author);
 
         result.IsSuccess.ShouldBeTrue();
         ticket.Status.ShouldBe(to);
@@ -179,7 +182,7 @@ public sealed class TicketTransitionTests
 
         TicketStateMachine.CanTransition(TicketStatus.Assigned, TicketStatus.New).ShouldBeTrue();
 
-        var result = ticket.ChangeStatus(TicketStatus.New, null, _clock.UtcNow, Author);
+        var result = ticket.ChangeStatus(TicketStatus.New, null, null, _clock.UtcNow, Author);
 
         result.IsFailure.ShouldBeTrue();
         result.Error!.Code.ShouldBe("helpdesk.unassign_to_return_to_new");
@@ -202,7 +205,7 @@ public sealed class TicketTransitionTests
     {
         var ticket = TicketIn(from);
 
-        var result = ticket.ChangeStatus(TicketStatus.New, null, _clock.UtcNow, Author);
+        var result = ticket.ChangeStatus(TicketStatus.New, null, null, _clock.UtcNow, Author);
 
         result.IsFailure.ShouldBeTrue();
         result.Error!.Code.ShouldBe("helpdesk.illegal_transition");
@@ -214,7 +217,7 @@ public sealed class TicketTransitionTests
     {
         var closed = TicketIn(TicketStatus.Closed);
 
-        var result = closed.ChangeStatus(TicketStatus.InProgress, null, _clock.UtcNow, Author);
+        var result = closed.ChangeStatus(TicketStatus.InProgress, null, null, _clock.UtcNow, Author);
 
         result.IsFailure.ShouldBeTrue();
         result.Error!.Message.ShouldBe("A Closed ticket cannot change status.");
@@ -253,7 +256,7 @@ public sealed class TicketTransitionTests
     {
         var ticket = TicketIn(TicketStatus.InProgress);
 
-        var result = ticket.ChangeStatus(TicketStatus.Resolved, notes, _clock.UtcNow, Technician);
+        var result = ticket.ChangeStatus(TicketStatus.Resolved, notes, holdReason: null, _clock.UtcNow, Technician);
 
         result.IsFailure.ShouldBeTrue();
         result.Error!.Code.ShouldBe("helpdesk.resolution_notes_required");
@@ -267,7 +270,7 @@ public sealed class TicketTransitionTests
     {
         var ticket = TicketIn(TicketStatus.InProgress);
 
-        var result = ticket.ChangeStatus(TicketStatus.Resolved, resolutionNotes: null, _clock.UtcNow, Technician);
+        var result = ticket.ChangeStatus(TicketStatus.Resolved, resolutionNotes: null, holdReason: null, _clock.UtcNow, Technician);
 
         result.IsFailure.ShouldBeTrue();
         result.Error!.Code.ShouldBe("helpdesk.resolution_notes_required");
@@ -281,6 +284,7 @@ public sealed class TicketTransitionTests
         var result = ticket.ChangeStatus(
             TicketStatus.Resolved,
             new string('x', Ticket.ResolutionNotesMaxLength + 1),
+            holdReason: null,
             _clock.UtcNow,
             Technician);
 
@@ -297,7 +301,7 @@ public sealed class TicketTransitionTests
     {
         var ticket = TicketIn(TicketStatus.InProgress);
 
-        var result = ticket.ChangeStatus(target, "Not a resolution.", _clock.UtcNow, Technician);
+        var result = ticket.ChangeStatus(target, "Not a resolution.", holdReason: null, _clock.UtcNow, Technician);
 
         result.IsFailure.ShouldBeTrue();
         result.Error!.Code.ShouldBe("helpdesk.resolution_notes_not_accepted");
@@ -385,7 +389,7 @@ public sealed class TicketTransitionTests
 
         foreach (var target in Enum.GetValues<TicketStatus>())
         {
-            ticket.ChangeStatus(target, target == TicketStatus.Resolved ? "Done." : null, _clock.UtcNow, Author)
+            ticket.ChangeStatus(target, target == TicketStatus.Resolved ? "Done." : null, target == TicketStatus.Waiting ? HoldReason : null, _clock.UtcNow, Author)
                 .IsFailure.ShouldBeTrue();
         }
 

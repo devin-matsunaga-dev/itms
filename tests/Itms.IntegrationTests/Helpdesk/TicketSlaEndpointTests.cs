@@ -399,8 +399,15 @@ public sealed class TicketSlaEndpointTests(IdentityWebFixture fixture) : IAsyncL
         TicketStatus status,
         string? resolutionNotes = null)
     {
+        // Waiting requires a hold reason since WP-1.15. None of these tests is about the
+        // reason — they are about what parking does to the clock — so it is supplied here.
         var response = await TicketClient.ChangeStatusAsync(
-            arranged.Tech, ticketId, status, Token, resolutionNotes);
+            arranged.Tech,
+            ticketId,
+            status,
+            Token,
+            resolutionNotes,
+            holdReason: status == TicketStatus.Waiting ? "Waiting on the vendor." : null);
 
         response.EnsureSuccessStatusCode();
     }

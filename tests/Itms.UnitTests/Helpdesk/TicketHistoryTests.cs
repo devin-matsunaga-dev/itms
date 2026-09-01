@@ -35,8 +35,9 @@ public sealed class TicketHistoryTests
         Guid? priorityId = null,
         Guid? assigneeId = null,
         string? assigneeName = null,
-        string? resolutionNotes = null) =>
-        new(status, priorityId ?? Medium, assigneeId, assigneeName, resolutionNotes);
+        string? resolutionNotes = null,
+        string? holdReason = null) =>
+        new(status, priorityId ?? Medium, assigneeId, assigneeName, resolutionNotes, holdReason);
 
     /// <summary>A change that moved nothing tracked writes no line at all.</summary>
     /// <remarks>

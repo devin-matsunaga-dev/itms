@@ -99,6 +99,7 @@ export function ticketDetail(overrides: Partial<TicketDetail> = {}): TicketDetai
     assigneeId: null,
     assigneeName: null,
     resolutionNotes: null,
+    holdReason: null,
     resolvedAt: null,
     closedAt: null,
     relatedAssetId: null,

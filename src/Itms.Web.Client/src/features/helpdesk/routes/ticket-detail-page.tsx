@@ -19,6 +19,7 @@ import { TicketDetailSkeleton } from '../components/ticket-detail-skeleton'
 import { TicketProperties } from '../components/ticket-properties'
 import { TicketTimeline } from '../components/ticket-timeline'
 import { TicketTransitionButtons } from '../components/ticket-transition-buttons'
+import type { TransitionNoteValue } from '../lib/ticket-transitions'
 import {
   useAddTicketComment,
   useAssignTicket,
@@ -90,9 +91,16 @@ export function TicketDetailPage(): React.JSX.Element {
   const etag = detail.data?.etag ?? null
 
   const onMove = useCallback(
-    (status: TicketStatus, resolutionNotes: string | null) => {
+    (status: TicketStatus, note: TransitionNoteValue | null) => {
       changeStatus.mutate(
-        { status, resolutionNotes, etag },
+        {
+          status,
+          // The note goes in the field its destination expects and null in the other; the
+          // server refuses a note offered to a transition that records none.
+          resolutionNotes: note?.field === 'resolutionNotes' ? note.value : null,
+          holdReason: note?.field === 'holdReason' ? note.value : null,
+          etag,
+        },
         {
           onSuccess: (result) => {
             toast.success(`${result.number} moved to ${result.status}.`)

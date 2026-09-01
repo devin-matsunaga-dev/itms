@@ -22,6 +22,9 @@ namespace Itms.UnitTests.Helpdesk;
 /// </remarks>
 public sealed class TicketAssignmentTests
 {
+
+    /// <summary>A reason to park a ticket with, so the transition tests read consistently.</summary>
+    private const string HoldReason = "Waiting on the vendor.";
     private static readonly Guid Author = Guid.CreateVersion7();
     private static readonly Guid Priya = Guid.CreateVersion7();
     private static readonly Guid Sam = Guid.CreateVersion7();
@@ -354,7 +357,7 @@ public sealed class TicketAssignmentTests
                 return ticket;
 
             case TicketStatus.Waiting:
-                ticket.Wait(_clock.UtcNow, Author).IsSuccess.ShouldBeTrue();
+                ticket.Wait(HoldReason, _clock.UtcNow, Author).IsSuccess.ShouldBeTrue();
                 return ticket;
 
             case TicketStatus.InProgress:

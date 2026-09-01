@@ -69,6 +69,7 @@ export const changeKindLabels: Record<TicketChangeKind, string> = {
   Priority: 'Priority',
   Assignment: 'Assignee',
   Resolution: 'Resolution',
+  Hold: 'On hold',
 }
 
 /**

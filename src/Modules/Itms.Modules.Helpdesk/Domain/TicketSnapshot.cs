@@ -1,7 +1,7 @@
 namespace Itms.Modules.Helpdesk.Domain;
 
 /// <summary>
-/// The four dimensions of a ticket that <see cref="TicketHistoryEntry"/> records, read
+/// The five dimensions of a ticket that <see cref="TicketHistoryEntry"/> records, read
 /// off the entity at one instant.
 /// </summary>
 /// <remarks>
@@ -27,14 +27,20 @@ namespace Itms.Modules.Helpdesk.Domain;
 /// <param name="AssigneeId">Who was responsible, or <see langword="null"/> when nobody was.</param>
 /// <param name="AssigneeName">Their display name as the ticket cached it, or <see langword="null"/>.</param>
 /// <param name="ResolutionNotes">What the ticket recorded as its resolution, or <see langword="null"/>.</param>
+/// <param name="HoldReason">
+/// What it was waiting on, or <see langword="null"/> when it was not parked. Tracked so a
+/// hold and a resume each write a timeline entry through the same snapshot diff every
+/// other dimension uses — the reason a hold is recorded at all is that this field moved.
+/// </param>
 public readonly record struct TicketSnapshot(
     TicketStatus Status,
     Guid PriorityId,
     Guid? AssigneeId,
     string? AssigneeName,
-    string? ResolutionNotes)
+    string? ResolutionNotes,
+    string? HoldReason)
 {
-    /// <summary>Reads the four tracked dimensions off a ticket as it stands right now.</summary>
+    /// <summary>Reads the five tracked dimensions off a ticket as it stands right now.</summary>
     /// <param name="ticket">The ticket to read.</param>
     /// <returns>The snapshot.</returns>
     public static TicketSnapshot Of(Ticket ticket)
@@ -46,6 +52,7 @@ public readonly record struct TicketSnapshot(
             ticket.PriorityId,
             ticket.AssigneeId,
             ticket.AssigneeName,
-            ticket.ResolutionNotes);
+            ticket.ResolutionNotes,
+            ticket.HoldReason);
     }
 }

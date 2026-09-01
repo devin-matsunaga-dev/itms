@@ -651,6 +651,17 @@ export interface components {
              *     records a resolution and silently dropping the text would lose it.
              */
             resolutionNotes: null | string;
+            /**
+             * @description What the ticket is waiting on. Required and non-blank when Status is
+             *     `Waiting`, and rejected for every other destination — the exact mirror of
+             *     ResolutionNotes, and for the same reason: a ticket nobody is working
+             *     should say why, and text somebody typed should never be silently dropped.
+             *
+             *     It is kept only while the ticket is parked. Resuming clears it, which is what makes a
+             *     second hold write its own line in the timeline rather than looking like no change at
+             *     all. Every reason ever given stays in the ticket's history.
+             */
+            holdReason: null | string;
         };
         /** @description The body of `POST /api/v1/departments`. */
         CreateDepartmentRequest: {
@@ -1242,7 +1253,7 @@ export interface components {
          * @description Which dimension of a ticket a history entry records having moved.
          * @enum {unknown}
          */
-        TicketChangeKind: "Status" | "Priority" | "Assignment" | "Resolution";
+        TicketChangeKind: "Status" | "Priority" | "Assignment" | "Resolution" | "Hold";
         /** @description One line of a ticket's conversation, as the API renders it. */
         TicketCommentResponse: {
             /**
@@ -1366,6 +1377,12 @@ export interface components {
             assigneeName: null | string;
             /** @description What was done, once it has been resolved. Kept through a reopen. */
             resolutionNotes: null | string;
+            /**
+             * @description What the ticket is waiting on while it is parked, and `null` whenever it
+             *     is not. Cleared on resuming, so it always describes the state the ticket is actually in;
+             *     every reason ever given stays in the ticket's history.
+             */
+            holdReason: null | string;
             /**
              * Format: date-time
              * @description When it was resolved (UTC), or `null`.

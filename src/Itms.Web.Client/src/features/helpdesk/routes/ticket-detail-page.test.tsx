@@ -239,7 +239,12 @@ describe('TicketDetailPage — transitions', () => {
     await person.click(await screen.findByRole('button', { name: 'Start work' }))
 
     await waitFor(() => {
-      expect(changeTicketStatus).toHaveBeenCalledWith(ticketId, 'InProgress', null, version)
+      expect(changeTicketStatus).toHaveBeenCalledWith(
+        ticketId,
+        'InProgress',
+        { resolutionNotes: null, holdReason: null },
+        version,
+      )
     })
   })
 
@@ -275,7 +280,7 @@ describe('TicketDetailPage — transitions', () => {
       expect(changeTicketStatus).toHaveBeenCalledWith(
         ticketId,
         'Resolved',
-        'Replaced the access point.',
+        { resolutionNotes: 'Replaced the access point.', holdReason: null },
         version,
       )
     })
@@ -353,5 +358,96 @@ describe('TicketDetailPage — assignment', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Mark Reyes').length).toBeGreaterThan(0)
     })
+  })
+})
+
+describe('TicketDetailPage — putting a ticket on hold', () => {
+  it('will not park a ticket without saying what it is waiting on', async () => {
+    const person = userEvent.setup()
+    loads(ticketDetail({ status: 'InProgress', allowedNextStatuses: ['Waiting'] }))
+    renderDetail()
+
+    await person.click(await screen.findByRole('button', { name: 'Put on hold' }))
+    await person.click(await screen.findByRole('button', { name: 'Put on hold' }))
+
+    expect(await screen.findByText('Say what the ticket is waiting on.')).toBeInTheDocument()
+    expect(changeTicketStatus).not.toHaveBeenCalled()
+  })
+
+  it('sends the reason in its own field, not the resolution’s', async () => {
+    // The server rejects a resolution offered to Waiting, and vice versa.
+    const person = userEvent.setup()
+    loads(ticketDetail({ status: 'InProgress', allowedNextStatuses: ['Waiting'] }))
+    renderDetail()
+
+    await person.click(await screen.findByRole('button', { name: 'Put on hold' }))
+    await person.type(
+      await screen.findByLabelText(/reason for the hold/i),
+      'Waiting on the vendor.',
+    )
+    await person.click(await screen.findByRole('button', { name: 'Put on hold' }))
+
+    await waitFor(() => {
+      expect(changeTicketStatus).toHaveBeenCalledWith(
+        ticketId,
+        'Waiting',
+        { resolutionNotes: null, holdReason: 'Waiting on the vendor.' },
+        version,
+      )
+    })
+  })
+
+  it('says why the ticket is parked, at the top of the screen', async () => {
+    loads(ticketDetail({ status: 'Waiting', holdReason: 'Waiting on the vendor.' }))
+    renderDetail()
+
+    expect(await screen.findByText('On hold')).toBeInTheDocument()
+    expect(screen.getByText('Waiting on the vendor.')).toBeInTheDocument()
+  })
+
+  it('renders the hold and its status move as one timeline event', async () => {
+    loads(
+      ticketDetail({
+        status: 'Waiting',
+        holdReason: 'Waiting on the vendor.',
+        history: [
+          historyEntry({
+            id: 'h-status',
+            sequence: 0,
+            fromValue: 'InProgress',
+            toValue: 'Waiting',
+            occurredAt: '2026-09-01T12:00:00Z',
+          }),
+          historyEntry({
+            id: 'h-hold',
+            kind: 'Hold',
+            sequence: 1,
+            fromValue: null,
+            toValue: 'Waiting on the vendor.',
+            occurredAt: '2026-09-01T12:00:00Z',
+          }),
+        ],
+      }),
+    )
+    renderDetail()
+
+    const activity = within(await screen.findByRole('list', { name: 'Ticket activity' }))
+    expect(activity.getAllByText('Mark Reyes updated this ticket')).toHaveLength(1)
+    expect(activity.getByText('On hold:')).toBeInTheDocument()
+  })
+
+  it('reads a lifted hold as lifted rather than as an empty value', async () => {
+    loads(
+      ticketDetail({
+        status: 'InProgress',
+        history: [
+          historyEntry({ id: 'h-hold', kind: 'Hold', fromValue: 'Waiting on the vendor.', toValue: null }),
+        ],
+      }),
+    )
+    renderDetail()
+
+    const activity = within(await screen.findByRole('list', { name: 'Ticket activity' }))
+    expect(activity.getByText('lifted')).toBeInTheDocument()
   })
 })

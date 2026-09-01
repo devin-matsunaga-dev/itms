@@ -118,16 +118,27 @@ public sealed class TicketDetailEndpointTests(IdentityWebFixture fixture) : IAsy
         var created = await TicketClient.CreateAsync(admin, reference, departmentId, "Moving", Token);
         await TicketWriter.ParkAsync(fixture.DataSource, created.Id, TicketStatus.InProgress, Token);
 
-        (await TicketClient.ChangeStatusAsync(admin, created.Id, TicketStatus.Waiting, Token))
+        (await TicketClient.ChangeStatusAsync(admin, created.Id, TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor."))
             .EnsureSuccessStatusCode();
         (await TicketClient.ChangeStatusAsync(admin, created.Id, TicketStatus.InProgress, Token))
             .EnsureSuccessStatusCode();
 
         var (ticket, _) = await TicketClient.GetAsync(admin, created.Id, Token);
 
-        ticket.History.Count.ShouldBe(2);
-        ticket.History[0].ToValue.ShouldBe(nameof(TicketStatus.InProgress));
-        ticket.History[1].ToValue.ShouldBe(nameof(TicketStatus.Waiting));
+        // Four, not two: parking and resuming each write their status move and the hold
+        // reason arriving or being lifted (WP-1.15).
+        // Four, not two: parking and resuming each write their status move and the hold
+        // reason arriving or being lifted (WP-1.15).
+        //
+        // The newest line is the hold being *lifted*, not the status move it shares an
+        // instant with — the read orders by `occurred_at DESC, sequence DESC`, and the hold
+        // is written second within the change. A screen groups the pair and renders them
+        // together, which is why the order inside one instant is a detail rather than a
+        // promise.
+        ticket.History.Count.ShouldBe(4);
+        ticket.History.Select(entry => entry.ToValue).ShouldContain(nameof(TicketStatus.InProgress));
+        ticket.History.Select(entry => entry.ToValue).ShouldContain(nameof(TicketStatus.Waiting));
+        ticket.History.Count(entry => entry.Kind == TicketChangeKind.Hold).ShouldBe(2);
         ticket.HasMoreHistory.ShouldBeFalse();
     }
 
@@ -172,11 +183,12 @@ public sealed class TicketDetailEndpointTests(IdentityWebFixture fixture) : IAsy
         var created = await TicketClient.CreateAsync(admin, reference, departmentId, "Busy", Token);
         await TicketWriter.ParkAsync(fixture.DataSource, created.Id, TicketStatus.InProgress, Token);
 
-        // Each round trip through Waiting writes two entries, so fourteen passes comfortably
-        // clears the twenty-five the detail embeds.
+        // Each round trip through Waiting now writes four entries — two status moves, and
+        // the hold reason arriving and being lifted — so fourteen passes clears the
+        // twenty-five the detail embeds several times over.
         for (var i = 0; i < 14; i++)
         {
-            (await TicketClient.ChangeStatusAsync(admin, created.Id, TicketStatus.Waiting, Token))
+            (await TicketClient.ChangeStatusAsync(admin, created.Id, TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor."))
                 .EnsureSuccessStatusCode();
             (await TicketClient.ChangeStatusAsync(admin, created.Id, TicketStatus.InProgress, Token))
                 .EnsureSuccessStatusCode();
@@ -190,7 +202,8 @@ public sealed class TicketDetailEndpointTests(IdentityWebFixture fixture) : IAsy
         var paged = await ApiClient.ListAsync<TicketHistoryDto>(
             admin, $"{TicketClient.Tickets}/{created.Id}/history?pageSize=200", Token);
 
-        paged.Total.ShouldBe(28);
+        // Fourteen round trips, four entries each.
+        paged.Total.ShouldBe(56);
     }
 
     [Fact]
@@ -235,7 +248,7 @@ public sealed class TicketDetailEndpointTests(IdentityWebFixture fixture) : IAsy
 
         var (_, before) = await TicketClient.GetAsync(admin, created.Id, Token);
 
-        (await TicketClient.ChangeStatusAsync(admin, created.Id, TicketStatus.Waiting, Token))
+        (await TicketClient.ChangeStatusAsync(admin, created.Id, TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor."))
             .EnsureSuccessStatusCode();
 
         var (_, after) = await TicketClient.GetAsync(admin, created.Id, Token);

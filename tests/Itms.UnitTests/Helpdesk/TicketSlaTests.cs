@@ -21,6 +21,9 @@ namespace Itms.UnitTests.Helpdesk;
 /// </remarks>
 public sealed class TicketSlaTests
 {
+
+    /// <summary>A reason to park a ticket with, so the transition tests read consistently.</summary>
+    private const string HoldReason = "Waiting on the vendor.";
     private static readonly Guid Author = Guid.CreateVersion7();
     private static readonly Guid Technician = Guid.CreateVersion7();
 
@@ -69,7 +72,7 @@ public sealed class TicketSlaTests
         _clock.Advance(TimeSpan.FromMinutes(30));
         var parked = _clock.UtcNow;
 
-        ticket.Wait(_clock.UtcNow, Technician).IsSuccess.ShouldBeTrue();
+        ticket.Wait(HoldReason, _clock.UtcNow, Technician).IsSuccess.ShouldBeTrue();
 
         ticket.SlaPausedAt.ShouldBe(parked);
         ticket.DueAt.ShouldBe(due);
@@ -83,7 +86,7 @@ public sealed class TicketSlaTests
         var due = ticket.DueAt;
         var warn = ticket.ResolutionWarnAt;
 
-        ticket.Wait(_clock.UtcNow, Technician);
+        ticket.Wait(HoldReason, _clock.UtcNow, Technician);
         _clock.Advance(TimeSpan.FromHours(3));
         ticket.Resume(_clock.UtcNow, Technician);
 
@@ -106,7 +109,7 @@ public sealed class TicketSlaTests
         foreach (var hours in new[] { 1, 2, 4 })
         {
             _clock.Advance(TimeSpan.FromMinutes(5));
-            ticket.Wait(_clock.UtcNow, Technician).IsSuccess.ShouldBeTrue();
+            ticket.Wait(HoldReason, _clock.UtcNow, Technician).IsSuccess.ShouldBeTrue();
 
             _clock.Advance(TimeSpan.FromHours(hours));
             ticket.Resume(_clock.UtcNow, Technician).IsSuccess.ShouldBeTrue();
@@ -127,7 +130,7 @@ public sealed class TicketSlaTests
         var responseDue = ticket.ResponseDueAt;
         var responseWarn = ticket.ResponseWarnAt;
 
-        ticket.Wait(_clock.UtcNow, Technician);
+        ticket.Wait(HoldReason, _clock.UtcNow, Technician);
         _clock.Advance(TimeSpan.FromHours(6));
         ticket.Resume(_clock.UtcNow, Technician);
 
@@ -140,7 +143,7 @@ public sealed class TicketSlaTests
     {
         var ticket = InProgress();
 
-        ticket.Wait(_clock.UtcNow, Technician);
+        ticket.Wait(HoldReason, _clock.UtcNow, Technician);
 
         // A week goes by with nobody able to work on it.
         _clock.Advance(TimeSpan.FromDays(7));
@@ -162,7 +165,7 @@ public sealed class TicketSlaTests
         var ticket = InProgress();
 
         _clock.Advance(TimeSpan.FromHours(5));
-        ticket.Wait(_clock.UtcNow, Technician);
+        ticket.Wait(HoldReason, _clock.UtcNow, Technician);
         _clock.Advance(TimeSpan.FromDays(2));
 
         var assessment = SlaAssessment.Of(ticket.Sla, ticket.Status, _clock.UtcNow);
@@ -177,7 +180,7 @@ public sealed class TicketSlaTests
         var ticket = InProgress();
         var due = ticket.DueAt;
 
-        ticket.Wait(_clock.UtcNow, Technician);
+        ticket.Wait(HoldReason, _clock.UtcNow, Technician);
         _clock.Advance(TimeSpan.FromHours(2));
         ticket.Resolve("Replaced the charger.", _clock.UtcNow, Technician).IsSuccess.ShouldBeTrue();
 
@@ -322,7 +325,7 @@ public sealed class TicketSlaTests
         var ticket = InProgress();
         var created = ticket.CreatedAt;
 
-        ticket.Wait(_clock.UtcNow, Technician);
+        ticket.Wait(HoldReason, _clock.UtcNow, Technician);
         _clock.Advance(TimeSpan.FromHours(5));
         ticket.Resume(_clock.UtcNow, Technician);
 
@@ -344,7 +347,7 @@ public sealed class TicketSlaTests
         var ticket = InProgress();
         var created = ticket.CreatedAt;
 
-        ticket.Wait(_clock.UtcNow, Technician);
+        ticket.Wait(HoldReason, _clock.UtcNow, Technician);
         _clock.Advance(TimeSpan.FromHours(2));
         ticket.RetargetSla(Critical, _clock.UtcNow, Technician);
 

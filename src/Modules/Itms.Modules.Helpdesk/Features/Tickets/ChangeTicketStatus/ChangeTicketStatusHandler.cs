@@ -120,7 +120,7 @@ internal sealed class ChangeTicketStatusHandler(
                 var from = ticket.Status;
                 var now = clock.UtcNow;
 
-                var transition = ticket.ChangeStatus(request.Status, request.ResolutionNotes, now, currentUser.UserId);
+                var transition = ticket.ChangeStatus(request.Status, request.ResolutionNotes, request.HoldReason, now, currentUser.UserId);
 
                 if (transition.IsFailure)
                 {

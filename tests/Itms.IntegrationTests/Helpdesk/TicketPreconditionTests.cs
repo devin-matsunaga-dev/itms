@@ -32,7 +32,7 @@ public sealed class TicketPreconditionTests(IdentityWebFixture fixture) : IAsync
         var (_, etag) = await TicketClient.GetAsync(admin, ticketId, Token);
 
         var response = await TicketClient.ChangeStatusAsync(
-            admin, ticketId, TicketStatus.Waiting, Token, ifMatch: etag);
+            admin, ticketId, TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor.", ifMatch: etag);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -47,7 +47,7 @@ public sealed class TicketPreconditionTests(IdentityWebFixture fixture) : IAsync
         var (_, stale) = await TicketClient.GetAsync(admin, ticketId, Token);
 
         // Somebody else moves it in between, exactly as a second technician would.
-        (await TicketClient.ChangeStatusAsync(admin, ticketId, TicketStatus.Waiting, Token))
+        (await TicketClient.ChangeStatusAsync(admin, ticketId, TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor."))
             .EnsureSuccessStatusCode();
 
         var response = await TicketClient.ChangeStatusAsync(
@@ -74,7 +74,7 @@ public sealed class TicketPreconditionTests(IdentityWebFixture fixture) : IAsync
         var (admin, ticketId) = await InProgressTicketAsync();
         var (_, stale) = await TicketClient.GetAsync(admin, ticketId, Token);
 
-        (await TicketClient.ChangeStatusAsync(admin, ticketId, TicketStatus.Waiting, Token))
+        (await TicketClient.ChangeStatusAsync(admin, ticketId, TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor."))
             .EnsureSuccessStatusCode();
 
         var before = await TicketWriter.HistoryAsync(fixture.Services, ticketId, Token);
@@ -93,7 +93,7 @@ public sealed class TicketPreconditionTests(IdentityWebFixture fixture) : IAsync
     {
         var (admin, ticketId) = await InProgressTicketAsync();
 
-        var response = await TicketClient.ChangeStatusAsync(admin, ticketId, TicketStatus.Waiting, Token);
+        var response = await TicketClient.ChangeStatusAsync(admin, ticketId, TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor.");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
@@ -105,7 +105,7 @@ public sealed class TicketPreconditionTests(IdentityWebFixture fixture) : IAsync
         var (admin, ticketId) = await InProgressTicketAsync();
 
         var response = await TicketClient.ChangeStatusAsync(
-            admin, ticketId, TicketStatus.Waiting, Token, ifMatch: "*");
+            admin, ticketId, TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor.", ifMatch: "*");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
@@ -120,7 +120,7 @@ public sealed class TicketPreconditionTests(IdentityWebFixture fixture) : IAsync
         var (admin, ticketId) = await InProgressTicketAsync();
 
         var response = await TicketClient.ChangeStatusAsync(
-            admin, ticketId, TicketStatus.Waiting, Token, ifMatch: "\"not-a-version\"");
+            admin, ticketId, TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor.", ifMatch: "\"not-a-version\"");
 
         response.StatusCode.ShouldBe(HttpStatusCode.PreconditionFailed);
 
@@ -136,7 +136,7 @@ public sealed class TicketPreconditionTests(IdentityWebFixture fixture) : IAsync
         var (_, etag) = await TicketClient.GetAsync(admin, ticketId, Token);
 
         var response = await TicketClient.ChangeStatusAsync(
-            admin, ticketId, TicketStatus.Waiting, Token, ifMatch: $"\"4294967295\", {etag}");
+            admin, ticketId, TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor.", ifMatch: $"\"4294967295\", {etag}");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
@@ -151,7 +151,7 @@ public sealed class TicketPreconditionTests(IdentityWebFixture fixture) : IAsync
         using var admin = await AuthClient.SignedInAsync(fixture, "admin", Token);
 
         var response = await TicketClient.ChangeStatusAsync(
-            admin, Guid.CreateVersion7(), TicketStatus.Waiting, Token, ifMatch: "\"1\"");
+            admin, Guid.CreateVersion7(), TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor.", ifMatch: "\"1\"");
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
@@ -175,7 +175,7 @@ public sealed class TicketPreconditionTests(IdentityWebFixture fixture) : IAsync
         // Parking wrote the row directly, so the creation tag is now genuinely stale — which
         // is the point: the precondition notices a change this client never made.
         var moved = await TicketClient.ChangeStatusAsync(
-            admin, ticket.Id, TicketStatus.Waiting, Token, ifMatch: etag);
+            admin, ticket.Id, TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor.", ifMatch: etag);
 
         moved.StatusCode.ShouldBe(HttpStatusCode.PreconditionFailed);
     }

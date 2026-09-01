@@ -61,6 +61,16 @@ export function TicketDetailHeader({ ticket, now }: TicketDetailHeaderProps): Re
         <p className="mt-2 text-copy whitespace-pre-wrap text-body">{ticket.description}</p>
       </div>
 
+      {ticket.holdReason === null || ticket.holdReason === undefined ? null : (
+        <div className="mt-5 rounded-tile bg-teal/12 p-4 dark:bg-teal/15">
+          <h2 className="flex items-center gap-1.5 text-label font-semibold text-muted-foreground uppercase">
+            <Pause className="size-3.5" aria-hidden="true" />
+            On hold
+          </h2>
+          <p className="mt-2 text-copy whitespace-pre-wrap text-body">{ticket.holdReason}</p>
+        </div>
+      )}
+
       {ticket.resolutionNotes === null || ticket.resolutionNotes === undefined ? null : (
         <div className="mt-5 rounded-tile bg-violet/12 p-4 dark:bg-violet/15">
           <h2 className="text-label font-semibold text-muted-foreground uppercase">

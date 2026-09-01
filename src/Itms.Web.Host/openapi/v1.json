@@ -2900,7 +2900,8 @@
       "ChangeTicketStatusRequest": {
         "required": [
           "status",
-          "resolutionNotes"
+          "resolutionNotes",
+          "holdReason"
         ],
         "type": "object",
         "properties": {
@@ -2914,6 +2915,13 @@
               "string"
             ],
             "description": "What was done. Required and non-blank when Status is\n`Resolved`, and rejected for every other destination, because no other transition\nrecords a resolution and silently dropping the text would lose it."
+          },
+          "holdReason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the ticket is waiting on. Required and non-blank when Status is\n`Waiting`, and rejected for every other destination — the exact mirror of\nResolutionNotes, and for the same reason: a ticket nobody is working\nshould say why, and text somebody typed should never be silently dropped.\n\nIt is kept only while the ticket is parked. Resuming clears it, which is what makes a\nsecond hold write its own line in the timeline rather than looking like no change at\nall. Every reason ever given stays in the ticket's history."
           }
         },
         "description": "The body of `POST /api/v1/tickets/{id}/status-changes`."
@@ -3947,7 +3955,8 @@
           "Status",
           "Priority",
           "Assignment",
-          "Resolution"
+          "Resolution",
+          "Hold"
         ],
         "description": "Which dimension of a ticket a history entry records having moved."
       },
@@ -4062,6 +4071,7 @@
           "assigneeId",
           "assigneeName",
           "resolutionNotes",
+          "holdReason",
           "resolvedAt",
           "closedAt",
           "relatedAssetId",
@@ -4160,6 +4170,13 @@
               "string"
             ],
             "description": "What was done, once it has been resolved. Kept through a reopen."
+          },
+          "holdReason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the ticket is waiting on while it is parked, and `null` whenever it\nis not. Cleared on resuming, so it always describes the state the ticket is actually in;\nevery reason ever given stays in the ticket's history."
           },
           "resolvedAt": {
             "type": [

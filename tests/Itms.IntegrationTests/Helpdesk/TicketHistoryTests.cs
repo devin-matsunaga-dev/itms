@@ -97,13 +97,20 @@ public sealed class TicketHistoryTests(IdentityWebFixture fixture) : IAsyncLifet
         var page = await History(technician, ticket);
 
         // Newest first, so the closure is the first line a reader sees.
-        page.Total.ShouldBe(6);
+        //
+        // Parking and resuming each write two lines, not one: the status move, and the
+        // hold reason arriving or being lifted (WP-1.15). They share an instant with their
+        // status entry, which is what lets a screen render each as a single event — the
+        // same shape resolving has had since WP-1.4.
+        page.Total.ShouldBe(8);
         page.Items.Select(entry => (entry.Kind, entry.FromValue, entry.ToValue)).ShouldBe(
         [
             (TicketChangeKind.Status, "Resolved", "Closed"),
             (TicketChangeKind.Resolution, null, "Replaced the charger."),
             (TicketChangeKind.Status, "InProgress", "Resolved"),
+            (TicketChangeKind.Hold, "Waiting on the vendor.", null),
             (TicketChangeKind.Status, "Waiting", "InProgress"),
+            (TicketChangeKind.Hold, null, "Waiting on the vendor."),
             (TicketChangeKind.Status, "InProgress", "Waiting"),
             (TicketChangeKind.Status, "Assigned", "InProgress"),
         ]);
@@ -226,9 +233,11 @@ public sealed class TicketHistoryTests(IdentityWebFixture fixture) : IAsyncLifet
         var first = await History(technician, ticket, page: 1, pageSize: 2);
         var second = await History(technician, ticket, page: 2, pageSize: 2);
 
-        all.Total.ShouldBe(3);
+        // Three status moves plus the hold and its lift (WP-1.15).
+        all.Total.ShouldBe(5);
         first.Items.Select(entry => entry.Id).ShouldBe(all.Items.Take(2).Select(entry => entry.Id));
-        second.Items.Select(entry => entry.Id).ShouldBe(all.Items.Skip(2).Select(entry => entry.Id));
+        second.Items.Select(entry => entry.Id)
+            .ShouldBe(all.Items.Skip(2).Take(2).Select(entry => entry.Id));
     }
 
     /// <summary>
@@ -277,7 +286,14 @@ public sealed class TicketHistoryTests(IdentityWebFixture fixture) : IAsyncLifet
             client,
             HttpMethod.Post,
             $"/api/v1/tickets/{ticketId}/status-changes",
-            new { status = status.ToString(), resolutionNotes },
+            new
+            {
+                status = status.ToString(),
+                resolutionNotes,
+                // Waiting requires a reason since WP-1.15. These tests are about the shape
+                // of the timeline, not about the reason, so one is supplied.
+                holdReason = status == TicketStatus.Waiting ? "Waiting on the vendor." : null,
+            },
             Token);
 
     private static async Task Succeeds(

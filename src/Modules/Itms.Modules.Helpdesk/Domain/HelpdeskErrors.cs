@@ -213,6 +213,44 @@ internal static class HelpdeskErrors
                 ["resolutionNotes"] = ["Resolution notes are only recorded when resolving a ticket."],
             });
 
+    /// <summary>Parking a ticket without saying what it is waiting on tells nobody anything.</summary>
+    /// <remarks>
+    /// The mirror of <see cref="ResolutionNotesRequired"/>. A ticket in Waiting is one
+    /// nobody is working, and "why" is the only thing that lets the next person — or the
+    /// requester reading their own timeline — know whether it is waiting on them.
+    /// </remarks>
+    public static Error HoldReasonRequired() =>
+        Error.Validation(
+            "helpdesk.hold_reason_required",
+            "Say what the ticket is waiting on.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["holdReason"] = ["Say what the ticket is waiting on."],
+            });
+
+    /// <summary>The reason exceeds what the column holds.</summary>
+    public static Error HoldReasonTooLong() =>
+        Error.Validation(
+            "helpdesk.hold_reason_too_long",
+            $"A hold reason cannot be longer than {Ticket.HoldReasonMaxLength} characters.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["holdReason"] = [$"A hold reason cannot be longer than {Ticket.HoldReasonMaxLength} characters."],
+            });
+
+    /// <summary>
+    /// Only holding a ticket records a reason, exactly as only resolving records a
+    /// resolution. Silently dropping text somebody typed is worse than refusing it.
+    /// </summary>
+    public static Error HoldReasonNotAccepted(TicketStatus target) =>
+        Error.Validation(
+            "helpdesk.hold_reason_not_accepted",
+            $"A hold reason is only recorded when putting a ticket on hold, not when moving it to {Describe(target)}.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["holdReason"] = ["A hold reason is only recorded when putting a ticket on hold."],
+            });
+
     /// <summary>No such user, as far as Identity is concerned.</summary>
     public static Error AssigneeNotFound() =>
         Error.Validation(

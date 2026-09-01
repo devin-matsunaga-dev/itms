@@ -76,10 +76,15 @@ export function useChangeTicketStatus(
 ): UseMutationResult<
   TicketStatusChange,
   Error,
-  { status: TicketStatus; resolutionNotes: string | null; etag: string | null }
+  {
+    status: TicketStatus
+    resolutionNotes: string | null
+    holdReason: string | null
+    etag: string | null
+  }
 > {
-  return useTicketWrite(id, ({ status, resolutionNotes, etag }) =>
-    changeTicketStatus(id, status, resolutionNotes, etag),
+  return useTicketWrite(id, ({ status, resolutionNotes, holdReason, etag }) =>
+    changeTicketStatus(id, status, { resolutionNotes, holdReason }, etag),
   )
 }
 

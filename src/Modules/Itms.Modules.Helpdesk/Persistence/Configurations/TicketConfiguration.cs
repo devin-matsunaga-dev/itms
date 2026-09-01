@@ -67,6 +67,7 @@ internal sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Property(t => t.RelatedAssetId).HasColumnName("related_asset_id");
         builder.Property(t => t.RelatedAlertId).HasColumnName("related_alert_id");
         builder.Property(t => t.ResolutionNotes).HasColumnName("resolution_notes").HasMaxLength(Ticket.ResolutionNotesMaxLength);
+        builder.Property(t => t.HoldReason).HasColumnName("hold_reason").HasMaxLength(Ticket.HoldReasonMaxLength);
         builder.Property(t => t.ResolvedAt).HasColumnName("resolved_at");
         builder.Property(t => t.ClosedAt).HasColumnName("closed_at");
 

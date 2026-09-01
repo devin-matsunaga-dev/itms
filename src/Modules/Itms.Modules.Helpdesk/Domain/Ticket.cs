@@ -50,6 +50,17 @@ public sealed class Ticket
     /// <summary>The longest the resolution notes may be.</summary>
     public const int ResolutionNotesMaxLength = 8000;
 
+    /// <summary>
+    /// The longest a hold reason may be. Comfortably inside
+    /// <c>TicketHistoryEntry.ValueMaxLength</c>, which is what carries it into the
+    /// timeline — a reason that did not fit would be silently truncated there.
+    /// </summary>
+    /// <remarks>
+    /// Shorter than a resolution on purpose: a resolution documents work and a hold reason
+    /// says what is being waited on.
+    /// </remarks>
+    public const int HoldReasonMaxLength = 2000;
+
     /// <summary>The longest a cached display name may be. Wide enough for anything Identity or Directory holds.</summary>
     public const int DisplayNameMaxLength = 256;
 
@@ -189,6 +200,26 @@ public sealed class Ticket
     /// </summary>
     public string? ResolutionNotes { get; private set; }
 
+    /// <summary>
+    /// Why the ticket is parked, while it is in <see cref="TicketStatus.Waiting"/> — and
+    /// <see langword="null"/> whenever it is not.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Cleared on leaving Waiting, and that is load-bearing.</b> A ticket can be held
+    /// more than once, and the timeline is built by comparing two snapshots
+    /// (<c>TicketChanges.Between</c>): if the reason survived a resume, holding again for
+    /// the same reason would produce no diff and therefore no history entry, and the
+    /// second hold would go unrecorded. The column carries only the current reason; every
+    /// reason ever given is in the ticket's history.
+    /// </para>
+    /// <para>
+    /// Unlike <see cref="ResolutionNotes"/>, which is kept through a reopen because it is
+    /// what the requester rejected and the next technician has to read.
+    /// </para>
+    /// </remarks>
+    public string? HoldReason { get; private set; }
+
     /// <summary>When it was resolved (UTC), or <see langword="null"/>.</summary>
     public DateTimeOffset? ResolvedAt { get; private set; }
 
@@ -304,12 +335,18 @@ public sealed class Ticket
     /// <see cref="TicketStatus.Resolved"/> and rejected otherwise — no other transition
     /// records a resolution.
     /// </param>
+    /// <param name="holdReason">
+    /// What the ticket is waiting on, required and non-blank when <paramref name="target"/>
+    /// is <see cref="TicketStatus.Waiting"/> and rejected otherwise — the mirror of
+    /// <paramref name="resolutionNotes"/>.
+    /// </param>
     /// <param name="now">The current instant, from <c>IClock</c>.</param>
     /// <param name="actor">Who is making the move.</param>
     /// <returns>Success, or a conflict describing why the move is refused.</returns>
     public Result ChangeStatus(
         TicketStatus target,
         string? resolutionNotes,
+        string? holdReason,
         DateTimeOffset now,
         Guid? actor)
     {
@@ -327,7 +364,7 @@ public sealed class Ticket
             return HelpdeskErrors.UnassignToReturnToNew();
         }
 
-        return Move(target, resolutionNotes, now, actor);
+        return Move(target, resolutionNotes, holdReason, now, actor);
     }
 
     /// <summary>
@@ -342,12 +379,14 @@ public sealed class Ticket
     /// </remarks>
     /// <param name="target">The status being moved to.</param>
     /// <param name="resolutionNotes">The resolution, when resolving.</param>
+    /// <param name="holdReason">What is being waited on, when holding.</param>
     /// <param name="now">The current instant.</param>
     /// <param name="actor">Who is making the move.</param>
     /// <returns>Success, or a conflict describing why the move is refused.</returns>
     private Result Move(
         TicketStatus target,
         string? resolutionNotes,
+        string? holdReason,
         DateTimeOffset now,
         Guid? actor)
     {
@@ -373,6 +412,23 @@ public sealed class Ticket
             return HelpdeskErrors.ResolutionNotesNotAccepted(target);
         }
 
+        if (target == TicketStatus.Waiting)
+        {
+            if (string.IsNullOrWhiteSpace(holdReason))
+            {
+                return HelpdeskErrors.HoldReasonRequired();
+            }
+
+            if (holdReason.Length > HoldReasonMaxLength)
+            {
+                return HelpdeskErrors.HoldReasonTooLong();
+            }
+        }
+        else if (holdReason is not null)
+        {
+            return HelpdeskErrors.HoldReasonNotAccepted(target);
+        }
+
         switch (target)
         {
             case TicketStatus.InProgress:
@@ -395,8 +451,11 @@ public sealed class Ticket
                 break;
 
             case TicketStatus.Waiting:
+                HoldReason = holdReason!.Trim();
+                break;
+
             case TicketStatus.Cancelled:
-                // Neither writes a field of its own. Waiting's effect on the SLA clock is
+                // Writes no field of its own. Waiting's effect on the SLA clock is
                 // handled below, with every other clock move; there is no CancelledAt
                 // column, and a cancelled ticket's SLA stops with no outcome rather than
                 // being frozen against UpdatedAt, which moves for unrelated reasons.
@@ -431,6 +490,12 @@ public sealed class Ticket
         if (Status == TicketStatus.Waiting)
         {
             sla = sla.Resume(now);
+
+            // And the reason goes with it. The ticket is no longer waiting on anything, so
+            // a reason left standing would describe a state it is not in — and, worse, a
+            // later hold for the same reason would produce no snapshot diff and so no
+            // history entry at all. See the remarks on HoldReason.
+            HoldReason = null;
         }
 
         if (target == TicketStatus.Waiting)
@@ -459,21 +524,22 @@ public sealed class Ticket
     /// <param name="actor">Who started.</param>
     /// <returns>Success, or a conflict.</returns>
     public Result Start(DateTimeOffset now, Guid? actor) =>
-        ChangeStatus(TicketStatus.InProgress, resolutionNotes: null, now, actor);
+        ChangeStatus(TicketStatus.InProgress, resolutionNotes: null, holdReason: null, now, actor);
 
     /// <summary>Work is blocked on somebody else. → <see cref="TicketStatus.Waiting"/>.</summary>
+    /// <param name="holdReason">What the ticket is waiting on. Required and non-blank.</param>
     /// <param name="now">The current instant.</param>
     /// <param name="actor">Who parked it.</param>
     /// <returns>Success, or a conflict.</returns>
-    public Result Wait(DateTimeOffset now, Guid? actor) =>
-        ChangeStatus(TicketStatus.Waiting, resolutionNotes: null, now, actor);
+    public Result Wait(string holdReason, DateTimeOffset now, Guid? actor) =>
+        ChangeStatus(TicketStatus.Waiting, resolutionNotes: null, holdReason, now, actor);
 
     /// <summary>Whatever it was waiting on arrived. <see cref="TicketStatus.Waiting"/> → <see cref="TicketStatus.InProgress"/>.</summary>
     /// <param name="now">The current instant.</param>
     /// <param name="actor">Who resumed it.</param>
     /// <returns>Success, or a conflict.</returns>
     public Result Resume(DateTimeOffset now, Guid? actor) =>
-        ChangeStatus(TicketStatus.InProgress, resolutionNotes: null, now, actor);
+        ChangeStatus(TicketStatus.InProgress, resolutionNotes: null, holdReason: null, now, actor);
 
     /// <summary>The problem is fixed, pending the requester's acceptance. → <see cref="TicketStatus.Resolved"/>.</summary>
     /// <param name="resolutionNotes">What was done. Required and non-blank.</param>
@@ -481,28 +547,28 @@ public sealed class Ticket
     /// <param name="actor">Who resolved it.</param>
     /// <returns>Success, or a conflict.</returns>
     public Result Resolve(string resolutionNotes, DateTimeOffset now, Guid? actor) =>
-        ChangeStatus(TicketStatus.Resolved, resolutionNotes, now, actor);
+        ChangeStatus(TicketStatus.Resolved, resolutionNotes, holdReason: null, now, actor);
 
     /// <summary>The fix did not hold. <see cref="TicketStatus.Resolved"/> → <see cref="TicketStatus.InProgress"/>.</summary>
     /// <param name="now">The current instant.</param>
     /// <param name="actor">Who reopened it.</param>
     /// <returns>Success, or a conflict.</returns>
     public Result Reopen(DateTimeOffset now, Guid? actor) =>
-        ChangeStatus(TicketStatus.InProgress, resolutionNotes: null, now, actor);
+        ChangeStatus(TicketStatus.InProgress, resolutionNotes: null, holdReason: null, now, actor);
 
     /// <summary>The requester accepted the resolution. <see cref="TicketStatus.Resolved"/> → <see cref="TicketStatus.Closed"/>, which is terminal.</summary>
     /// <param name="now">The current instant.</param>
     /// <param name="actor">Who closed it.</param>
     /// <returns>Success, or a conflict.</returns>
     public Result Close(DateTimeOffset now, Guid? actor) =>
-        ChangeStatus(TicketStatus.Closed, resolutionNotes: null, now, actor);
+        ChangeStatus(TicketStatus.Closed, resolutionNotes: null, holdReason: null, now, actor);
 
     /// <summary>Abandoned before resolution. Legal from any pre-resolved state, and terminal.</summary>
     /// <param name="now">The current instant.</param>
     /// <param name="actor">Who cancelled it.</param>
     /// <returns>Success, or a conflict.</returns>
     public Result Cancel(DateTimeOffset now, Guid? actor) =>
-        ChangeStatus(TicketStatus.Cancelled, resolutionNotes: null, now, actor);
+        ChangeStatus(TicketStatus.Cancelled, resolutionNotes: null, holdReason: null, now, actor);
 
     /// <summary>
     /// Puts <paramref name="assigneeId"/> in charge of the ticket, moving it out of
@@ -556,7 +622,7 @@ public sealed class Ticket
         // workflow.
         if (Status == TicketStatus.New)
         {
-            var moved = Move(TicketStatus.Assigned, resolutionNotes: null, now, actor);
+            var moved = Move(TicketStatus.Assigned, resolutionNotes: null, holdReason: null, now, actor);
 
             if (moved.IsFailure)
             {
@@ -605,7 +671,7 @@ public sealed class Ticket
             return HelpdeskErrors.CannotUnassignFrom(Status);
         }
 
-        var moved = Move(TicketStatus.New, resolutionNotes: null, now, actor);
+        var moved = Move(TicketStatus.New, resolutionNotes: null, holdReason: null, now, actor);
 
         if (moved.IsFailure)
         {

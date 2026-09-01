@@ -51,7 +51,7 @@ public static class TicketChanges
         TicketSnapshot after,
         TicketPriorityNames? priorityNames = null)
     {
-        var changes = new List<TicketChange>(capacity: 4);
+        var changes = new List<TicketChange>(capacity: 5);
 
         if (before.Status != after.Status)
         {
@@ -84,6 +84,13 @@ public static class TicketChanges
         if (!string.Equals(before.ResolutionNotes, after.ResolutionNotes, StringComparison.Ordinal))
         {
             changes.Add(new TicketChange(TicketChangeKind.Resolution, before.ResolutionNotes, after.ResolutionNotes));
+        }
+
+        // Set when the ticket is parked and cleared when it resumes, so both directions
+        // produce a line: "on hold — waiting on the vendor", and later "hold lifted".
+        if (!string.Equals(before.HoldReason, after.HoldReason, StringComparison.Ordinal))
+        {
+            changes.Add(new TicketChange(TicketChangeKind.Hold, before.HoldReason, after.HoldReason));
         }
 
         return changes;

@@ -44,5 +44,17 @@ public sealed class ChangeTicketStatusValidator : AbstractValidator<ChangeTicket
         When(request => request.Status != TicketStatus.Resolved, () =>
             RuleFor(request => request.ResolutionNotes)
                 .Null().WithMessage("Resolution notes are only recorded when resolving a ticket."));
+
+        // The exact mirror, for holding. A ticket in Waiting is one nobody is working, and
+        // the reason is what tells the next technician — and the requester reading their
+        // own timeline — whether it is waiting on them.
+        When(request => request.Status == TicketStatus.Waiting, () =>
+            RuleFor(request => request.HoldReason)
+                .NotEmpty().WithMessage("Say what the ticket is waiting on.")
+                .MaximumLength(Ticket.HoldReasonMaxLength));
+
+        When(request => request.Status != TicketStatus.Waiting, () =>
+            RuleFor(request => request.HoldReason)
+                .Null().WithMessage("A hold reason is only recorded when putting a ticket on hold."));
     }
 }

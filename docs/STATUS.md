@@ -6,7 +6,7 @@
 **Phase:** 1 — Helpdesk **complete**. Phase 0 and Phase 1 both await their gate walkthroughs and the `v0.1-phase0` / `v0.2-phase1` tags.
 **Current WP:** `WP-2.1 — Asset domain & lifecycle` — **not before the Phase 1 gate**
 **Branch:** `feat/wp-2.1-asset-domain`
-**Last completed:** `WP-1.14 — Picker defects` (2026-09-01)
+**Last completed:** `WP-1.15 — Hold reason` (2026-09-01)
 **Last updated:** 2026-09-01
 
 > **Phase 1 is complete, including the two packages added against the human's mockup** (WP-1.11's table rebuild and WP-1.12's search and counters). Both are in `WORK_PACKAGES.md` now. What remains before Phase 2 is the gate itself: the walkthrough, the root README, and the tag.
@@ -20,7 +20,7 @@
 | Phase | Packages | Done | Tag |
 |---|---|---|---|
 | 0 — Foundation | 0.1 – 0.9 | 9 / 9 | *gate pending* |
-| 1 — Helpdesk | 1.1 – 1.14 | 14 / 14 | *gate pending* |
+| 1 — Helpdesk | 1.1 – 1.15 | 15 / 15 | *gate pending* |
 | 2 — Assets & directory | 2.1 – 2.7 | 0 / 7 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
@@ -333,14 +333,24 @@
 - **The assignee picker and the queue's assignee filter now show only Technicians and Admins**, via `canHoldTickets`. The requester picker on the create form deliberately still lists everybody — anyone can have a ticket raised for them. That is the third caller of the "is this person staff" test WP-1.6 predicted; it is one exported function reusing `hasAnyRole`, not a third copy of the role check.
 - **A person who currently holds a ticket is kept in the picker even if they no longer pass the filter** — deactivated, or their staff role removed — because a select whose value names no item renders blank and the ticket would appear unassigned.
 
+### Noticed during WP-1.15
+
+- **Putting a ticket on hold now requires a reason, and that is a behaviour change for anything already calling the API.** `POST /tickets/{id}/status-changes` with `status=Waiting` and no `holdReason` is a 400. It is the exact mirror of the resolution rule WP-1.3 set — required for one destination, rejected for every other — but it means any client written against the old shape breaks. There is only one client and it was updated in the same diff.
+- **Thirteen existing integration tests moved tickets to Waiting and had to be told why.** Three suites now supply a default reason inside their own `Move`/`MoveAsync` helper rather than at every call site, because none of those tests is *about* the reason — `TicketHoldEndpointTests` is, and it posts its own body so the refusal is still asserted somewhere. **`TicketWriter.MoveAsync` does the same**, so any later test arranging a park gets a reason for free.
+- **A walk through the workflow is two entries longer per hold, and five tests asserted exact timeline counts.** WP-1.4 warned that its exact-count assertions would need care from any package that added a change kind; this is that package. The counts are updated and the shapes asserted rather than just the totals.
+- **The newest line after a resume is the hold being lifted, not the status move.** The read orders by `occurred_at DESC, sequence DESC` and the hold is written second within the change, so it sorts first. A screen groups entries sharing an instant and renders them together, which is why `TicketDetailEndpointTests` now asserts the *contents* of the group rather than `History[0]`. **A later package that indexes into `History` by position is making the same mistake.**
+- **`TicketWriter.ParkAsync` still writes the status column with raw SQL and leaves `hold_reason` null.** A ticket parked that way is in Waiting with no reason — a state the entity can no longer produce. It is arrangement-only and WP-1.3 and WP-1.6 both recorded that those call sites should migrate to real transitions; this is the third reason to. Any test asserting on a parked ticket's reason must not use it.
+- **Nothing clears `hold_reason` for tickets parked before this migration.** The column is added nullable and backfills nothing, so a ticket already sitting in Waiting shows no reason until it is resumed and held again. There are no such tickets in any real deployment yet — Phase 1 has not shipped — so no backfill was written. If that stops being true before the gate, one is a single `UPDATE`.
+- **The hold reason is visible to the requester**, deliberately: WP-1.5 widened the timeline to them and "waiting on the vendor" is exactly what they most want to know. It is therefore **not** the place for anything internal — that is what an internal note is for, and the composer is right there on the same screen.
+
 ## Known issues
 
 - none
 
 ## Environment notes
 
-- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.14: **695 unit, 52 architecture, 446 integration** (the integration run is about 109 s, of which the 50,000-ticket volume test is roughly half) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
-- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 270 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
+- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.15: **708 unit, 52 architecture, 453 integration** (the integration run is about 109 s, of which the 50,000-ticket volume test is roughly half) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
+- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 276 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
 - **`aspire run` now also starts `web-client`.** It runs `npm install` first (an Aspire installer resource) and then `npm run dev`, waits for `web-host`, and is published on an external endpoint — the dashboard prints its URL. The Vite dev server proxies `/api` to the host, so the browser sees one origin.
 - **The colour scheme is remembered per browser** under `localStorage["itms.theme"]`, and follows the operating system until the viewer picks a mode. Clearing site data returns it to the system preference. There is no server-side or per-account theme setting, and none is planned.
 - **Node 24 LTS and npm 11 are what the client is built with.** `node -v` should report v24.x; the lockfile is committed and `npm ci` is the reproducible install.

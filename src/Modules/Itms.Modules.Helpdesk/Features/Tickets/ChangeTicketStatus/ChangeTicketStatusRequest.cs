@@ -26,6 +26,17 @@ namespace Itms.Modules.Helpdesk.Features.Tickets.ChangeTicketStatus;
 /// <c>Resolved</c>, and rejected for every other destination, because no other transition
 /// records a resolution and silently dropping the text would lose it.
 /// </param>
+/// <param name="HoldReason">
+/// What the ticket is waiting on. Required and non-blank when <paramref name="Status"/> is
+/// <c>Waiting</c>, and rejected for every other destination — the exact mirror of
+/// <paramref name="ResolutionNotes"/>, and for the same reason: a ticket nobody is working
+/// should say why, and text somebody typed should never be silently dropped.
+///
+/// It is kept only while the ticket is parked. Resuming clears it, which is what makes a
+/// second hold write its own line in the timeline rather than looking like no change at
+/// all. Every reason ever given stays in the ticket's history.
+/// </param>
 public sealed record ChangeTicketStatusRequest(
     TicketStatus Status,
-    string? ResolutionNotes);
+    string? ResolutionNotes,
+    string? HoldReason);

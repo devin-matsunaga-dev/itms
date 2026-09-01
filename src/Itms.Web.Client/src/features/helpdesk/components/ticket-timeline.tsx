@@ -5,6 +5,7 @@ import {
   Lock,
   MessageSquare,
   MoreHorizontal,
+  PauseCircle,
   TicketPlus,
   UserRound,
   type LucideIcon,
@@ -141,8 +142,14 @@ function Body({ item }: { item: ActivityItem }): React.JSX.Element | null {
       {item.entries.map((entry) => (
         <li key={entry.id} className="text-copy text-body">
           <span className="text-muted-foreground">{changeKindLabels[entry.kind]}: </span>
-          {entry.kind === 'Resolution' ? (
-            <span className="whitespace-pre-wrap">{describeValue(entry, entry.toValue)}</span>
+          {entry.kind === 'Resolution' || entry.kind === 'Hold' ? (
+            // A value, not a move between two: "on hold — waiting on the vendor" reads as
+            // a sentence, where "— → waiting on the vendor" reads as a bug.
+            <span className="whitespace-pre-wrap">
+              {entry.toValue === null || entry.toValue.length === 0
+                ? 'lifted'
+                : describeValue(entry, entry.toValue)}
+            </span>
           ) : (
             <>
               <span>{describeValue(entry, entry.fromValue)}</span>
@@ -220,6 +227,10 @@ function changeDecoration(kind: TicketChangeKind | undefined): Decoration {
       return { icon: Flag, tint: 'bg-warning/12 dark:bg-warning/15', tone: 'text-warning' }
     case 'Resolution':
       return { icon: CircleCheck, tint: 'bg-violet/12 dark:bg-violet/15', tone: 'text-violet' }
+    case 'Hold':
+      // `teal` is Waiting's hue in DESIGN.md §2's semantic map, so a hold in the timeline
+      // and the Waiting status pill above it are the same colour.
+      return { icon: PauseCircle, tint: 'bg-teal/12 dark:bg-teal/15', tone: 'text-teal' }
     default:
       return { icon: ArrowRightLeft, tint: 'bg-primary-soft', tone: 'text-primary' }
   }

@@ -125,6 +125,10 @@ Ticket detail with header pills, properties panel, comment/note composer with a 
 *Added after WP-1.13, from a defect found by hand: no ticket could change status.* A blank search term on `GET /api/v1/users` returned nothing, so every requester and assignee picker was empty. Fixes the lookup, documents the contract, filters the assignee pickers to people who can hold a ticket, and pins the client's own query string in an integration test.
 **Done when:** a ticket can be assigned and moved through its whole workflow in the browser, and a test fails if the picker query ever returns nothing again.
 
+### WP-1.15 — Hold reason `[SENSITIVE]`
+*Added after WP-1.14.* Putting a ticket on hold requires a reason, the exact mirror of the resolution rule: required and non-blank for `Waiting`, rejected for every other destination. Stored on the ticket while it is parked and cleared on resuming, so a second hold records itself; surfaced in the detail header and in the timeline beside the status move.
+**Done when:** a technician cannot park a ticket without saying why, the reason reads in the activity beside the status change, and holding twice for the same reason is recorded twice.
+
 🏁 **Phase 1 gate.** Tag `v0.2-phase1`.
 
 ---

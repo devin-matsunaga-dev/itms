@@ -115,14 +115,17 @@ public sealed class TicketAccessTests(IdentityWebFixture fixture) : IAsyncLifeti
         var world = await WorldAsync();
 
         await TicketWriter.ParkAsync(fixture.DataSource, world.TheirTicket.Id, TicketStatus.InProgress, Token);
-        (await TicketClient.ChangeStatusAsync(world.Tech, world.TheirTicket.Id, TicketStatus.Waiting, Token))
+        (await TicketClient.ChangeStatusAsync(world.Tech, world.TheirTicket.Id, TicketStatus.Waiting, Token, holdReason: "Waiting on the vendor."))
             .EnsureSuccessStatusCode();
 
         var page = await ApiClient.ListAsync<TicketHistoryDto>(
             world.User, $"{TicketClient.Tickets}/{world.TheirTicket.Id}/history", Token);
 
-        page.Total.ShouldBe(1);
-        page.Items.Single().ToValue.ShouldBe(nameof(TicketStatus.Waiting));
+        // The status move and the hold reason, at one instant (WP-1.15). The requester
+        // seeing why their own ticket is parked is the point of the reason existing.
+        page.Total.ShouldBe(2);
+        page.Items.Select(entry => entry.ToValue)
+            .ShouldBe([nameof(TicketStatus.Waiting), "Waiting on the vendor."], ignoreOrder: true);
     }
 
     [Fact]

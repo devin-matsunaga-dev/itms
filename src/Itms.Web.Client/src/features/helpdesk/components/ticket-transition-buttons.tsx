@@ -11,17 +11,18 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { TicketDetail, TicketStatus } from '@/lib/api/types'
-import { transitionActions, type TransitionAction } from '../lib/ticket-transitions'
+import {
+  transitionActions,
+  type TransitionAction,
+  type TransitionNoteValue,
+} from '../lib/ticket-transitions'
 import { statusLabels } from '../lib/ticket-display'
-
-/** `Ticket.ResolutionNotesMaxLength`. */
-const resolutionNotesMaxLength = 8000
 
 interface TicketTransitionButtonsProps {
   ticket: TicketDetail
   /** True while a write is in flight, so a transition cannot be pressed twice. */
   busy: boolean
-  onMove: (status: TicketStatus, resolutionNotes: string | null) => void
+  onMove: (status: TicketStatus, note: TransitionNoteValue | null) => void
 }
 
 /**
@@ -59,7 +60,7 @@ export function TicketTransitionButtons({
   }
 
   const start = (action: TransitionAction): void => {
-    if (action.requiresNotes || action.confirms) {
+    if (action.note !== null || action.confirms) {
       setPendingAction(action)
       setNotes('')
       setNotesError(null)
@@ -73,13 +74,13 @@ export function TicketTransitionButtons({
       return
     }
 
-    if (pendingAction.requiresNotes) {
+    if (pendingAction.note !== null) {
       const trimmed = notes.trim()
       if (trimmed.length === 0) {
-        setNotesError('Describe what was done to resolve the ticket.')
+        setNotesError(pendingAction.note.required)
         return
       }
-      onMove(pendingAction.status, trimmed)
+      onMove(pendingAction.status, { field: pendingAction.note.field, value: trimmed })
       close()
       return
     }
@@ -116,47 +117,46 @@ export function TicketTransitionButtons({
             <>
               <DialogHeader>
                 <DialogTitle>
-                  {pendingAction.requiresNotes
-                    ? `Resolve ${ticket.number}`
+                  {pendingAction.note === null
+                    ? `${pendingAction.label} — ${ticket.number}`
                     : `${pendingAction.label} — ${ticket.number}`}
                 </DialogTitle>
                 <DialogDescription>
-                  {pendingAction.requiresNotes
-                    ? 'Say what was done. The requester reads this, and it stays on the ticket if it is reopened.'
-                    : `This moves the ticket to ${statusLabels[pendingAction.status]}, which it cannot be moved out of.`}
+                  {pendingAction.note?.description ??
+                    `This moves the ticket to ${statusLabels[pendingAction.status]}, which it cannot be moved out of.`}
                 </DialogDescription>
               </DialogHeader>
 
-              {pendingAction.requiresNotes ? (
+              {pendingAction.note === null ? null : (
                 <div className="flex flex-col gap-1.5">
                   <Label
-                    htmlFor="resolution-notes"
+                    htmlFor="transition-note"
                     className="text-field-label font-medium text-heading"
                   >
-                    Resolution notes
+                    {pendingAction.note.label}
                     <span className="text-danger" aria-hidden="true">
                       *
                     </span>
                   </Label>
                   <Textarea
-                    id="resolution-notes"
+                    id="transition-note"
                     rows={5}
-                    maxLength={resolutionNotesMaxLength}
+                    maxLength={pendingAction.note.maxLength}
                     value={notes}
                     aria-invalid={notesError !== null}
-                    aria-describedby={notesError === null ? undefined : 'resolution-notes-error'}
+                    aria-describedby={notesError === null ? undefined : 'transition-note-error'}
                     onChange={(event) => {
                       setNotes(event.target.value)
                       setNotesError(null)
                     }}
                   />
                   {notesError === null ? null : (
-                    <p id="resolution-notes-error" className="text-caption text-danger">
+                    <p id="transition-note-error" className="text-caption text-danger">
                       {notesError}
                     </p>
                   )}
                 </div>
-              ) : null}
+              )}
 
               <DialogFooter>
                 <Button variant="outline" onClick={close}>

@@ -503,17 +503,35 @@ public sealed class TicketStatusEndpointTests(IdentityWebFixture fixture) : IAsy
 
     private static string Path(Guid ticketId) => $"/api/v1/tickets/{ticketId}/status-changes";
 
+    /// <summary>
+    /// Posts a transition, supplying the note its destination requires.
+    /// </summary>
+    /// <remarks>
+    /// Waiting takes a hold reason and Resolved takes resolution notes; every other
+    /// destination refuses both (WP-1.15). The reason is filled in here rather than at
+    /// forty call sites, because none of these tests is about the hold reason — the ones
+    /// that are live in <c>TicketHoldEndpointTests</c> and post their own body.
+    /// </remarks>
     private static Task<HttpResponseMessage> Move(
         HttpClient client,
         Guid ticketId,
         TicketStatus status,
-        string? resolutionNotes) =>
+        string? resolutionNotes,
+        string? holdReason = null) =>
         ApiClient.SendAsync(
             client,
             HttpMethod.Post,
             Path(ticketId),
-            new { status = status.ToString(), resolutionNotes },
+            new
+            {
+                status = status.ToString(),
+                resolutionNotes,
+                holdReason = holdReason ?? (status == TicketStatus.Waiting ? DefaultHoldReason : null),
+            },
             Token);
+
+    /// <summary>A reason to park with, where the test is about something else.</summary>
+    private const string DefaultHoldReason = "Waiting on the vendor.";
 
     private static async Task<TicketStatusChangeDto> Succeeds(
         HttpClient client,

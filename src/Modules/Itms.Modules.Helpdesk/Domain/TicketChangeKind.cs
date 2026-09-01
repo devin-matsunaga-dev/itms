@@ -33,4 +33,14 @@ public enum TicketChangeKind
 
     /// <summary>Its resolution notes were recorded, replaced, or cleared.</summary>
     Resolution,
+
+    /// <summary>
+    /// It was put on hold with a reason, or that reason was lifted when it resumed.
+    /// </summary>
+    /// <remarks>
+    /// Written at the same instant as the <see cref="Status"/> entry the same move
+    /// produces, exactly as <see cref="Resolution"/> is — so a screen that groups entries
+    /// sharing an instant renders "on hold, because X" as one event rather than two rows.
+    /// </remarks>
+    Hold,
 }

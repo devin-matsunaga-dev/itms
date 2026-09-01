@@ -54,6 +54,11 @@ namespace Itms.Modules.Helpdesk.Features.Tickets;
 /// <param name="AssigneeId">The technician responsible, or <see langword="null"/>.</param>
 /// <param name="AssigneeName">Their display name, or <see langword="null"/>.</param>
 /// <param name="ResolutionNotes">What was done, once it has been resolved. Kept through a reopen.</param>
+/// <param name="HoldReason">
+/// What the ticket is waiting on while it is parked, and <see langword="null"/> whenever it
+/// is not. Cleared on resuming, so it always describes the state the ticket is actually in;
+/// every reason ever given stays in the ticket's history.
+/// </param>
 /// <param name="ResolvedAt">When it was resolved (UTC), or <see langword="null"/>.</param>
 /// <param name="ClosedAt">When it was closed (UTC), or <see langword="null"/>.</param>
 /// <param name="RelatedAssetId">The asset it concerns, or <see langword="null"/>. WP-2.5 sets it.</param>
@@ -85,6 +90,7 @@ public sealed record TicketDetailResponse(
     Guid? AssigneeId,
     string? AssigneeName,
     string? ResolutionNotes,
+    string? HoldReason,
     DateTimeOffset? ResolvedAt,
     DateTimeOffset? ClosedAt,
     Guid? RelatedAssetId,
@@ -225,6 +231,7 @@ public sealed record TicketDetailResponse(
                 ticket.AssigneeId,
                 ticket.AssigneeName,
                 ticket.ResolutionNotes,
+                ticket.HoldReason,
                 ticket.ResolvedAt,
                 ticket.ClosedAt,
                 ticket.RelatedAssetId,

@@ -98,18 +98,20 @@ export function createTicket(request: CreateTicketRequest): Promise<TicketDetail
 /**
  * Moves a ticket to another status.
  *
- * `resolutionNotes` is required and non-blank when the destination is `Resolved`, and
- * rejected for every other destination (WP-1.3) — so it is sent as null unless resolving.
+ * Two destinations carry a note and every other refuses one: `Resolved` requires
+ * `resolutionNotes`, `Waiting` requires `holdReason`. Both are sent — as null unless they
+ * belong to this destination — because the server rejects the one that does not, and
+ * silently dropping text somebody typed would be worse.
  */
 export function changeTicketStatus(
   id: string,
   status: TicketStatus,
-  resolutionNotes: string | null,
+  notes: { resolutionNotes: string | null; holdReason: string | null },
   etag: string | null,
 ): Promise<TicketStatusChange> {
   return apiFetch<TicketStatusChange>(`/tickets/${id}/status-changes`, {
     method: 'POST',
-    body: { status, resolutionNotes },
+    body: { status, ...notes },
     ...ifMatch(etag),
   })
 }

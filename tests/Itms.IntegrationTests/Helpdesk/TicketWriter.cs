@@ -250,6 +250,7 @@ internal static class TicketWriter
     /// <param name="target">The status to move it to.</param>
     /// <param name="resolutionNotes">The resolution, when moving to Resolved.</param>
     /// <param name="cancellationToken">Cancels the work.</param>
+    /// <param name="holdReason">What the ticket is waiting on, when moving to Waiting.</param>
     /// <param name="failAfterSave">
     /// Runs inside the transaction after the change and its history have been saved. A test
     /// that throws from here rolls both of them back.
@@ -260,6 +261,7 @@ internal static class TicketWriter
         TicketStatus target,
         string? resolutionNotes,
         CancellationToken cancellationToken,
+        string? holdReason = null,
         Action? failAfterSave = null)
     {
         await using var scope = services.CreateAsyncScope();
@@ -278,7 +280,11 @@ internal static class TicketWriter
                 var before = TicketSnapshot.Of(ticket);
                 var now = clock.UtcNow;
 
-                var transition = ticket.ChangeStatus(target, resolutionNotes, now, actor: null);
+                // Waiting requires a reason (WP-1.15); a caller that did not name one is
+                // arranging a park rather than testing the rule, so it gets a default.
+                var reason = holdReason ?? (target == TicketStatus.Waiting ? "Waiting on the vendor." : null);
+
+                var transition = ticket.ChangeStatus(target, resolutionNotes, reason, now, actor: null);
                 if (transition.IsFailure)
                 {
                     throw new InvalidOperationException($"The suite asked for an illegal move to {target}.");

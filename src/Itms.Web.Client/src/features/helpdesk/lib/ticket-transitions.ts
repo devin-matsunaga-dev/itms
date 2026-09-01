@@ -27,14 +27,63 @@
 
 import type { TicketStatus } from '@/lib/api/types'
 
+/** A note the person actually wrote, and the field it travels in. */
+export interface TransitionNoteValue {
+  readonly field: TransitionNote['field']
+  readonly value: string
+}
+
+/** The note a transition collects, and how the dialog should ask for it. */
+export interface TransitionNote {
+  /** Which request field it travels in. */
+  readonly field: 'resolutionNotes' | 'holdReason'
+  readonly label: string
+  readonly description: string
+  /** The message when it is left blank, matching what the server would say. */
+  readonly required: string
+  readonly maxLength: number
+}
+
+/** `Ticket.ResolutionNotesMaxLength`. */
+const resolutionNotesMaxLength = 8000
+
+/** `Ticket.HoldReasonMaxLength`. Shorter: a reason names what is being waited on. */
+const holdReasonMaxLength = 2000
+
+const notes: Partial<Record<TicketStatus, TransitionNote>> = {
+  Resolved: {
+    field: 'resolutionNotes',
+    label: 'Resolution notes',
+    description:
+      'Say what was done. The requester reads this, and it stays on the ticket if it is reopened.',
+    required: 'Describe what was done to resolve the ticket.',
+    maxLength: resolutionNotesMaxLength,
+  },
+  Waiting: {
+    field: 'holdReason',
+    label: 'Reason for the hold',
+    description:
+      'Say what the ticket is waiting on. The requester sees this, and it is cleared when work resumes.',
+    required: 'Say what the ticket is waiting on.',
+    maxLength: holdReasonMaxLength,
+  },
+}
+
 /** One transition, as a button. */
 export interface TransitionAction {
   /** The destination to send to `POST /tickets/{id}/status-changes`. */
   readonly status: TicketStatus
   /** The verb on the button. Sentence case, per DESIGN.md §2. */
   readonly label: string
-  /** True when the server requires non-blank resolution notes with the move (WP-1.3). */
-  readonly requiresNotes: boolean
+  /**
+   * The note this move requires, or null when it takes none.
+   *
+   * Two destinations carry one and the server refuses it on every other: `Resolved` wants
+   * the resolution, `Waiting` wants the reason the ticket is being parked. Both are
+   * required and non-blank, and both are rejected if sent to anything else — so the field
+   * a dialog collects has to match the destination exactly.
+   */
+  readonly note: TransitionNote | null
   /** True when the move is worth confirming before it is made. */
   readonly confirms: boolean
   /** True for the one destructive action, which DESIGN.md §4 paints in `danger`. */
@@ -66,7 +115,7 @@ export function transitionActions(
     .map((status) => ({
       status,
       label: label(from, status),
-      requiresNotes: status === 'Resolved',
+      note: notes[status] ?? null,
       confirms: status === 'Cancelled' || status === 'Closed',
       destructive: status === 'Cancelled',
     }))

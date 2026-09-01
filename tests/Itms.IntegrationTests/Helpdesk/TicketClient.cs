@@ -108,6 +108,7 @@ public sealed record TicketDetailDto(
     Guid? AssigneeId,
     string? AssigneeName,
     string? ResolutionNotes,
+    string? HoldReason,
     DateTimeOffset? ResolvedAt,
     DateTimeOffset? ClosedAt,
     Guid? RelatedAssetId,
@@ -297,6 +298,7 @@ internal static class TicketClient
     /// <param name="cancellationToken">Cancels the exchange.</param>
     /// <param name="resolutionNotes">The resolution, when resolving.</param>
     /// <param name="ifMatch">The entity tag to require, or null to state no precondition.</param>
+    /// <param name="holdReason">What the ticket is waiting on, when holding.</param>
     /// <returns>The raw response.</returns>
     public static async Task<HttpResponseMessage> ChangeStatusAsync(
         HttpClient client,
@@ -304,14 +306,15 @@ internal static class TicketClient
         TicketStatus status,
         CancellationToken cancellationToken,
         string? resolutionNotes = null,
-        string? ifMatch = null)
+        string? ifMatch = null,
+        string? holdReason = null)
     {
         ArgumentNullException.ThrowIfNull(client);
 
         var request = new HttpRequestMessage(HttpMethod.Post, $"{Tickets}/{ticketId}/status-changes")
         {
             Content = JsonContent.Create(
-                new { status = status.ToString(), resolutionNotes },
+                new { status = status.ToString(), resolutionNotes, holdReason },
                 options: Json),
         };
 
