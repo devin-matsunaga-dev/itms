@@ -723,8 +723,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Reads one asset. */
+        /**
+         * Reads one asset.
+         * @description Carries an ETag naming the asset's current version. Send it back as If-Match on a lifecycle call to be told the asset has moved before the change is attempted.
+         */
         get: operations["GetAsset"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reads an asset's history, newest first.
+         * @description Entries sharing an occurredAt came from one operation — issuing equipment out of stock moves the holder and the status — and are meant to be read together, in sequence order.
+         */
+        get: operations["ListAssetHistory"];
         put?: never;
         post?: never;
         delete?: never;
@@ -750,6 +773,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/{id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issues an asset to somebody, transfers it, or takes it back.
+         * @description Naming a user issues or transfers the asset; omitting one takes it back. Issuing an in-stock asset also deploys it, and returning a deployed one puts it back in stock — a transfer between two people moves nobody's lifecycle status. Send the asset's ETag as If-Match to be refused with 412 if it has moved since you read it.
+         */
+        post: operations["AssignAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/{id}/repairs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sends an asset away to be fixed.
+         * @description The holder is kept: a machine at the vendor is still issued to whoever had it, which is what tells the return-to-service call where to put it back. Send the asset's ETag as If-Match to be refused with 412 if it has moved since you read it.
+         */
+        post: operations["SendAssetForRepair"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/{id}/returns-to-service": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Brings an asset back from repair.
+         * @description It goes back to deployed if somebody still holds it, and into stock if nobody does. Send the asset's ETag as If-Match to be refused with 412 if it has moved since you read it.
+         */
+        post: operations["ReturnAssetToService"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/{id}/retirements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Takes an asset out of service and keeps it on the books.
+         * @description Retiring also releases whoever holds it, so a deployed asset records both the release and the transition. Retired is terminal: no lifecycle call is accepted afterwards. Send the asset's ETag as If-Match to be refused with 412 if it has moved since you read it.
+         */
+        post: operations["RetireAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -764,6 +867,53 @@ export interface components {
              * @default false
              */
             isInternal: boolean;
+        };
+        /**
+         * @description Which dimension of an asset a history entry records having moved.
+         * @enum {unknown}
+         */
+        AssetChangeKind: "Assignment" | "Status";
+        /** @description One line of an asset's timeline, as the API renders it. */
+        AssetHistoryEntryResponse: {
+            /**
+             * Format: uuid
+             * @description The entry's id.
+             */
+            id: string;
+            /** @description Which dimension moved. */
+            kind: components["schemas"]["AssetChangeKind"];
+            /** @description What it read before, or `null` when there was nothing there. */
+            fromValue: null | string;
+            /** @description What it reads now, or `null` when the change cleared it. */
+            toValue: null | string;
+            /** @description What the operator said about it, or `null`. */
+            note: null | string;
+            /**
+             * Format: date-time
+             * @description When the change happened (UTC).
+             */
+            occurredAt: string;
+            /**
+             * Format: int32
+             * @description Where this line sits among the lines the same operation wrote. Entries sharing an
+             *     OccurredAt came from one operation and are meant to be read together.
+             */
+            sequence: number;
+            /**
+             * Format: uuid
+             * @description Who made it, or `null` when the system did.
+             */
+            actorId: null | string;
+            /** @description Their display name at the time, or `null`. */
+            actorName: null | string;
+        };
+        /**
+         * @description The body of a lifecycle operation that names no other party: sending an asset for
+         *     repair, returning it to service, retiring it.
+         */
+        AssetLifecycleRequest: {
+            /** @description What the operator wants recorded against this move, or `null`. */
+            note: null | string;
         };
         /** @description An asset as the API renders it. */
         AssetResponse: {
@@ -802,7 +952,7 @@ export interface components {
             assetStatusName: string;
             /**
              * Format: uuid
-             * @description Who holds it. Always null until WP-2.2 adds assignment.
+             * @description Who currently holds it.
              */
             assignedToUserId: null | string;
             /** @description Their cached display name. */
@@ -910,6 +1060,16 @@ export interface components {
              * @description When it was last changed (UTC).
              */
             updatedAt: string;
+        };
+        /** @description Who is to hold the asset, or nobody. */
+        AssignAssetRequest: {
+            /**
+             * Format: uuid
+             * @description Who is taking it on, or `null` to take it back off whoever has it.
+             */
+            assignedToUserId: null | string;
+            /** @description What the operator wants recorded against this move, or `null`. */
+            note: null | string;
         };
         /** @description The body of `POST /api/v1/tickets/{id}/assignments`. */
         AssignTicketRequest: {
@@ -1267,6 +1427,37 @@ export interface components {
              *     an Organization may be.
              */
             parentId: null | string;
+        };
+        /**
+         * @description The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as
+         *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
+         *     object so the shape reaches OpenAPI and, from there, the generated client.
+         */
+        PagedResultOfAssetHistoryEntryResponse: {
+            /** @description The items on this page. */
+            items: components["schemas"]["AssetHistoryEntryResponse"][];
+            /**
+             * Format: int32
+             * @description The total number of matching items across all pages.
+             */
+            total: number;
+            /**
+             * Format: int32
+             * @description The 1-based page number this envelope represents.
+             */
+            page: number;
+            /**
+             * Format: int32
+             * @description The page size that was applied, after clamping.
+             */
+            pageSize: number;
+            /**
+             * Format: int32
+             * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
+             */
+            totalPages?: number;
+            /** @description True when a further page exists. */
+            hasNextPage?: boolean;
         };
         /**
          * @description The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as
@@ -4895,6 +5086,56 @@ export interface operations {
             };
         };
     };
+    ListAssetHistory: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfAssetHistoryEntryResponse"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     CreateAsset: {
         parameters: {
             query?: never;
@@ -4944,6 +5185,318 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AssignAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignAssetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SendAssetForRepair: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetLifecycleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReturnAssetToService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetLifecycleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RetireAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetLifecycleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
                 headers: {
                     [name: string]: unknown;
                 };

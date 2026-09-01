@@ -1,3 +1,5 @@
+using System.Net.Http.Json;
+using System.Text.Json;
 using Itms.IntegrationTests.Api;
 
 namespace Itms.IntegrationTests.AssetsModule;
@@ -37,7 +39,8 @@ public sealed record AssetStatusDto(
 /// <param name="AssetStatusId">Its status.</param>
 /// <param name="AssetStatusCode">That status's immutable code.</param>
 /// <param name="AssetStatusName">That status's current name.</param>
-/// <param name="AssignedToUserId">Who holds it. Null until WP-2.2.</param>
+/// <param name="AssignedToUserId">Who currently holds it.</param>
+/// <param name="AssignedToUserName">Their display name, cached on the asset row.</param>
 /// <param name="DepartmentId">The department that owns it.</param>
 /// <param name="DepartmentName">That department's cached name.</param>
 /// <param name="LocationId">Where it is.</param>
@@ -56,11 +59,33 @@ public sealed record AssetDto(
     string AssetStatusCode,
     string AssetStatusName,
     Guid? AssignedToUserId,
+    string? AssignedToUserName,
     Guid? DepartmentId,
     string? DepartmentName,
     Guid? LocationId,
     string? LocationPath,
     decimal? Cost);
+
+/// <summary>One line of an asset's timeline as the suite reads it off the wire.</summary>
+/// <param name="Id">The entry's id.</param>
+/// <param name="Kind">Which dimension moved — <c>Assignment</c> or <c>Status</c>.</param>
+/// <param name="FromValue">What it read before.</param>
+/// <param name="ToValue">What it reads now.</param>
+/// <param name="Note">What the operator said about it.</param>
+/// <param name="OccurredAt">When it happened (UTC).</param>
+/// <param name="Sequence">Where it sat among the entries the same operation wrote.</param>
+/// <param name="ActorId">Who did it.</param>
+/// <param name="ActorName">Their display name at the time.</param>
+public sealed record AssetHistoryDto(
+    Guid Id,
+    string Kind,
+    string? FromValue,
+    string? ToValue,
+    string? Note,
+    DateTimeOffset OccurredAt,
+    int Sequence,
+    Guid? ActorId,
+    string? ActorName);
 
 /// <summary>The asset request shapes the suite needs, written once.</summary>
 /// <remarks>
@@ -70,6 +95,8 @@ public sealed record AssetDto(
 /// </remarks>
 public static class AssetsClient
 {
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
     /// <summary>The route the asset endpoints hang off.</summary>
     public const string Assets = "/api/v1/assets";
 
@@ -182,4 +209,146 @@ public static class AssetsClient
         var page = await ApiClient.ListAsync<AssetStatusDto>(client, Statuses, cancellationToken);
         return page.Items.Single(status => string.Equals(status.Code, code, StringComparison.Ordinal));
     }
+
+    /// <summary>Reads an asset and the entity tag it came back with.</summary>
+    /// <param name="client">The signed-in client.</param>
+    /// <param name="assetId">The asset to read.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The asset and its <c>ETag</c>.</returns>
+    public static async Task<(AssetDto Asset, string ETag)> GetAssetAsync(
+        HttpClient client,
+        Guid assetId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+
+        var response = await client.GetAsync(new Uri($"{Assets}/{assetId}", UriKind.Relative), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var asset = await ApiClient.ReadAsync<AssetDto>(response, cancellationToken);
+        return (asset, response.Headers.ETag?.ToString() ?? string.Empty);
+    }
+
+    /// <summary>Reads an asset's timeline, newest first.</summary>
+    /// <param name="client">The signed-in client.</param>
+    /// <param name="assetId">The asset whose history is wanted.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The page envelope.</returns>
+    public static Task<PageDto<AssetHistoryDto>> HistoryAsync(
+        HttpClient client,
+        Guid assetId,
+        CancellationToken cancellationToken) =>
+        ApiClient.ListAsync<AssetHistoryDto>(client, $"{Assets}/{assetId}/history", cancellationToken);
+
+    /// <summary>Issues, transfers, or takes back an asset.</summary>
+    /// <param name="client">A technician or admin client.</param>
+    /// <param name="assetId">The asset.</param>
+    /// <param name="assignedToUserId">Who takes it on, or null to take it back.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="note">The operator's note, if any.</param>
+    /// <param name="ifMatch">The entity tag to require, or null to state no precondition.</param>
+    /// <returns>The raw response.</returns>
+    public static Task<HttpResponseMessage> AssignAsync(
+        HttpClient client,
+        Guid assetId,
+        Guid? assignedToUserId,
+        CancellationToken cancellationToken,
+        string? note = null,
+        string? ifMatch = null) =>
+        LifecycleAsync(client, assetId, "assignments", new { assignedToUserId, note }, cancellationToken, ifMatch);
+
+    /// <summary>Sends an asset away to be fixed.</summary>
+    /// <param name="client">A technician or admin client.</param>
+    /// <param name="assetId">The asset.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="note">The operator's note, if any.</param>
+    /// <param name="ifMatch">The entity tag to require, or null to state no precondition.</param>
+    /// <returns>The raw response.</returns>
+    public static Task<HttpResponseMessage> SendForRepairAsync(
+        HttpClient client,
+        Guid assetId,
+        CancellationToken cancellationToken,
+        string? note = null,
+        string? ifMatch = null) =>
+        LifecycleAsync(client, assetId, "repairs", new { note }, cancellationToken, ifMatch);
+
+    /// <summary>Brings an asset back from repair.</summary>
+    /// <param name="client">A technician or admin client.</param>
+    /// <param name="assetId">The asset.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="note">The operator's note, if any.</param>
+    /// <param name="ifMatch">The entity tag to require, or null to state no precondition.</param>
+    /// <returns>The raw response.</returns>
+    public static Task<HttpResponseMessage> ReturnToServiceAsync(
+        HttpClient client,
+        Guid assetId,
+        CancellationToken cancellationToken,
+        string? note = null,
+        string? ifMatch = null) =>
+        LifecycleAsync(client, assetId, "returns-to-service", new { note }, cancellationToken, ifMatch);
+
+    /// <summary>Takes an asset out of service.</summary>
+    /// <param name="client">A technician or admin client.</param>
+    /// <param name="assetId">The asset.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="note">The operator's note, if any.</param>
+    /// <param name="ifMatch">The entity tag to require, or null to state no precondition.</param>
+    /// <returns>The raw response.</returns>
+    public static Task<HttpResponseMessage> RetireAsync(
+        HttpClient client,
+        Guid assetId,
+        CancellationToken cancellationToken,
+        string? note = null,
+        string? ifMatch = null) =>
+        LifecycleAsync(client, assetId, "retirements", new { note }, cancellationToken, ifMatch);
+
+    /// <summary>
+    /// Posts one lifecycle call, optionally stating an <c>If-Match</c> precondition.
+    /// </summary>
+    /// <remarks>
+    /// Built by hand rather than through <c>ApiClient.SendAsync</c>, which has nowhere to
+    /// put a header: a test has to be able to attach a deliberately malformed
+    /// <c>If-Match</c> without <c>HttpClient</c> validating it away. One helper for all four
+    /// routes rather than <c>TicketClient</c>'s copy per route — they differ only in the
+    /// segment and the body.
+    /// </remarks>
+    /// <param name="client">A technician or admin client.</param>
+    /// <param name="assetId">The asset.</param>
+    /// <param name="segment">The route segment under the asset.</param>
+    /// <param name="body">The request body.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="ifMatch">The entity tag to require, or null to state no precondition.</param>
+    /// <returns>The raw response.</returns>
+    public static async Task<HttpResponseMessage> LifecycleAsync(
+        HttpClient client,
+        Guid assetId,
+        string segment,
+        object body,
+        CancellationToken cancellationToken,
+        string? ifMatch = null)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{Assets}/{assetId}/{segment}")
+        {
+            Content = JsonContent.Create(body, body.GetType(), options: Json),
+        };
+
+        if (ifMatch is not null)
+        {
+            // Added without validation, so a test can send a deliberately malformed tag.
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        var csrf = await client.GetFromJsonAsync<CsrfDto>(
+            new Uri("/api/v1/auth/csrf", UriKind.Relative),
+            Json,
+            cancellationToken)
+            ?? throw new InvalidOperationException("No antiforgery token was issued.");
+
+        request.Headers.Add(csrf.HeaderName, csrf.Token);
+        return await client.SendAsync(request, cancellationToken);
+    }
+
+    private sealed record CsrfDto(string HeaderName, string Token);
 }

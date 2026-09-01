@@ -18,11 +18,24 @@ namespace Itms.Modules.Assets.Auditing;
 /// <b>Creating an asset is audited here and raises no event, deliberately.</b>
 /// ARCHITECTURE.md §5's event list names <c>AssetAssigned</c> and
 /// <c>AssetStatusChanged</c> and no <c>AssetCreated</c>, and the Audit module binds a
-/// consumer to each of the two that exist. WP-2.2 is the package that starts publishing
-/// them, and it inherits the trap WP-1.3 set and WP-1.6 defused in Helpdesk: <b>if WP-2.2
-/// ever adds an assignment or status action to this file as well as publishing the event,
-/// every such change records two rows saying the same thing.</b> The event is the route for
-/// those two; <c>IAuditWriter</c> is the route for everything else.
+/// consumer to each of the two that exist. The event is the route for those two;
+/// <c>IAuditWriter</c> is the route for everything else.
+/// </para>
+/// <para>
+/// <b>WP-2.2 published both events and deliberately declared no action string for either,
+/// which is the trap WP-1.3 set and WP-1.6 had to go back and defuse in Helpdesk.</b>
+/// <c>AssetLifecycleMutation</c> publishes; the Audit module's consumer derives
+/// <c>asset.assigned</c> and <c>asset.status_changed</c> from what it publishes. <b>Adding
+/// an assignment or lifecycle action to this file would make every such change record two
+/// rows saying the same thing.</b> There is no gap here to fill — a change that looks
+/// unaudited is being audited on the outbox, one dispatcher pass later.
+/// </para>
+/// <para>
+/// <b>What that costs, recorded where somebody will look for it.</b> An event-derived row
+/// carries no source IP and no actor name, because the dispatcher runs on a background
+/// scope with no principal — WP-1.6 paid the same price for the ticket actions. The asset's
+/// own timeline is what keeps both: <c>AssetHistoryEntry</c> is written inside the request
+/// by the handler and caches the actor's name at the time.
 /// </para>
 /// <para>
 /// The names are declared here rather than shared with the Audit module because a module

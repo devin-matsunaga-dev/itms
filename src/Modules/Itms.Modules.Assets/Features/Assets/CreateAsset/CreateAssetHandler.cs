@@ -4,6 +4,7 @@ using Itms.Contracts.Lookups;
 using Itms.Modules.Assets.Auditing;
 using Itms.Modules.Assets.Domain;
 using Itms.Modules.Assets.Persistence;
+using Itms.Modules.Assets.Persistence.Configurations;
 using Itms.Platform.Data;
 using Itms.Platform.Identity;
 using Itms.Platform.Results;
@@ -16,6 +17,12 @@ namespace Itms.Modules.Assets.Features.Assets.CreateAsset;
 /// Records a new asset.
 /// </summary>
 /// <remarks>
+/// <para>
+/// <b>It answers with the row version</b>, added by WP-2.2 along with the lifecycle
+/// operations that honour an <c>If-Match</c>: the 201 carries an <c>ETag</c>, so a client
+/// that records equipment and immediately issues it never has to read the asset back to
+/// state a precondition.
+/// </para>
 /// <para>
 /// The two uniqueness checks are what WP-2.1's done-criterion asks for. Both are advisory
 /// — a concurrent insert can still beat them to the unique index — and both exist so the
@@ -51,15 +58,15 @@ internal sealed class CreateAssetHandler(
     /// <summary>Records the asset described by <paramref name="request"/>.</summary>
     /// <param name="request">The new asset's fields.</param>
     /// <param name="cancellationToken">Cancels the work.</param>
-    /// <returns>The created asset, or a validation failure, or a 409 on a duplicate tag or serial.</returns>
-    public async Task<Result<AssetResponse>> HandleAsync(
+    /// <returns>The created asset and its version, or a validation failure, or a 409 on a duplicate tag or serial.</returns>
+    public async Task<Result<AssetDetail>> HandleAsync(
         CreateAssetRequest request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         Error? failure = null;
-        AssetResponse? created = null;
+        AssetDetail? created = null;
 
         // Resolved before the transaction opens: these are reads against another module,
         // and holding a write transaction across them would widen it for no benefit.
@@ -129,7 +136,7 @@ internal sealed class CreateAssetHandler(
                     return;
                 }
 
-                database.Assets.Add(asset);
+                var entry = database.Assets.Add(asset);
                 await database.SaveChangesAsync(token).ConfigureAwait(false);
 
                 // Inside the transaction, so a create that rolls back leaves no entry
@@ -154,7 +161,13 @@ internal sealed class CreateAssetHandler(
                             .Set("cost", asset.Cost?.ToString(CultureInfo.InvariantCulture))),
                     token).ConfigureAwait(false);
 
-                created = AssetResponse.From(asset, type, status.Status);
+                created = new AssetDetail(
+                    AssetResponse.From(asset, type, status.Status),
+                    // Read back off the tracked entry after the INSERT: xmin is
+                    // ValueGeneratedOnAddOrUpdate, so this is the version the ETag on the
+                    // 201 names, and it is what a client puts in the If-Match of the first
+                    // lifecycle call it makes against the asset it just recorded.
+                    entry.Property<uint>(AssetConfiguration.VersionProperty).CurrentValue);
             },
             cancellationToken).ConfigureAwait(false);
 

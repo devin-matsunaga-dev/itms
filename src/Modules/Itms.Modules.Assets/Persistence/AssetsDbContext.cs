@@ -31,6 +31,12 @@ public sealed class AssetsDbContext(DbContextOptions<AssetsDbContext> options) :
     /// <summary>Where an asset is in its life.</summary>
     public DbSet<AssetStatus> AssetStatuses => Set<AssetStatus>();
 
+    /// <summary>
+    /// Every lifecycle move an asset has made. Append-only in practice — see
+    /// <see cref="AssetHistoryEntry"/>.
+    /// </summary>
+    public DbSet<AssetHistoryEntry> AssetHistory => Set<AssetHistoryEntry>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,5 +46,6 @@ public sealed class AssetsDbContext(DbContextOptions<AssetsDbContext> options) :
         modelBuilder.ApplyConfiguration(new AssetTypeConfiguration());
         modelBuilder.ApplyConfiguration(new AssetStatusConfiguration());
         modelBuilder.ApplyConfiguration(new AssetConfiguration());
+        modelBuilder.ApplyConfiguration(new AssetHistoryEntryConfiguration());
     }
 }

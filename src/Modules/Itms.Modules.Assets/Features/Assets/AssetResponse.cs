@@ -25,7 +25,7 @@ namespace Itms.Modules.Assets.Features.Assets;
 /// <param name="AssetStatusId">Where it is in its life.</param>
 /// <param name="AssetStatusCode">That status's immutable code — what a client keys colours and rules off.</param>
 /// <param name="AssetStatusName">That status's current name.</param>
-/// <param name="AssignedToUserId">Who holds it. Always null until WP-2.2 adds assignment.</param>
+/// <param name="AssignedToUserId">Who currently holds it.</param>
 /// <param name="AssignedToUserName">Their cached display name.</param>
 /// <param name="DepartmentId">The department that owns it.</param>
 /// <param name="DepartmentName">That department's cached name.</param>
@@ -72,9 +72,29 @@ public sealed record AssetResponse(
     /// <returns>The response shape.</returns>
     internal static AssetResponse From(Asset asset, AssetType type, AssetStatus status)
     {
-        ArgumentNullException.ThrowIfNull(asset);
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(status);
+
+        return From(asset, type.Id, type.Name, AssetStatusRef.Of(status));
+    }
+
+    /// <summary>
+    /// Renders an asset whose type and status the caller resolved separately.
+    /// </summary>
+    /// <remarks>
+    /// A lifecycle operation works in <see cref="AssetStatusRef"/> rather than in status
+    /// entities — it has to reason about codes, not rows — and reloading the entity just to
+    /// render the response would be a query to fetch text it is already holding. One shape,
+    /// two ways in.
+    /// </remarks>
+    /// <param name="asset">The asset to render.</param>
+    /// <param name="assetTypeId">Its type's id.</param>
+    /// <param name="assetTypeName">That type's current name.</param>
+    /// <param name="status">The status it carries now.</param>
+    /// <returns>The response shape.</returns>
+    internal static AssetResponse From(Asset asset, Guid assetTypeId, string assetTypeName, AssetStatusRef status)
+    {
+        ArgumentNullException.ThrowIfNull(asset);
 
         return new AssetResponse(
             asset.Id,
@@ -84,8 +104,8 @@ public sealed record AssetResponse(
             asset.Barcode,
             asset.Manufacturer,
             asset.Model,
-            type.Id,
-            type.Name,
+            assetTypeId,
+            assetTypeName,
             status.Id,
             status.Code,
             status.Name,

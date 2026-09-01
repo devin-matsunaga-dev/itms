@@ -130,6 +130,114 @@ internal static class AssetsErrors
             });
 
     /// <summary>
+    /// The asset has reached the end of its life and cannot be issued to anybody.
+    /// </summary>
+    /// <remarks>
+    /// A conflict rather than a validation failure: the request is well formed and the
+    /// person named in it is a perfectly good holder — it is the asset's own state that
+    /// refuses. The three statuses that reach here are the ones
+    /// <c>AssetLifecycle.IsTerminal</c> knows; a custom status an administrator added is
+    /// not one of them, deliberately.
+    /// </remarks>
+    public static Error AssetNotAssignable(string statusName) =>
+        Error.Conflict(
+            "assets.asset_not_assignable",
+            $"This asset is {statusName} and cannot be assigned to anybody.");
+
+    /// <summary>That person already holds this asset.</summary>
+    /// <remarks>
+    /// Refused rather than treated as a no-op, because succeeding would raise
+    /// <c>AssetAssigned</c> and write a history line saying the asset moved from somebody
+    /// to the same somebody.
+    /// </remarks>
+    public static Error AlreadyAssignedToThatUser(string userName) =>
+        Error.Conflict(
+            "assets.already_assigned_to_that_user",
+            $"{userName} already holds this asset.");
+
+    /// <summary>Nobody holds this asset, so there is nothing to take back.</summary>
+    public static Error AssetNotAssigned() =>
+        Error.Conflict("assets.asset_not_assigned", "Nobody currently holds this asset.");
+
+    /// <summary>
+    /// The lifecycle move is not one <c>AssetLifecycle</c> allows from where the asset is.
+    /// </summary>
+    /// <remarks>
+    /// A 409 rather than a 400, for the reason a ticket's illegal transition is one: the
+    /// request is well formed and the move exists in general — it is this asset's current
+    /// status that refuses it. Both statuses are named because the person reading the
+    /// message is looking at a screen that offered the action.
+    /// </remarks>
+    public static Error AssetTransitionNotAllowed(string fromStatusName, string toStatusName) =>
+        Error.Conflict(
+            "assets.transition_not_allowed",
+            $"An asset that is {fromStatusName} cannot be moved to {toStatusName}.");
+
+    /// <summary>
+    /// The deployment has no active status carrying the code this operation has to move
+    /// the asset into.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Reachable by a deployment whose seeder never ran — the gap recorded against WP-6.6 —
+    /// or by an administrator who retired one of the seeded lifecycle statuses. The code is
+    /// named because the fix is administrative and the person hitting it can act on it.
+    /// </para>
+    /// <para>
+    /// A conflict rather than the validation failure <see cref="NoDefaultAssetStatus"/>
+    /// returns, and the asymmetry is deliberate: there the caller can act, by naming a
+    /// status the request left out. Here there is no field to correct — the deployment is
+    /// missing a row — so a 400 would be blaming the caller for somebody else's
+    /// configuration.
+    /// </para>
+    /// </remarks>
+    public static Error MissingLifecycleStatus(string code) =>
+        Error.Conflict(
+            "assets.missing_lifecycle_status",
+            $"This deployment has no active '{code}' status, so the asset cannot be moved into it.");
+
+    /// <summary>No such account, as far as Identity is concerned.</summary>
+    public static Error HolderNotFound() =>
+        Error.Validation(
+            "assets.holder_not_found",
+            "No such user.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["assignedToUserId"] = ["No such user."],
+            });
+
+    /// <summary>
+    /// The account exists but has been deactivated.
+    /// </summary>
+    /// <remarks>
+    /// Invariant 9 keeps a deactivated user's asset history intact, so equipment they
+    /// already hold stays theirs on the record — but handing them more is issuing
+    /// equipment to somebody who has left.
+    /// </remarks>
+    public static Error HolderInactive() =>
+        Error.Validation(
+            "assets.holder_inactive",
+            "That account has been deactivated and cannot be given equipment.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["assignedToUserId"] = ["That account has been deactivated and cannot be given equipment."],
+            });
+
+    /// <summary>
+    /// The caller's <c>If-Match</c> named a version the asset is no longer at.
+    /// </summary>
+    /// <remarks>
+    /// A 412, checked before anything is attempted — the whole point of stating a
+    /// precondition is to be told before the write rather than after it. Its sibling
+    /// <see cref="AssetChangedConcurrently"/> is the 409 for a race the precondition could
+    /// not have caught.
+    /// </remarks>
+    public static Error AssetPreconditionFailed() =>
+        Error.PreconditionFailed(
+            "assets.asset_conflict",
+            "The asset has changed since you loaded it. Reload it and try again.");
+
+    /// <summary>
     /// Somebody else changed the asset between this request reading it and writing it.
     /// The <c>xmin</c> token is what notices.
     /// </summary>

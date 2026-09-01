@@ -2,6 +2,7 @@ using System.Net;
 using Itms.IntegrationTests.Api;
 using Itms.IntegrationTests.AssetsModule;
 using Itms.IntegrationTests.Identity;
+using Itms.Modules.Assets.Domain;
 
 namespace Itms.IntegrationTests.AuditModule;
 
@@ -13,11 +14,12 @@ namespace Itms.IntegrationTests.AuditModule;
 /// request, and arrives before the response does.
 /// </summary>
 /// <remarks>
-/// <b>These rows are synchronous, unlike a ticket's.</b> WP-1.6 moved the ticket actions
-/// onto the outbox and its suites had to start waiting with <c>Eventually</c>. If WP-2.2
-/// starts publishing the two asset events, the assignment and status rows become eventually
-/// consistent and any assertion on them will need the same wait — the rows in this class
-/// will not, because creation stays on <c>IAuditWriter</c>.
+/// <b>Creation and reference-data rows are synchronous; assignment and lifecycle rows are
+/// not.</b> WP-2.2 started publishing <c>AssetAssigned</c> and <c>AssetStatusChanged</c>,
+/// so those two are derived by the Audit module's consumer one dispatcher pass later and
+/// every assertion on them waits with <c>Eventually</c> — exactly as WP-1.6's ticket rows
+/// do. Everything else here still arrives before the response does, because it goes through
+/// <c>IAuditWriter</c> inside the request.
 /// </remarks>
 [Collection(IdentityTestGroup.Name)]
 public sealed class AssetsAuditTests(IdentityWebFixture fixture) : IAsyncLifetime
@@ -134,6 +136,173 @@ public sealed class AssetsAuditTests(IdentityWebFixture fixture) : IAsyncLifetim
         update.Changes["name"].ShouldBe(new("Scanner", "Document Scanner"));
         update.Changes.ShouldNotContainKey("sortOrder");
         update.Changes.ShouldNotContainKey("description");
+    }
+
+
+    /// <summary>
+    /// The trap WP-2.1 recorded and this package had to not walk into. The assignment is
+    /// audited from the event and <em>only</em> from the event: an <c>IAuditWriter</c> call
+    /// beside the publish would put two rows here saying the same thing, which is what
+    /// WP-1.6 had to go back and delete from Helpdesk.
+    /// </summary>
+    [Fact]
+    public async Task Issuing_an_asset_writes_exactly_one_assignment_row_and_one_status_row()
+    {
+        var (client, techId) = await SignedInAsync("tech");
+        using var tech = client;
+        var holder = await UserIdAsync("user");
+
+        var typeId = await AssetsClient.AnyTypeIdAsync(tech, Token);
+        var asset = await AssetsClient.CreateAssetAsync(tech, "LAP-0600", typeId, Token);
+
+        (await AssetsClient.AssignAsync(tech, asset.Id, holder, Token)).EnsureSuccessStatusCode();
+
+        await Eventually.UntilAsync(
+            async () => (await Entries("Asset", asset.Id.ToString())).Count == 3,
+            "the assignment and status rows to be dispatched",
+            Token);
+
+        var rows = await Entries("Asset", asset.Id.ToString());
+
+        rows.Select(row => row.Action).ShouldBe([
+            "assets.asset_created",
+            "asset.assigned",
+            "asset.status_changed",
+        ]);
+
+        var assigned = rows[1];
+        assigned.Changes["assignedToUserId"].ShouldBe(new(null, holder.ToString()));
+
+        // Stamped explicitly by the handler, because the dispatcher runs on a background
+        // scope with no principal.
+        assigned.ActorId.ShouldBe(techId);
+    }
+
+    /// <summary>
+    /// The codes, not the display names. An administrator renaming "Repair" must not make
+    /// two rows written a year apart describe the same move differently.
+    /// </summary>
+    [Fact]
+    public async Task A_lifecycle_move_is_audited_by_status_code()
+    {
+        var (client, _) = await SignedInAsync("tech");
+        using var tech = client;
+
+        var typeId = await AssetsClient.AnyTypeIdAsync(tech, Token);
+        var asset = await AssetsClient.CreateAssetAsync(tech, "LAP-0601", typeId, Token);
+
+        (await AssetsClient.SendForRepairAsync(tech, asset.Id, Token)).EnsureSuccessStatusCode();
+
+        await Eventually.UntilAsync(
+            async () => (await ByAction("asset.status_changed")).Count == 1,
+            "the status row to be dispatched",
+            Token);
+
+        var row = (await ByAction("asset.status_changed")).ShouldHaveSingleItem();
+
+        row.EntityId.ShouldBe(asset.Id.ToString());
+        row.Changes["status"].ShouldBe(new(AssetStatusCode.InStock, AssetStatusCode.Repair));
+    }
+
+    /// <summary>
+    /// A transfer moves nobody's lifecycle status, so it must not raise
+    /// <c>AssetStatusChanged</c> — a row saying an asset went from Deployed to Deployed is
+    /// the mistake WP-1.6 documented for a reassignment.
+    /// </summary>
+    [Fact]
+    public async Task A_transfer_writes_an_assignment_row_and_no_status_row()
+    {
+        var (client, _) = await SignedInAsync("tech");
+        using var tech = client;
+        var alice = await UserIdAsync("user");
+        var bob = await UserIdAsync("admin");
+
+        var typeId = await AssetsClient.AnyTypeIdAsync(tech, Token);
+        var asset = await AssetsClient.CreateAssetAsync(tech, "LAP-0602", typeId, Token);
+
+        (await AssetsClient.AssignAsync(tech, asset.Id, alice, Token)).EnsureSuccessStatusCode();
+        (await AssetsClient.AssignAsync(tech, asset.Id, bob, Token)).EnsureSuccessStatusCode();
+
+        await Eventually.UntilAsync(
+            async () => (await ByAction("asset.assigned")).Count == 2,
+            "both assignment rows to be dispatched",
+            Token);
+
+        // The issue moved the status out of stock; the transfer moved nothing.
+        (await ByAction("asset.status_changed")).ShouldHaveSingleItem();
+
+        var transfer = (await ByAction("asset.assigned"))[^1];
+        transfer.Changes["assignedToUserId"].ShouldBe(new(alice.ToString(), bob.ToString()));
+    }
+
+    /// <summary>
+    /// The price WP-1.6 paid for defusing the double-write, restated for assets so nobody
+    /// reads it as a defect. An event-derived row has no source IP and no actor name,
+    /// because the dispatcher runs on a background scope. The asset's own timeline keeps
+    /// both, which is where somebody chasing a laptop should look.
+    /// </summary>
+    [Fact]
+    public async Task An_event_derived_row_carries_no_source_ip_and_no_actor_name()
+    {
+        var (client, techId) = await SignedInAsync("tech");
+        using var tech = client;
+        var holder = await UserIdAsync("user");
+
+        var typeId = await AssetsClient.AnyTypeIdAsync(tech, Token);
+        var asset = await AssetsClient.CreateAssetAsync(tech, "LAP-0603", typeId, Token);
+
+        (await AssetsClient.AssignAsync(tech, asset.Id, holder, Token)).EnsureSuccessStatusCode();
+
+        await Eventually.UntilAsync(
+            async () => (await ByAction("asset.assigned")).Count == 1,
+            "the assignment row to be dispatched",
+            Token);
+
+        var row = (await ByAction("asset.assigned")).ShouldHaveSingleItem();
+        row.ActorId.ShouldBe(techId);
+        row.ActorName.ShouldBeNull();
+        row.SourceIp.ShouldBeNull();
+
+        // Which is why the timeline exists: it was written inside the request and kept both.
+        var history = await AssetsClient.HistoryAsync(tech, asset.Id, Token);
+        var entry = history.Items.First(item => item.Kind == "Assignment");
+        entry.ActorId.ShouldBe(techId);
+        entry.ActorName.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    /// <summary>
+    /// The refusal writes nothing, on the lifecycle surface as well as on creation: no
+    /// event is published from a transaction that rolled back.
+    /// </summary>
+    [Fact]
+    public async Task A_refused_lifecycle_move_publishes_nothing()
+    {
+        var (client, _) = await SignedInAsync("tech");
+        using var tech = client;
+
+        var typeId = await AssetsClient.AnyTypeIdAsync(tech, Token);
+        var asset = await AssetsClient.CreateAssetAsync(tech, "LAP-0604", typeId, Token);
+
+        (await AssetsClient.RetireAsync(tech, asset.Id, Token)).EnsureSuccessStatusCode();
+
+        await Eventually.UntilAsync(
+            async () => (await ByAction("asset.status_changed")).Count == 1,
+            "the retirement row to be dispatched",
+            Token);
+
+        // Retired is terminal, so this is refused before anything is written.
+        (await AssetsClient.SendForRepairAsync(tech, asset.Id, Token)).StatusCode
+            .ShouldBe(HttpStatusCode.Conflict);
+
+        (await ByAction("asset.status_changed")).ShouldHaveSingleItem();
+    }
+
+    private async Task<Guid> UserIdAsync(string userName)
+    {
+        using var client = fixture.CreateClient();
+        var response = await AuthClient.LoginAsync(client, userName, AuthClient.Password, Token);
+        response.EnsureSuccessStatusCode();
+        return (await AuthClient.ReadUserAsync(response, Token)).Id;
     }
 
     private static async Task Post(HttpClient client, string path)

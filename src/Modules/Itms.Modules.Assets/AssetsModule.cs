@@ -11,9 +11,15 @@ using Itms.Modules.Assets.Features.AssetTypes.GetAssetType;
 using Itms.Modules.Assets.Features.AssetTypes.ListAssetTypes;
 using Itms.Modules.Assets.Features.AssetTypes.SetAssetTypeActivation;
 using Itms.Modules.Assets.Features.AssetTypes.UpdateAssetType;
+using Itms.Modules.Assets.Features.AssetHistory;
+using Itms.Modules.Assets.Features.AssetHistory.ListAssetHistory;
 using Itms.Modules.Assets.Features.Assets;
+using Itms.Modules.Assets.Features.Assets.AssignAsset;
 using Itms.Modules.Assets.Features.Assets.CreateAsset;
 using Itms.Modules.Assets.Features.Assets.GetAsset;
+using Itms.Modules.Assets.Features.Assets.RetireAsset;
+using Itms.Modules.Assets.Features.Assets.ReturnAssetToService;
+using Itms.Modules.Assets.Features.Assets.SendAssetForRepair;
 using Itms.Modules.Assets.Persistence;
 using Itms.Platform.Data;
 using Microsoft.AspNetCore.Routing;
@@ -41,15 +47,16 @@ public static class AssetsModule
     /// rather than silently reading nothing.
     /// </para>
     /// <para>
-    /// <b>No event consumer, and this module publishes nothing.</b> ARCHITECTURE.md §5 names
-    /// <c>AssetAssigned</c> and <c>AssetStatusChanged</c>; both belong to the assignment and
-    /// lifecycle transitions <c>WP-2.2</c> adds. Publishing needs nothing registered here —
-    /// <c>IEventPublisher</c> comes from <c>AddMessaging</c>, which the composition root has
-    /// already run — but <b>a consumer would</b>: the assembly list passed to
-    /// <c>AddMessaging</c> is what the bus scans for <c>IEventConsumer&lt;T&gt;</c>, and
-    /// Assets is not on it. The first package to add one here must add
-    /// <c>Itms.Modules.Assets</c> to that call, or the consumer silently never runs and no
-    /// test would notice.
+    /// <b>This module publishes two events and consumes none.</b>
+    /// <c>AssetLifecycleMutation</c> raises <c>AssetAssigned</c> and
+    /// <c>AssetStatusChanged</c> (ARCHITECTURE.md §5), and publishing needs nothing
+    /// registered here — <c>IEventPublisher</c> comes from <c>AddMessaging</c>, which the
+    /// composition root has already run. <b>A consumer would</b>: the assembly list passed
+    /// to <c>AddMessaging</c> is what the bus scans for <c>IEventConsumer&lt;T&gt;</c>, and
+    /// Assets is still not on it. The first package to add one here — the department rename
+    /// and location move that refresh an asset's cached names are the obvious candidates —
+    /// must add <c>Itms.Modules.Assets</c> to that call, or the consumer silently never runs
+    /// and no test would notice.
     /// </para>
     /// </remarks>
     /// <param name="services">The container. <c>AddPlatform</c> and <c>AddMessaging</c> must already have run.</param>
@@ -82,12 +89,26 @@ public static class AssetsModule
 
         services.TryAddScoped<CreateAssetHandler>();
         services.TryAddScoped<GetAssetHandler>();
+        services.TryAddScoped<ListAssetHistoryHandler>();
+
+        // The timeline writer and the transaction envelope every lifecycle operation shares.
+        // Scoped, because both hold the request's own DbContext and the transaction it is
+        // enlisted in.
+        services.TryAddScoped<AssetHistoryRecorder>();
+        services.TryAddScoped<AssetLifecycleMutation>();
+
+        services.TryAddScoped<AssignAssetHandler>();
+        services.TryAddScoped<SendAssetForRepairHandler>();
+        services.TryAddScoped<ReturnAssetToServiceHandler>();
+        services.TryAddScoped<RetireAssetHandler>();
 
         services.TryAddScoped<IValidator<CreateAssetTypeRequest>, CreateAssetTypeValidator>();
         services.TryAddScoped<IValidator<UpdateAssetTypeRequest>, UpdateAssetTypeValidator>();
         services.TryAddScoped<IValidator<CreateAssetStatusRequest>, CreateAssetStatusValidator>();
         services.TryAddScoped<IValidator<UpdateAssetStatusRequest>, UpdateAssetStatusValidator>();
         services.TryAddScoped<IValidator<CreateAssetRequest>, CreateAssetValidator>();
+        services.TryAddScoped<IValidator<AssignAssetRequest>, AssignAssetValidator>();
+        services.TryAddScoped<IValidator<AssetLifecycleRequest>, AssetLifecycleRequestValidator>();
 
         return services;
     }

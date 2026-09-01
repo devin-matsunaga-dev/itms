@@ -3452,6 +3452,7 @@
           "Assets"
         ],
         "summary": "Reads one asset.",
+        "description": "Carries an ETag naming the asset's current version. Send it back as If-Match on a lifecycle call to be told the asset has moved before the change is attempted.",
         "operationId": "GetAsset",
         "parameters": [
           {
@@ -3471,6 +3472,81 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AssetResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/assets/{id}/history": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Reads an asset's history, newest first.",
+        "description": "Entries sharing an occurredAt came from one operation — issuing equipment out of stock moves the holder and the status — and are meant to be read together, in sequence order.",
+        "operationId": "ListAssetHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfAssetHistoryEntryResponse"
                 }
               }
             }
@@ -3570,6 +3646,402 @@
           { }
         ]
       }
+    },
+    "/api/v1/assets/{id}/assignments": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Issues an asset to somebody, transfers it, or takes it back.",
+        "description": "Naming a user issues or transfers the asset; omitting one takes it back. Issuing an in-stock asset also deploys it, and returning a deployed one puts it back in stock — a transfer between two people moves nobody's lifecycle status. Send the asset's ETag as If-Match to be refused with 412 if it has moved since you read it.",
+        "operationId": "AssignAsset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/assets/{id}/repairs": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Sends an asset away to be fixed.",
+        "description": "The holder is kept: a machine at the vendor is still issued to whoever had it, which is what tells the return-to-service call where to put it back. Send the asset's ETag as If-Match to be refused with 412 if it has moved since you read it.",
+        "operationId": "SendAssetForRepair",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/assets/{id}/returns-to-service": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Brings an asset back from repair.",
+        "description": "It goes back to deployed if somebody still holds it, and into stock if nobody does. Send the asset's ETag as If-Match to be refused with 412 if it has moved since you read it.",
+        "operationId": "ReturnAssetToService",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/assets/{id}/retirements": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Takes an asset out of service and keeps it on the books.",
+        "description": "Retiring also releases whoever holds it, so a deployed asset records both the release and the transition. Retired is terminal: no lifecycle call is accepted afterwards. Send the asset's ETag as If-Match to be refused with 412 if it has moved since you read it.",
+        "operationId": "RetireAsset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
     }
   },
   "components": {
@@ -3591,6 +4063,101 @@
           }
         },
         "description": "The body of `POST /api/v1/tickets/{id}/comments`."
+      },
+      "AssetChangeKind": {
+        "enum": [
+          "Assignment",
+          "Status"
+        ],
+        "description": "Which dimension of an asset a history entry records having moved."
+      },
+      "AssetHistoryEntryResponse": {
+        "required": [
+          "id",
+          "kind",
+          "fromValue",
+          "toValue",
+          "note",
+          "occurredAt",
+          "sequence",
+          "actorId",
+          "actorName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The entry's id.",
+            "format": "uuid"
+          },
+          "kind": {
+            "description": "Which dimension moved.",
+            "$ref": "#/components/schemas/AssetChangeKind"
+          },
+          "fromValue": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What it read before, or `null` when there was nothing there."
+          },
+          "toValue": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What it reads now, or `null` when the change cleared it."
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the operator said about it, or `null`."
+          },
+          "occurredAt": {
+            "type": "string",
+            "description": "When the change happened (UTC).",
+            "format": "date-time"
+          },
+          "sequence": {
+            "type": "integer",
+            "description": "Where this line sits among the lines the same operation wrote. Entries sharing an\nOccurredAt came from one operation and are meant to be read together.",
+            "format": "int32"
+          },
+          "actorId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who made it, or `null` when the system did.",
+            "format": "uuid"
+          },
+          "actorName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Their display name at the time, or `null`."
+          }
+        },
+        "description": "One line of an asset's timeline, as the API renders it."
+      },
+      "AssetLifecycleRequest": {
+        "required": [
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the operator wants recorded against this move, or `null`."
+          }
+        },
+        "description": "The body of a lifecycle operation that names no other party: sending an asset for\nrepair, returning it to service, retiring it."
       },
       "AssetResponse": {
         "required": [
@@ -3693,7 +4260,7 @@
               "null",
               "string"
             ],
-            "description": "Who holds it. Always null until WP-2.2 adds assignment.",
+            "description": "Who currently holds it.",
             "format": "uuid"
           },
           "assignedToUserName": {
@@ -3888,6 +4455,31 @@
           }
         },
         "description": "An asset type as the API renders it."
+      },
+      "AssignAssetRequest": {
+        "required": [
+          "assignedToUserId",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "assignedToUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who is taking it on, or `null` to take it back off whoever has it.",
+            "format": "uuid"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the operator wants recorded against this move, or `null`."
+          }
+        },
+        "description": "Who is to hold the asset, or nobody."
       },
       "AssignTicketRequest": {
         "required": [
@@ -4619,6 +5211,49 @@
           }
         },
         "description": "The body of `POST /api/v1/locations/{id}/move`."
+      },
+      "PagedResultOfAssetHistoryEntryResponse": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetHistoryEntryResponse"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
       },
       "PagedResultOfAssetStatusResponse": {
         "required": [
