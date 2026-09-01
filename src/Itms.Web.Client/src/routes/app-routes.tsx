@@ -5,6 +5,8 @@ import { RequireRole } from '@/features/auth/components/require-role'
 import { LoginPage } from '@/features/auth/routes/login-page'
 import { DashboardPage } from '@/features/dashboard/routes/dashboard-page'
 import { TicketsPage } from '@/features/helpdesk/routes/tickets-page'
+import { NewTicketPage } from '@/features/helpdesk/routes/new-ticket-page'
+import { TicketDetailPage } from '@/features/helpdesk/routes/ticket-detail-page'
 import { AssetsPage } from '@/features/assets/routes/assets-page'
 import { UsersPage } from '@/features/users/routes/users-page'
 import { MonitoringPage } from '@/features/monitoring/routes/monitoring-page'
@@ -30,6 +32,11 @@ export function AppRoutes(): React.JSX.Element {
         <Route element={<AppShell />}>
           <Route index element={guarded('/', <DashboardPage />)} />
           <Route path="tickets" element={guarded('/tickets', <TicketsPage />)} />
+          {/* The two screens under the queue take its nav entry's role rule, which is
+              every signed-in account: a User raises and follows their own tickets, and
+              the server's row filter is what decides which ones they can see. */}
+          <Route path="tickets/new" element={guarded('/tickets', <NewTicketPage />)} />
+          <Route path="tickets/:id" element={guarded('/tickets', <TicketDetailPage />)} />
           <Route path="assets" element={guarded('/assets', <AssetsPage />)} />
           <Route path="users" element={guarded('/users', <UsersPage />)} />
           <Route path="monitoring" element={guarded('/monitoring', <MonitoringPage />)} />

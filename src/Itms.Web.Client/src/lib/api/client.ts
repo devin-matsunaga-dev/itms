@@ -110,9 +110,31 @@ export function onUnauthorized(listener: () => void): () => void {
 
 export interface ApiRequest {
   method?: string
-  /** Serialized as JSON. Omit for a body-less request. */
+  /**
+   * Serialized as JSON. Omit for a body-less request.
+   *
+   * A `FormData` is the one exception: it is passed to `fetch` untouched and no
+   * `Content-Type` is set, because only the browser can write the multipart boundary.
+   * That is what the ticket attachment upload sends.
+   */
   body?: unknown
+  /**
+   * Extra request headers. `If-Match` is the one this application sends — a ticket's
+   * ETag, echoed back so a write that raced somebody else is refused with 412 before
+   * anything is attempted rather than losing the race and answering 409.
+   */
+  headers?: Record<string, string>
   signal?: AbortSignal
+}
+
+/** A response, with the header a conditional write needs to read off it. */
+export interface ApiResult<T> {
+  readonly data: T
+  /**
+   * The response's `ETag`, when it carried one. Opaque: a client compares tags and
+   * echoes them, it never parses one.
+   */
+  readonly etag: string | null
 }
 
 /**
@@ -123,10 +145,30 @@ export interface ApiRequest {
  * @throws ApiError when the response is not a success status.
  */
 export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promise<T> {
-  const method = (request.method ?? 'GET').toUpperCase()
-  const headers: Record<string, string> = { Accept: 'application/json' }
+  const result = await apiRequest<T>(path, request)
+  return result.data
+}
 
-  if (request.body !== undefined) {
+/**
+ * The same call, with the response's `ETag` alongside the body.
+ *
+ * Separate from {@link apiFetch} rather than replacing it: only the two ticket writes
+ * and the read that feeds them care about the header, and forty call sites should not
+ * have to unwrap a result they have no use for.
+ *
+ * @throws ApiError when the response is not a success status.
+ */
+export async function apiRequest<T>(
+  path: string,
+  request: ApiRequest = {},
+): Promise<ApiResult<T>> {
+  const method = (request.method ?? 'GET').toUpperCase()
+  const isForm = request.body instanceof FormData
+  const headers: Record<string, string> = { Accept: 'application/json', ...request.headers }
+
+  // A multipart body carries its own boundary, which only the browser can generate.
+  // Setting the header here would send one without it and the server would see no parts.
+  if (request.body !== undefined && !isForm) {
     headers['Content-Type'] = 'application/json'
   }
 
@@ -135,13 +177,15 @@ export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promi
     headers[token.headerName] = token.token
   }
 
+  const body = request.body === undefined ? undefined : isForm ? request.body : JSON.stringify(request.body)
+
   const send = (): Promise<Response> =>
     fetch(`${apiRoot}${path}`, {
       method,
       headers,
       // The session is a cookie. Nothing is read from or written to browser storage.
       credentials: 'same-origin',
-      ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) }),
+      ...(body === undefined ? {} : { body: body as BodyInit }),
       ...(request.signal ? { signal: request.signal } : {}),
     })
 
@@ -172,9 +216,11 @@ export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promi
     throw await toApiError(response)
   }
 
+  const etag = response.headers.get('etag')
+
   if (response.status === 204) {
-    return undefined as T
+    return { data: undefined as T, etag }
   }
 
-  return (await response.json()) as T
+  return { data: (await response.json()) as T, etag }
 }

@@ -29,10 +29,6 @@ vi.mock('@/features/helpdesk/api/tickets-api', () => ({
   fetchAssignableUsers: () => fetchAssignableUsers(),
 }))
 
-const toastInfo = vi.fn()
-
-vi.mock('sonner', () => ({ toast: { info: (message: string) => toastInfo(message) } }))
-
 vi.mock('@/features/auth/api/auth-api', () => ({
   fetchCurrentUser: () => fetchCurrentUser(),
   login: vi.fn(),
@@ -146,7 +142,12 @@ function page(items: TicketListItem[], total = items.length, pageNumber = 1): Pa
 /** Reports the address the screen has navigated to, so the URL can be asserted on. */
 function Address(): React.JSX.Element {
   const location = useLocation()
-  return <output data-testid="address">{location.search}</output>
+  return (
+    <>
+      <output data-testid="address">{location.search}</output>
+      <output data-testid="path">{location.pathname}</output>
+    </>
+  )
 }
 
 function renderQueue(route = '/tickets') {
@@ -171,12 +172,12 @@ function lastQuery(): TicketQuery {
 }
 
 const address = () => screen.getByTestId('address').textContent ?? ''
+const path = () => screen.getByTestId('path').textContent ?? ''
 
 beforeEach(() => {
   fetchTickets.mockReset()
   fetchCurrentUser.mockReset()
   fetchAssignableUsers.mockReset()
-  toastInfo.mockReset()
 
   fetchTickets.mockResolvedValue(page([ticket()]))
   fetchCurrentUser.mockResolvedValue(technician)
@@ -223,8 +224,21 @@ describe('TicketsPage — the queue', () => {
 
     // The header action, and the empty state offering the same thing a second time.
     expect(await screen.findByText('No tickets yet')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /new ticket/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /new ticket/i })).toHaveAttribute(
+      'href',
+      '/tickets/new',
+    )
     expect(screen.getByRole('button', { name: /create the first ticket/i })).toBeInTheDocument()
+  })
+
+  it('takes the empty state’s own action to the create form', async () => {
+    const person = userEvent.setup()
+    fetchTickets.mockResolvedValue(page([]))
+    renderQueue()
+
+    await person.click(await screen.findByRole('button', { name: /create the first ticket/i }))
+
+    expect(path()).toBe('/tickets/new')
   })
 
   it('distinguishes an empty queue from a queue nothing matches', async () => {
@@ -236,13 +250,15 @@ describe('TicketsPage — the queue', () => {
     expect(screen.getAllByRole('button', { name: /clear filters/i })).toHaveLength(2)
   })
 
-  it('says the detail screen is still to come rather than linking into a 404', async () => {
+  it('opens the detail screen for the ticket whose number was clicked', async () => {
     const person = userEvent.setup()
     renderQueue()
 
     await person.click(await screen.findByRole('button', { name: 'TKT-0001' }))
 
-    expect(toastInfo).toHaveBeenCalledWith('Ticket detail for TKT-0001 arrives in WP-1.10.')
+    // The row navigates by id, not by number: the number is what a person reads and the
+    // id is what the API is keyed on.
+    expect(path()).toBe('/tickets/ticket-1')
   })
 })
 

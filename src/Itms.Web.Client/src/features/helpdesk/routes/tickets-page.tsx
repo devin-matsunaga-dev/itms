@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from 'react'
-import { Navigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { Plus, Ticket } from 'lucide-react'
-import { toast } from 'sonner'
 import { PageHeader } from '@/components/layout/page-header'
 import { EmptyState } from '@/components/common/empty-state'
 import { ErrorState } from '@/components/common/error-state'
@@ -43,6 +42,7 @@ import { applyView, isViewActive, type TicketViewId } from '../lib/ticket-views'
  */
 export function TicketsPage(): React.JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams()
+  const routerNavigate = useNavigate()
   const query = useMemo(() => parseTicketQuery(searchParams), [searchParams])
 
   const now = useNow()
@@ -111,16 +111,18 @@ export function TicketsPage(): React.JSX.Element {
     )
   }, [currentUser, query, worksTheQueue])
 
-  // The create form is WP-1.10. Until it exists the button says so rather than
-  // navigating to a screen that is not there — the same call WP-0.8 made for the
-  // search pill.
+  // WP-1.9 fixed both of these in the frame and had them raise a toast naming this
+  // package. They navigate now; nothing else about the table changed.
   const newTicket = useCallback(() => {
-    toast.info('The ticket create form arrives in WP-1.10.')
-  }, [])
+    void routerNavigate('/tickets/new')
+  }, [routerNavigate])
 
-  const openTicket = useCallback((ticket: TicketListItem) => {
-    toast.info(`Ticket detail for ${ticket.number} arrives in WP-1.10.`)
-  }, [])
+  const openTicket = useCallback(
+    (ticket: TicketListItem) => {
+      void routerNavigate(`/tickets/${ticket.id}`)
+    },
+    [routerNavigate],
+  )
 
   // The queue's own ordering is written into the address rather than inherited from the
   // API's default, so what somebody is looking at is what they can send on. A bare
@@ -136,7 +138,7 @@ export function TicketsPage(): React.JSX.Element {
         title="Tickets"
         subtitle="Every request raised across the organisation."
         actions={
-          <Button onClick={newTicket}>
+          <Button render={<Link to="/tickets/new" />}>
             <Plus className="size-4" aria-hidden="true" />
             New Ticket
           </Button>

@@ -43,6 +43,30 @@ export type TicketListItem = Schemas['TicketListItemResponse']
 /** The queue's page envelope. */
 export type PagedTickets = Schemas['PagedResultOfTicketListItemResponse']
 
+/** One ticket in full — `GET /api/v1/tickets/{id}`, and what a creation answers with. */
+export type TicketDetail = Schemas['TicketDetailResponse']
+
+/** What a ticket looks like immediately after a status change. */
+export type TicketStatusChange = Schemas['TicketStatusChangeResponse']
+
+/** What a ticket looks like immediately after an assignment. */
+export type TicketAssignment = Schemas['TicketAssignmentResponse']
+
+/** One line of a ticket's conversation. */
+export type TicketComment = Schemas['TicketCommentResponse']
+
+/** A file attached to a ticket. Metadata only; the bytes come from the download route. */
+export type TicketAttachment = Schemas['TicketAttachmentResponse']
+
+/** One line of a ticket's timeline. */
+export type TicketHistoryEntry = Schemas['TicketHistoryEntryResponse']
+
+/** Which dimension of a ticket a history entry records having moved. */
+export type TicketChangeKind = Schemas['TicketChangeKind']
+
+/** The body of `POST /api/v1/tickets`. */
+export type CreateTicketRequest = Schemas['CreateTicketRequest']
+
 /** A ticket's two SLA clocks, and where each stands right now. */
 export type TicketSla = Schemas['TicketSlaResponse']
 

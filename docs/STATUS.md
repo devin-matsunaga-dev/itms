@@ -3,11 +3,13 @@
 > Updated by Claude Code at the end of every session. This is the only place that says where the build is.
 
 **Project:** Unified IT Management System (ITMS)
-**Phase:** 1 — Helpdesk (Phase 0 complete, awaiting the gate walkthrough and the `v0.1-phase0` tag)
-**Current WP:** `WP-1.10 — Helpdesk UI: detail & create` `[UI]`
-**Branch:** `feat/wp-1.10-helpdesk-detail`
-**Last completed:** `WP-1.9 — Helpdesk UI: queue & list` (2026-09-01)
+**Phase:** 1 — Helpdesk **complete**. Phase 0 and Phase 1 both await their gate walkthroughs and the `v0.1-phase0` / `v0.2-phase1` tags.
+**Current WP:** `WP-2.1 — Asset domain & lifecycle`
+**Branch:** `feat/wp-2.1-asset-domain`
+**Last completed:** `WP-1.10 — Helpdesk UI: detail & create` (2026-09-01)
 **Last updated:** 2026-09-01
+
+> **Do not open WP-2.1 before the Phase 1 gate.** Every package in Phase 1 is built and green, and the gate walkthrough — log in → create ticket → assign → resolve, in a browser — is now doable end to end for the first time. It is WP-1.10's manual checklist. The two Phase 0 items owed at its gate (the root README, and the seeder-in-production gap recorded against WP-6.6) are still owed.
 
 ---
 
@@ -16,7 +18,7 @@
 | Phase | Packages | Done | Tag |
 |---|---|---|---|
 | 0 — Foundation | 0.1 – 0.9 | 9 / 9 | *gate pending* |
-| 1 — Helpdesk | 1.1 – 1.10 | 9 / 10 | — |
+| 1 — Helpdesk | 1.1 – 1.10 | 10 / 10 | *gate pending* |
 | 2 — Assets & directory | 2.1 – 2.7 | 0 / 7 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
@@ -265,14 +267,32 @@
 - **The queue is unmeasured in a browser.** `TicketQueuePerformanceTests` covers the endpoint at 50,000 rows, and the table renders whatever page it is handed — but nothing has looked at 100 rows of nine columns with a live clock on each. `useNow` re-renders the whole table every 30 seconds; at the 100-row page size that is 900 cells. If it ever stutters, the fix is to move the countdown into its own memoised cell rather than to drop the clock.
 - **The `sameTicketQuery(query, defaultTicketQuery)` test in the empty state is a proxy for "nothing is filtered".** It compares the whole query, so somebody who has only changed the *page size* and found nothing is told "No tickets match these filters". Harmless and slightly wrong; `hasActiveFilters` is the function that actually means it, and swapping to it is a one-line change nobody has needed yet.
 
+### Noticed during WP-1.10
+
+- **`shadcn add` silently reverted `button.tsx` to the stock theme, and the next package must expect it to.** Adding `textarea checkbox dialog` also rewrote `src/components/ui/button.tsx` — back to 32px buttons, `hover:bg-primary/80` instead of `primary-hover`, a soft-tinted destructive variant, and no 150ms cap — undoing WP-0.8's restyling to `DESIGN.md` §4. It was caught by reading the diff and reverted in the same session. **Every `shadcn add` from here on must be followed by `git diff src/components/ui/`**, because the CLI touches files it was not asked for and the damage is a palette regression that no test would fail on.
+- **The client is one 715 kB chunk, and Phase 1 ended without the split that three packages called owed.** WP-0.8 (612 kB), WP-0.9, WP-1.1, and WP-1.9 (664 kB) each recorded `React.lazy` per route as the fix and Phase 1 as where it stops being optional. Phase 1 is now over and it did not happen. The router is still the only file that would change; `WP-6.4` owns a frontend bundle split, but leaving it that long means every Phase 2–5 screen is added to an initial bundle nobody is splitting. **This should be claimed at the Phase 1 gate rather than carried further.**
+- **`useAssignableUsers` is now read for two different questions and its name only describes one.** The queue reads it for the assignee filter; WP-1.10's create form reads it for the *requester* picker. Both call `GET /api/v1/users`, which is the general Technician-guarded people picker — one endpoint, one cache entry, and the sharing is deliberate. The name is not: `useUserPicker` is what it does. Renaming touches `use-tickets.ts`, `tickets-api.ts`, `ticket-filters.tsx`, and two pages, which is why it was not done inside a `[UI]` package that had already grown.
+- **The queue's ticket number is still a `<button>`, not a link.** `DESIGN.md` §4 says the first column is "rendered as a `primary` link", and it looks like one, but middle-click, open-in-new-tab, and copy-link do nothing on it. WP-1.9 built `TicketTable` around an `onOpen` callback and predicted WP-1.10 would replace exactly one callback, which is what happened. Turning the number into a real `<a href="/tickets/:id">` while keeping the row click is a contained change for whichever package next touches that table.
+- **`apiFetch` grew two things every later module inherits.** It now accepts extra request headers (`If-Match` is the only one this application sends) and passes a `FormData` body through untouched with no `Content-Type`, because only the browser can write a multipart boundary. `apiRequest` is the same call returning the response's `ETag` alongside the body. The antiforgery token, its one silent retry, and the 401 broadcast are unchanged. **A module wanting conditional writes or an upload has them already; it must not write a second fetch helper.**
+- **`If-Match` is sent on the two ticket writes and deliberately not on the other two.** A status change and an assignment both mutate the row the tag names. A comment and an attachment are additive, race nothing, and are accepted on a ticket in any status including Closed (WP-1.7) — sending a precondition there would refuse a reply for a reason the person could not act on.
+- **WP-1.8's missing SLA on the transition response is closed by a refetch, not by a server change.** The detail is invalidated after every write, which was needed anyway to pick up the fresh `ETag`. A later package wanting an optimistic detail — patching the cache from the response rather than refetching — would have to ask for the SLA on `TicketStatusChangeResponse` first, which is the four columns and one `Assessed` call WP-1.8 declined to add while nothing read them.
+- **The timeline groups by `occurredAt` alone.** WP-1.4's note says entries sharing that instant came from one change, and the grouping follows it literally: two *different* actors changing the same ticket within one millisecond would render as one event under the first actor's name. It needs two concurrent writes on one row to reach, which the `xmin` token already refuses, so it is recorded rather than defended against.
+- **There is no way into the rest of a long ticket from this screen.** The detail embeds the head of the timeline and the thread (25 each) with `hasMoreHistory` / `hasMoreComments`, and the screen renders a marker saying older activity is not shown — but `GET /api/v1/tickets/{id}/history` is paged and nothing calls it, and the comment and attachment list endpoints are likewise unreached. A ticket with a long argument on it cannot be read in full in the browser. That wants a "show everything" affordance, and it is the first thing a busy queue will ask for.
+- **An attachment upload has no progress and no client-side size check.** The cap and the allowlist are the server's, deliberately (a second copy in the client could disagree), so a 12 MB file on a slow link shows a disabled button and then a problem document. `WP-6.4`'s performance pass or whichever package next touches attachments should decide whether the client reads the limits from configuration or shows progress.
+- **A comment and an attachment are two separate actions.** That is the API's shape — two routes, two audits — but "reply with a screenshot" is one thought, and the screen makes it two. Combining them client-side would mean two requests that can half-fail, which is worse; combining them properly is a server question.
+- **`Panel` is new in `src/components/common/`** and is `DESIGN.md` §4's panel card given a name — icon, title, right-aligned control, no internal header rule. The queue's filter bar still writes the same shape inline (WP-1.9). `WP-5.2`'s dashboard is built almost entirely out of this component and should use it rather than write the card a seventh time.
+- **The priority-change path is still unowned.** `Ticket.RetargetSla` has had no production caller since WP-1.8, and WP-1.10 did not claim it: it needs an endpoint, a `TicketSnapshot` taken before the write so `TicketHistoryRecorder` writes the entry, and the audit decision WP-1.7 framed. `WP-5.8 — Administration` is the remaining candidate. Until then a ticket filed at the wrong priority keeps it.
+- **No end-to-end test, by decision.** `CONVENTIONS.md` reserves Playwright for a handful of critical paths and the Phase 1 gate walkthrough is the first real one — but this machine's headless Chromium still cannot start (`libnspr4.so` missing, and installing it needs sudo), so an E2E suite written here would be written and never run. The walkthrough is WP-1.10's numbered manual checklist instead. When a machine can run it, that checklist is the script.
+- **Every screen still has to be looked at in both colour schemes by a person.** `DESIGN.md` §5 makes a colour that only works in one mode a bug, and the detail and create screens introduce several new soft fills — the `violet` resolution block, the `warning` wash on an internal note and on the composer, and the dialog's `heading/25` backdrop. Vitest asserts none of it. It is on the manual checklist.
+
 ## Known issues
 
 - none
 
 ## Environment notes
 
-- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.9: **684 unit, 52 architecture, 415 integration** (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
-- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 156 tests, about three seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
+- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.10: **684 unit, 52 architecture, 415 integration** (unchanged — WP-1.10 touched no server code) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
+- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 214 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
 - **`aspire run` now also starts `web-client`.** It runs `npm install` first (an Aspire installer resource) and then `npm run dev`, waits for `web-host`, and is published on an external endpoint — the dashboard prints its URL. The Vite dev server proxies `/api` to the host, so the browser sees one origin.
 - **The colour scheme is remembered per browser** under `localStorage["itms.theme"]`, and follows the operating system until the viewer picks a mode. Clearing site data returns it to the system preference. There is no server-side or per-account theme setting, and none is planned.
 - **Node 24 LTS and npm 11 are what the client is built with.** `node -v` should report v24.x; the lockfile is committed and `npm ci` is the reproducible install.
