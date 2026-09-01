@@ -16,6 +16,7 @@
 
 - Never write code before the human says "go".
 - Never start the next work package. Never merge, push, or tag — the human does that.
+- Branch from an up-to-date `main`, never from another package's branch (`main` squash-merges, so a branch off a branch conflicts with itself).
 - Target `net10.0`, Node 24, Python 3.13+, React 19. Never scaffold `net8.0` or `net9.0`.
 - Never modify auth configuration, credential handling, outbox/bus wiring, earlier migrations, or `DESIGN.md` tokens unless the current package explicitly says to.
 - Never commit secrets, write SNMP set operations, or add any update or delete path for audit rows.

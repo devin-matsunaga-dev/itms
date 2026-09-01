@@ -61,6 +61,8 @@ Do not start the next package. Do not merge. Do not tag. The human verifies, com
 
 ## Standing rules
 
+- **Cut every branch from an up-to-date `main`, never from the previous package's branch.** `WORKFLOW.md` step 9 lands each package on `main` with `git merge --squash`, which re-commits the same content under a new id. A branch cut from another package's branch therefore carries a *second* copy of that package, and merging it makes git diff both copies against a common ancestor that predates them — producing conflicts in every shared file even though the content is identical. If the previous package has not landed yet, wait for it; if you are asked to branch anyway, say this first. (Learned at WP-1.12, which had to be rebased onto `main` to land.)
+
 - **Never modify without an explicit instruction in the current package:** auth configuration, credential handling, outbox/bus wiring, migration history from earlier packages, or `DESIGN.md` tokens.
 - **Never** commit secrets, write SNMP set operations, delete or update audit rows, or add anything from the Defer column of `SPEC.md`.
 - If the package is marked `[SENSITIVE]`, say so in your scope summary — the human will review your diff line by line.
