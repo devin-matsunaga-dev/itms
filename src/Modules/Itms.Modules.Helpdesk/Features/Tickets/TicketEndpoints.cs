@@ -4,6 +4,7 @@ using Itms.Modules.Helpdesk.Features.Tickets.AssignTicket;
 using Itms.Modules.Helpdesk.Features.Tickets.ChangeTicketStatus;
 using Itms.Modules.Helpdesk.Features.Tickets.CreateTicket;
 using Itms.Modules.Helpdesk.Features.Tickets.GetTicket;
+using Itms.Modules.Helpdesk.Features.Tickets.LinkTicketAsset;
 using Itms.Modules.Helpdesk.Features.Tickets.ListTickets;
 using Itms.Modules.Helpdesk.Features.Tickets.TicketCounters;
 using Itms.Platform.Http;
@@ -23,8 +24,9 @@ namespace Itms.Modules.Helpdesk.Features.Tickets;
 /// <remarks>
 /// <para>
 /// WP-1.3 mapped the status change, WP-1.4 the timeline that records it, WP-1.5 the three
-/// that make a ticket reachable at all — create, list, detail — and WP-1.6 the assignment
-/// that decides who works it.
+/// that make a ticket reachable at all — create, list, detail — WP-1.6 the assignment
+/// that decides who works it, and WP-2.5 the asset link that says which machine it is
+/// about.
 /// </para>
 /// <para>
 /// <b>The group is no longer Technician-only.</b> ARCHITECTURE.md §7 gives a User their own
@@ -238,6 +240,42 @@ internal static class TicketEndpoints
                 + "reassignment leaves the status alone. Send the ticket's ETag as If-Match to be "
                 + "refused with 412 if it has moved since you read it.")
             .Produces<TicketAssignmentResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed);
+
+        writes
+            .MapPost("/{id:guid}/related-asset", async (
+                Guid id,
+                LinkTicketAssetRequest request,
+                LinkTicketAssetHandler handler,
+                HttpContext context,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await handler
+                    .HandleAsync(id, request, TicketETag.PreconditionFrom(context.Request), cancellationToken)
+                    .ConfigureAwait(false);
+
+                return WithETag(result, context, link => link.Response, link => link.Version);
+            })
+            // Technician or Admin, narrower than the group and matching the other two
+            // writes: a requester may read and comment on their own ticket, never decide
+            // which piece of equipment it is filed against.
+            .RequireAuthorization(ItmsPolicies.Technician)
+            .WithValidation<LinkTicketAssetRequest>()
+            .WithName("LinkTicketAsset")
+            .WithSummary("Names the asset a ticket is about, changes it, or clears the link.")
+            .WithDescription(
+                "Send an assetId to link the ticket to a piece of equipment, or null to clear the "
+                + "link. Linking an asset the ticket already names, or clearing a link it does not "
+                + "have, is refused rather than treated as a no-op — either would write a timeline "
+                + "line describing a change that did not happen. A closed or cancelled ticket "
+                + "cannot be relinked. Send the ticket's ETag as If-Match to be refused with 412 if "
+                + "it has moved since you read it.")
+            .Produces<TicketAssetLinkResponse>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)

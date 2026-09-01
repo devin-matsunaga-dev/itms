@@ -1,9 +1,11 @@
+using Itms.Contracts.Lookups;
 using Itms.Modules.Assets.Features.AssetHistory;
 using Itms.Modules.Assets.Features.AssetHistory.ListAssetHistory;
 using Itms.Modules.Assets.Features.Assets.AssignAsset;
 using Itms.Modules.Assets.Features.Assets.CreateAsset;
 using Itms.Modules.Assets.Features.Assets.GetAsset;
 using Itms.Modules.Assets.Features.Assets.ListAssets;
+using Itms.Modules.Assets.Features.Assets.ListAssetTickets;
 using Itms.Modules.Assets.Features.Assets.RetireAsset;
 using Itms.Modules.Assets.Features.Assets.ReturnAssetToService;
 using Itms.Modules.Assets.Features.Assets.SendAssetForRepair;
@@ -32,12 +34,14 @@ namespace Itms.Modules.Assets.Features.Assets;
 /// which is why <c>AssignAssetHandler</c> asks Identity for no role.
 /// </para>
 /// <para>
-/// <b>Three reads.</b> The list is the whole surface WP-2.3 names — filtering by type,
+/// <b>Four reads.</b> The list is the whole surface WP-2.3 names — filtering by type,
 /// status, department, location, holder and warranty window, search, paging and sorting.
 /// The single-asset read came in with WP-2.1 so the create's <c>Location</c> header pointed
 /// somewhere, and the history read with WP-2.2, because a timeline nothing can read cannot
 /// be verified by a human. Only the single-asset read carries an <c>ETag</c>: a page of two
-/// hundred assets has two hundred versions and no one of them is the page's.
+/// hundred assets has two hundred versions and no one of them is the page's. WP-2.5 added
+/// the fourth — the tickets this asset has been the subject of, read through
+/// <c>ITicketLookup</c> because Assets may not touch the helpdesk schema.
 /// </para>
 /// <para>
 /// <b>The four writes are the five lifecycle operations SPEC.md §3 names.</b> Assignment
@@ -129,6 +133,32 @@ internal static class AssetEndpoints
                 + "stock moves the holder and the status — and are meant to be read together, in "
                 + "sequence order.")
             .Produces<PagedResult<AssetHistoryEntryResponse>>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group
+            .MapGet("/{id:guid}/tickets", async (
+                Guid id,
+                ListAssetTicketsHandler handler,
+                int? page,
+                int? pageSize,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await handler
+                    .HandleAsync(id, PageRequest.Of(page, pageSize), cancellationToken)
+                    .ConfigureAwait(false);
+
+                return result.ToOk();
+            })
+            .RequireAuthorization(ItmsPolicies.Technician)
+            .WithName("ListAssetTickets")
+            .WithSummary("Reads the tickets raised about an asset, newest first.")
+            .WithDescription(
+                "Every ticket linked to the asset, whatever its status: an asset's support history "
+                + "is the whole story of that machine. Read through the Helpdesk module's public "
+                + "contract, so the rows carry the ticket summary rather than the full ticket — "
+                + "follow a row to GET /api/v1/tickets/{id} for the detail.")
+            .Produces<PagedResult<TicketSummary>>()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
     }

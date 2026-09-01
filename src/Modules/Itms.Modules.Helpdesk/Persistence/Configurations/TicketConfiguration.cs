@@ -140,5 +140,15 @@ internal sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         // Like the three above, it is a considered guess rather than a measurement;
         // WP-6.4 owns the review against the query set that actually runs.
         builder.HasIndex(t => new { t.Status, t.DueAt }).HasDatabaseName("ix_tickets_status_due_at");
+
+        // An asset's support history, which WP-2.5 gave the column its first reader. Not a
+        // foreign key — the asset is another module's row (§3 rule 6) — so nothing else
+        // would have created this index, and without it every asset detail page would scan
+        // the ticket table. Partial, because the overwhelming majority of tickets name no
+        // asset and an index entry per null row is pure cost.
+        builder
+            .HasIndex(t => t.RelatedAssetId)
+            .HasDatabaseName("ix_tickets_related_asset_id")
+            .HasFilter("related_asset_id IS NOT NULL");
     }
 }

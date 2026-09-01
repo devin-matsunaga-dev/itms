@@ -1,3 +1,4 @@
+using Itms.Contracts.Lookups;
 using Itms.Modules.Helpdesk.Domain;
 using Itms.Modules.Helpdesk.Features.TicketAttachments;
 using Itms.Modules.Helpdesk.Features.TicketComments;
@@ -25,6 +26,14 @@ namespace Itms.Modules.Helpdesk.Features.Tickets.GetTicket;
 /// <c>hasMore…</c> flag and the client pages on through that list's own endpoint.
 /// </para>
 /// <para>
+/// <b>The related asset is read live, in a fifth query, and only when there is one.</b> The
+/// ticket stores the id and no cached tag (§3 rule 6 leaves the choice open, and WP-2.5 took
+/// it at the human's direction): a single-row detail can afford one lookup and be right,
+/// where the fifty-thousand-row queue could not — which is why <c>requesterName</c> and
+/// <c>departmentName</c> are cached columns and this is not. An asset soft-deleted since it
+/// was linked comes back null and the detail simply shows no link.
+/// </para>
+/// <para>
 /// <b>The conversation and the attachments are filtered by
 /// <see cref="TicketVisibility"/> before they are counted, not after.</b> A requester's
 /// detail contains no internal note, no internal attachment, and no flag or count implying
@@ -36,7 +45,12 @@ namespace Itms.Modules.Helpdesk.Features.Tickets.GetTicket;
 /// <param name="database">The helpdesk context.</param>
 /// <param name="currentUser">Who is asking. Decides whether this ticket exists for them at all.</param>
 /// <param name="clock">The system clock, for the SLA states. The stored instants come from the row; where they stand comes from here.</param>
-internal sealed class GetTicketHandler(HelpdeskDbContext database, ICurrentUser currentUser, IClock clock)
+/// <param name="assets">Assets' public contract, for the related asset's display text.</param>
+internal sealed class GetTicketHandler(
+    HelpdeskDbContext database,
+    ICurrentUser currentUser,
+    IClock clock,
+    IAssetLookup assets)
 {
     /// <summary>Reads the ticket.</summary>
     /// <param name="ticketId">The ticket wanted.</param>
@@ -110,6 +124,10 @@ internal sealed class GetTicketHandler(HelpdeskDbContext database, ICurrentUser 
 
         var hasMoreAttachments = Trim(attachments);
 
+        var relatedAsset = detail.Response.RelatedAssetId is { } assetId
+            ? await assets.GetAsync(assetId, cancellationToken).ConfigureAwait(false)
+            : null;
+
         return Result.Success(detail with
         {
             // Assessed first, so the `with` below cannot drop it: the SLA states are the
@@ -125,6 +143,7 @@ internal sealed class GetTicketHandler(HelpdeskDbContext database, ICurrentUser 
                 HasMoreComments = hasMoreComments,
                 Attachments = attachments,
                 HasMoreAttachments = hasMoreAttachments,
+                RelatedAsset = TicketRelatedAssetResponse.From(relatedAsset),
             },
         });
     }

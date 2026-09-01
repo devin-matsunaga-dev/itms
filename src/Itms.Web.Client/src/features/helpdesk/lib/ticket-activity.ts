@@ -70,6 +70,10 @@ export const changeKindLabels: Record<TicketChangeKind, string> = {
   Assignment: 'Assignee',
   Resolution: 'Resolution',
   Hold: 'On hold',
+  // WP-2.5 widened the enum. The label is here rather than in an asset screen because
+  // this map is the one place the timeline names a dimension, and a missing key is a
+  // type error rather than a blank row.
+  Asset: 'Related asset',
 }
 
 /**

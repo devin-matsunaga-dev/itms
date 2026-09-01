@@ -294,6 +294,144 @@
         ]
       }
     },
+    "/api/v1/users/{id}/assets": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Reads the equipment currently issued to somebody.",
+        "description": "Everything assigned to the user right now, by asset tag. Unpaged: this answers what one person is holding, which is a handful of things rather than a queue. A Technician or an Admin may ask about anybody; anybody else only about themselves.",
+        "operationId": "ListUserAssets",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssetSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/users/{id}/tickets": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Reads the tickets somebody raised, newest first.",
+        "description": "state=Open is what is still being worked and state=Past is what is finished with — resolved, closed, or cancelled. The two are complementary, so the pair is the whole history and nothing appears in both; omitting state returns every ticket. Rows carry the ticket summary rather than the full ticket: follow one to GET /api/v1/tickets/{id} for the detail.",
+        "operationId": "ListUserTickets",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/TicketActivity"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfTicketSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
     "/api/v1/departments": {
       "get": {
         "tags": [
@@ -2593,6 +2731,112 @@
         ]
       }
     },
+    "/api/v1/tickets/{id}/related-asset": {
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Names the asset a ticket is about, changes it, or clears the link.",
+        "description": "Send an assetId to link the ticket to a piece of equipment, or null to clear the link. Linking an asset the ticket already names, or clearing a link it does not have, is refused rather than treated as a no-op — either would write a timeline line describing a change that did not happen. A closed or cancelled ticket cannot be relinked. Send the ticket's ETag as If-Match to be refused with 412 if it has moved since you read it.",
+        "operationId": "LinkTicketAsset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkTicketAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketAssetLinkResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
     "/api/v1/tickets/{ticketId}/comments": {
       "get": {
         "tags": [
@@ -4059,6 +4303,81 @@
         ]
       }
     },
+    "/api/v1/assets/{id}/tickets": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Reads the tickets raised about an asset, newest first.",
+        "description": "Every ticket linked to the asset, whatever its status: an asset's support history is the whole story of that machine. Read through the Helpdesk module's public contract, so the rows carry the ticket summary rather than the full ticket — follow a row to GET /api/v1/tickets/{id} for the detail.",
+        "operationId": "ListAssetTickets",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfTicketSummary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
     "/api/v1/assets/{id}/assignments": {
       "post": {
         "tags": [
@@ -4978,6 +5297,58 @@
         },
         "description": "An asset status as the API renders it."
       },
+      "AssetSummary": {
+        "required": [
+          "id",
+          "assetTag",
+          "name",
+          "assetType",
+          "status",
+          "assignedToUserId",
+          "locationId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The asset's id.",
+            "format": "uuid"
+          },
+          "assetTag": {
+            "type": "string",
+            "description": "The unique, immutable asset tag (invariant 4)."
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name, suitable for a ticket or alert header."
+          },
+          "assetType": {
+            "type": "string",
+            "description": "The asset type, as configured in Assets."
+          },
+          "status": {
+            "type": "string",
+            "description": "The lifecycle status, as a string — the enum stays inside Assets."
+          },
+          "assignedToUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The current holder, if any.",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Where the asset is, if known.",
+            "format": "uuid"
+          }
+        },
+        "description": "The fields another module is allowed to know about an asset. Deliberately flat and\nsmall: it is a display and reference projection, not the asset aggregate, and\nnothing outside Assets should be able to reason about lifecycle rules from it."
+      },
       "AssetTypeResponse": {
         "required": [
           "id",
@@ -5706,6 +6077,23 @@
       "IResult": {
         "type": "object"
       },
+      "LinkTicketAssetRequest": {
+        "required": [
+          "assetId"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The asset the ticket concerns, or `null` to clear the link. A null is a\ndeliberate instruction, not an omitted field.",
+            "format": "uuid"
+          }
+        },
+        "description": "The body of `POST /api/v1/tickets/{id}/related-asset`."
+      },
       "LocationKind": {
         "enum": [
           "Organization",
@@ -6387,6 +6775,49 @@
         },
         "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
       },
+      "PagedResultOfTicketSummary": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketSummary"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -6457,6 +6888,58 @@
           "Descending",
           null
         ]
+      },
+      "TicketActivity": {
+        "type": "integer"
+      },
+      "TicketAssetLinkResponse": {
+        "required": [
+          "id",
+          "number",
+          "previousAsset",
+          "relatedAsset",
+          "changedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The ticket.",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "Its human-readable number, so a toast can name it."
+          },
+          "previousAsset": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The asset it named before, or `null` if it named none.",
+                "$ref": "#/components/schemas/TicketRelatedAssetResponse"
+              }
+            ]
+          },
+          "relatedAsset": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The asset it names now, or `null` after an unlink.",
+                "$ref": "#/components/schemas/TicketRelatedAssetResponse"
+              }
+            ]
+          },
+          "changedAt": {
+            "type": "string",
+            "description": "When the link changed, in UTC.",
+            "format": "date-time"
+          }
+        },
+        "description": "What a ticket looks like immediately after the asset it names changed."
       },
       "TicketAssignmentResponse": {
         "required": [
@@ -6649,7 +7132,8 @@
           "Priority",
           "Assignment",
           "Resolution",
-          "Hold"
+          "Hold",
+          "Asset"
         ],
         "description": "Which dimension of a ticket a history entry records having moved."
       },
@@ -6892,7 +7376,7 @@
               "null",
               "string"
             ],
-            "description": "The asset it concerns, or `null`. WP-2.5 sets it.",
+            "description": "The asset it concerns, or `null`. TicketRelatedAssetResponse? TicketDetailResponse.RelatedAsset carries the\nsame asset's display text on a read; this is the bare id every write answers with.",
             "format": "uuid"
           },
           "relatedAlertId": {
@@ -6961,6 +7445,17 @@
           "hasMoreAttachments": {
             "type": "boolean",
             "description": "True when there are more attachments the caller may see than\nIReadOnlyList&lt;TicketAttachmentResponse&gt; TicketDetailResponse.Attachments carries."
+          },
+          "relatedAsset": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The asset Guid? TicketDetailResponse.RelatedAssetId names, as it reads right now — or\n`null` when the ticket names none.",
+                "$ref": "#/components/schemas/TicketRelatedAssetResponse"
+              }
+            ]
           }
         },
         "description": "One ticket in full, as the detail screen reads it."
@@ -7220,6 +7715,40 @@
         },
         "description": "A ticket priority as the API renders it."
       },
+      "TicketRelatedAssetResponse": {
+        "required": [
+          "id",
+          "assetTag",
+          "name",
+          "assetType",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The asset's id.",
+            "format": "uuid"
+          },
+          "assetTag": {
+            "type": "string",
+            "description": "The identifier on the physical label. Unique and immutable."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its display name, falling back to the tag when it has none."
+          },
+          "assetType": {
+            "type": "string",
+            "description": "What kind of thing it is."
+          },
+          "status": {
+            "type": "string",
+            "description": "Its lifecycle status, as the stable code a client colours on."
+          }
+        },
+        "description": "An asset as a ticket names it, resolved through `IAssetLookup`."
+      },
       "TicketSlaResponse": {
         "required": [
           "responseTargetMinutes",
@@ -7390,6 +7919,105 @@
           }
         },
         "description": "What a ticket looks like immediately after a status change."
+      },
+      "TicketSummary": {
+        "required": [
+          "id",
+          "number",
+          "subject",
+          "status",
+          "priorityCode",
+          "priorityRank",
+          "requesterId",
+          "assigneeId",
+          "relatedAssetId",
+          "isOpen",
+          "createdAt",
+          "dueAt",
+          "resolvedAt",
+          "closedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The ticket's id.",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "The human-readable number, `TKT-####`. What people quote."
+          },
+          "subject": {
+            "type": "string",
+            "description": "The one-line summary."
+          },
+          "status": {
+            "type": "string",
+            "description": "Where it sits in the workflow, as a string — the enum stays inside Helpdesk."
+          },
+          "priorityCode": {
+            "type": "string",
+            "description": "The priority's stable key, for colour and for rules."
+          },
+          "priorityRank": {
+            "type": "integer",
+            "description": "Its ordering weight, so a panel can sort without a second call.",
+            "format": "int32"
+          },
+          "requesterId": {
+            "type": "string",
+            "description": "Who the ticket is for.",
+            "format": "uuid"
+          },
+          "assigneeId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The technician responsible, or `null`.",
+            "format": "uuid"
+          },
+          "relatedAssetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The asset it concerns, or `null`.",
+            "format": "uuid"
+          },
+          "isOpen": {
+            "type": "boolean",
+            "description": "False once the ticket is resolved, closed, or cancelled. The split SPEC.md §4 asks a\nuser page for — open tickets above, previous tickets below."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was raised (UTC).",
+            "format": "date-time"
+          },
+          "dueAt": {
+            "type": "string",
+            "description": "When resolution is due (UTC), pauses included.",
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was resolved (UTC), or `null`.",
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was closed (UTC), or `null`.",
+            "format": "date-time"
+          }
+        },
+        "description": "The fields another module is allowed to know about a ticket. Flat and small for the\nsame reason AssetSummary is: it is a display and reference projection,\nand no module outside Helpdesk should be able to reason about the state machine,\nthe SLA arithmetic, or the conversation from it."
       },
       "UpdateAssetStatusRequest": {
         "required": [

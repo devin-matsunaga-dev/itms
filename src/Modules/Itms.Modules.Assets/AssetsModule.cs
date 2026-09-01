@@ -20,6 +20,7 @@ using Itms.Modules.Assets.Features.Assets.AssignAsset;
 using Itms.Modules.Assets.Features.Assets.CreateAsset;
 using Itms.Modules.Assets.Features.Assets.GetAsset;
 using Itms.Modules.Assets.Features.Assets.ListAssets;
+using Itms.Modules.Assets.Features.Assets.ListAssetTickets;
 using Itms.Modules.Assets.Features.Assets.RetireAsset;
 using Itms.Modules.Assets.Features.Assets.ReturnAssetToService;
 using Itms.Modules.Assets.Features.Assets.SendAssetForRepair;
@@ -43,11 +44,10 @@ public static class AssetsModule
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>No public contract implementation yet.</b> <c>IAssetLookup</c> is how every other
-    /// module reads assets and it is still an interface only — <c>WP-2.5</c> claims it by
-    /// name, alongside the ticket ↔ asset link that first needs it. Nothing here registers
-    /// an implementation, so a module resolving <c>IAssetLookup</c> today fails at startup
-    /// rather than silently reading nothing.
+    /// <b>The public contract is implemented from WP-2.5.</b> <c>IAssetLookup</c> is how
+    /// every other module reads assets, and <c>AssetLookupService</c> is the answer —
+    /// Helpdesk's ticket link and its detail read are its first consumers. It was the last
+    /// of the four lookup contracts to get one.
     /// </para>
     /// <para>
     /// <b>This module publishes two events and consumes none.</b>
@@ -94,6 +94,7 @@ public static class AssetsModule
         services.TryAddScoped<GetAssetHandler>();
         services.TryAddScoped<ListAssetsHandler>();
         services.TryAddScoped<ListAssetHistoryHandler>();
+        services.TryAddScoped<ListAssetTicketsHandler>();
 
         // The timeline writer and the transaction envelope every lifecycle operation shares.
         // Scoped, because both hold the request's own DbContext and the transaction it is
@@ -113,6 +114,11 @@ public static class AssetsModule
         services.TryAddScoped<IValidator<CreateAssetRequest>, CreateAssetValidator>();
         services.TryAddScoped<IValidator<AssignAssetRequest>, AssignAssetValidator>();
         services.TryAddScoped<IValidator<AssetLifecycleRequest>, AssetLifecycleRequestValidator>();
+
+        // This module's public contract: how Helpdesk, Monitoring, and Alerts read an asset
+        // without referencing Assets (ARCHITECTURE.md §3 rule 2). Scoped, because it holds
+        // the request's own context.
+        services.TryAddScoped<IAssetLookup, AssetLookupService>();
 
         // This module's reference count for the directory screens: how much equipment
         // sits in a department or a room

@@ -30,10 +30,17 @@ namespace Itms.Modules.Helpdesk.Features.Tickets;
 /// or flag that would tell them one exists.
 /// </para>
 /// <para>
-/// <b>What is not here yet.</b>
-/// <see cref="RelatedAssetId"/> and <see cref="RelatedAlertId"/> are returned as bare ids
-/// because nothing sets them until WP-2.5 and WP-3.7; when those land, each will want its
-/// display text alongside, the way the requester and department names travel here.
+/// <b>The related asset came at WP-2.5, and its display text does not travel the way the
+/// requester's and the department's do.</b> Those are cached columns on the ticket row,
+/// because the queue renders fifty thousand of them and cannot resolve a name per row; this
+/// one is <see cref="RelatedAsset"/>, filled in by the handler from <c>IAssetLookup</c> at
+/// the moment of the read. A single-row detail can afford the lookup, and what it buys is a
+/// tag that is never stale.
+/// </para>
+/// <para>
+/// <b>What is not here yet.</b> <see cref="RelatedAlertId"/> is still a bare id, because
+/// nothing sets it until WP-3.7. When it lands it will want its display text alongside, and
+/// <see cref="RelatedAsset"/> is the shape to follow.
 /// </para>
 /// </remarks>
 /// <param name="Id">The ticket's id.</param>
@@ -61,7 +68,10 @@ namespace Itms.Modules.Helpdesk.Features.Tickets;
 /// </param>
 /// <param name="ResolvedAt">When it was resolved (UTC), or <see langword="null"/>.</param>
 /// <param name="ClosedAt">When it was closed (UTC), or <see langword="null"/>.</param>
-/// <param name="RelatedAssetId">The asset it concerns, or <see langword="null"/>. WP-2.5 sets it.</param>
+/// <param name="RelatedAssetId">
+/// The asset it concerns, or <see langword="null"/>. <see cref="RelatedAsset"/> carries the
+/// same asset's display text on a read; this is the bare id every write answers with.
+/// </param>
 /// <param name="RelatedAlertId">The alert it was raised from, or <see langword="null"/>. WP-3.7 sets it.</param>
 /// <param name="CreatedAt">When it was raised (UTC).</param>
 /// <param name="UpdatedAt">When it last moved (UTC).</param>
@@ -171,6 +181,23 @@ public sealed record TicketDetailResponse(
     /// <see cref="Attachments"/> carries.
     /// </summary>
     public bool HasMoreAttachments { get; init; }
+
+    /// <summary>
+    /// The asset <see cref="RelatedAssetId"/> names, as it reads right now — or
+    /// <see langword="null"/> when the ticket names none.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Set after projection, like <see cref="AllowedNextStatuses"/>, because it is not a
+    /// column: it is another module's row, read through <c>IAssetLookup</c> on the way out.
+    /// </para>
+    /// <para>
+    /// It is also null when the asset has been soft-deleted since it was linked, while
+    /// <see cref="RelatedAssetId"/> still names it. That pairing is deliberate — the ticket
+    /// records what it was linked to, and the detail shows what can still be shown.
+    /// </para>
+    /// </remarks>
+    public TicketRelatedAssetResponse? RelatedAsset { get; init; }
 
     /// <summary>
     /// The same ticket with its SLA states filled in for <paramref name="now"/>.

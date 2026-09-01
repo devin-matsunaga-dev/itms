@@ -36,8 +36,9 @@ public sealed class TicketHistoryTests
         Guid? assigneeId = null,
         string? assigneeName = null,
         string? resolutionNotes = null,
-        string? holdReason = null) =>
-        new(status, priorityId ?? Medium, assigneeId, assigneeName, resolutionNotes, holdReason);
+        string? holdReason = null,
+        Guid? relatedAssetId = null) =>
+        new(status, priorityId ?? Medium, assigneeId, assigneeName, resolutionNotes, holdReason, relatedAssetId);
 
     /// <summary>A change that moved nothing tracked writes no line at all.</summary>
     /// <remarks>
@@ -343,5 +344,71 @@ public sealed class TicketHistoryTests
         snapshot.AssigneeId.ShouldBeNull();
         snapshot.AssigneeName.ShouldBeNull();
         snapshot.ResolutionNotes.ShouldBeNull();
+    }
+
+    /// <summary>
+    /// A change of related asset writes one line carrying both tags — the display text
+    /// resolved from Assets, never the bare ids the ticket stores.
+    /// </summary>
+    [Fact]
+    public void A_link_to_an_asset_is_recorded_from_and_to()
+    {
+        var laptop = Guid.CreateVersion7();
+
+        var changes = TicketChanges.Between(
+            Snapshot(),
+            Snapshot(relatedAssetId: laptop),
+            assetTags: new TicketAssetTags(null, "LAP-0042"));
+
+        var change = changes.ShouldHaveSingleItem();
+        change.Kind.ShouldBe(TicketChangeKind.Asset);
+        change.From.ShouldBeNull();
+        change.To.ShouldBe("LAP-0042");
+    }
+
+    /// <summary>Clearing a link is a change in the other direction, and is recorded too.</summary>
+    [Fact]
+    public void Clearing_a_link_is_recorded_as_a_move_to_nothing()
+    {
+        var laptop = Guid.CreateVersion7();
+
+        var changes = TicketChanges.Between(
+            Snapshot(relatedAssetId: laptop),
+            Snapshot(),
+            assetTags: new TicketAssetTags("LAP-0042", null));
+
+        var change = changes.ShouldHaveSingleItem();
+        change.Kind.ShouldBe(TicketChangeKind.Asset);
+        change.From.ShouldBe("LAP-0042");
+        change.To.ShouldBeNull();
+    }
+
+    /// <summary>
+    /// The same guard the priority carries: recording "the asset changed" without saying
+    /// which asset looks like coverage and is not, so the omission throws rather than
+    /// writing a line nobody can read.
+    /// </summary>
+    [Fact]
+    public void A_link_change_without_the_tags_to_describe_it_throws()
+    {
+        Should.Throw<ArgumentException>(() => TicketChanges.Between(
+            Snapshot(),
+            Snapshot(relatedAssetId: Guid.CreateVersion7())));
+    }
+
+    /// <summary>
+    /// A ticket whose asset did not move owes no line, even when the tags happen to be
+    /// supplied — the id is what decides, not the display text.
+    /// </summary>
+    [Fact]
+    public void An_unchanged_link_owes_no_history()
+    {
+        var laptop = Guid.CreateVersion7();
+
+        TicketChanges.Between(
+            Snapshot(relatedAssetId: laptop),
+            Snapshot(relatedAssetId: laptop),
+            assetTags: new TicketAssetTags("LAP-0042", "LAP-0042"))
+            .ShouldBeEmpty();
     }
 }

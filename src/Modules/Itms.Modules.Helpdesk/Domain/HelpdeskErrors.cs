@@ -162,6 +162,53 @@ internal static class HelpdeskErrors
     /// status is what separates them for anybody who cares which happened.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// The ticket is closed or cancelled, so the asset it names cannot be changed.
+    /// </summary>
+    /// <remarks>
+    /// A 409 for the same reason <see cref="TicketNotAssignable"/> is: the request is well
+    /// formed and the link is a legitimate thing to want — it is this ticket's state that
+    /// refuses it. A resolved ticket is not terminal and is not refused here, because the
+    /// asset is very often identified while the resolution is being written up.
+    /// </remarks>
+    public static Error TicketNotLinkable(TicketStatus status) =>
+        Error.Conflict(
+            "helpdesk.ticket_not_linkable",
+            $"A {Describe(status)} ticket cannot have its related asset changed.");
+
+    /// <summary>The ticket already names that asset.</summary>
+    /// <remarks>
+    /// Not a no-op, for the reason <see cref="AlreadyAssignedToThatTechnician"/> gives: it
+    /// would write a timeline line saying the ticket moved from an asset to the same asset.
+    /// </remarks>
+    public static Error AlreadyLinkedToThatAsset() =>
+        Error.Conflict(
+            "helpdesk.already_linked_to_that_asset",
+            "The ticket already names that asset.");
+
+    /// <summary>The caller asked to clear a link the ticket does not have.</summary>
+    public static Error TicketHasNoRelatedAsset() =>
+        Error.Conflict(
+            "helpdesk.ticket_has_no_related_asset",
+            "The ticket does not name an asset, so there is nothing to unlink.");
+
+    /// <summary>No such asset, as far as Assets is concerned.</summary>
+    /// <remarks>
+    /// A 400 with a field message rather than a 404, following
+    /// <see cref="RequesterNotFound"/>: the ticket in the route exists and was found, and
+    /// what is wrong is a value in the body. A soft-deleted asset lands here too — the
+    /// lookup does not return one — which is correct: a ticket should not be linked to
+    /// equipment that has been removed from the inventory.
+    /// </remarks>
+    public static Error RelatedAssetNotFound() =>
+        Error.Validation(
+            "helpdesk.related_asset_not_found",
+            "No such asset.",
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["assetId"] = ["No such asset."],
+            });
+
     public static Error TicketPreconditionFailed() =>
         Error.PreconditionFailed(
             "helpdesk.ticket_conflict",

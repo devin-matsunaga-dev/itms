@@ -28,6 +28,7 @@ using Itms.Modules.Helpdesk.Features.Tickets.AssignTicket;
 using Itms.Modules.Helpdesk.Features.Tickets.ChangeTicketStatus;
 using Itms.Modules.Helpdesk.Features.Tickets.CreateTicket;
 using Itms.Modules.Helpdesk.Features.Tickets.GetTicket;
+using Itms.Modules.Helpdesk.Features.Tickets.LinkTicketAsset;
 using Itms.Modules.Helpdesk.Features.Tickets.ListTickets;
 using Itms.Modules.Helpdesk.Features.Tickets.TicketCounters;
 using Itms.Modules.Helpdesk.Persistence;
@@ -100,6 +101,7 @@ public static class HelpdeskModule
         services.TryAddScoped<GetTicketHandler>();
         services.TryAddScoped<ChangeTicketStatusHandler>();
         services.TryAddScoped<AssignTicketHandler>();
+        services.TryAddScoped<LinkTicketAssetHandler>();
         services.TryAddScoped<ListTicketHistoryHandler>();
         services.TryAddScoped<AddTicketCommentHandler>();
         services.TryAddScoped<ListTicketCommentsHandler>();
@@ -124,7 +126,13 @@ public static class HelpdeskModule
         services.TryAddScoped<IValidator<ChangeTicketStatusRequest>, ChangeTicketStatusValidator>();
         services.TryAddScoped<IValidator<CreateTicketRequest>, CreateTicketValidator>();
         services.TryAddScoped<IValidator<AssignTicketRequest>, AssignTicketValidator>();
+        services.TryAddScoped<IValidator<LinkTicketAssetRequest>, LinkTicketAssetValidator>();
         services.TryAddScoped<IValidator<AddTicketCommentRequest>, AddTicketCommentValidator>();
+
+        // This module's public contract: how Assets and Identity read a ticket without
+        // referencing Helpdesk (ARCHITECTURE.md §3 rule 2). Scoped, because it holds the
+        // request's own context.
+        services.TryAddScoped<ITicketLookup, TicketLookupService>();
 
         // This module's reference count for the directory screens: how many tickets are
         // filed against a department

@@ -55,6 +55,66 @@ public sealed record TicketSlaDto(
     bool IsPaused,
     long PausedSeconds);
 
+/// <summary>The asset a ticket names, as the detail and the link response render it.</summary>
+/// <param name="Id">The asset's id.</param>
+/// <param name="AssetTag">Its unique, immutable tag.</param>
+/// <param name="Name">Its display name, falling back to the tag.</param>
+/// <param name="AssetType">What kind of thing it is.</param>
+/// <param name="Status">Its lifecycle status, as the stable code.</param>
+public sealed record TicketRelatedAssetDto(
+    Guid Id,
+    string AssetTag,
+    string Name,
+    string AssetType,
+    string Status);
+
+/// <summary>A link change as the suite reads it off the wire.</summary>
+/// <param name="Id">The ticket.</param>
+/// <param name="Number">Its human-readable number.</param>
+/// <param name="PreviousAsset">The asset it named before, or null.</param>
+/// <param name="RelatedAsset">The asset it names now, or null.</param>
+/// <param name="ChangedAt">When the link changed.</param>
+public sealed record TicketAssetLinkDto(
+    Guid Id,
+    string Number,
+    TicketRelatedAssetDto? PreviousAsset,
+    TicketRelatedAssetDto? RelatedAsset,
+    DateTimeOffset ChangedAt);
+
+/// <summary>
+/// A ticket as another module's panel renders it — the shape <c>ITicketLookup</c> hands
+/// out, which is what the asset and user pages return.
+/// </summary>
+/// <param name="Id">The ticket's id.</param>
+/// <param name="Number">Its human-readable number.</param>
+/// <param name="Subject">The one-line summary.</param>
+/// <param name="Status">Where it sits in the workflow, as a string.</param>
+/// <param name="PriorityCode">Its priority's stable key.</param>
+/// <param name="PriorityRank">That priority's ordering weight.</param>
+/// <param name="RequesterId">Who it is for.</param>
+/// <param name="AssigneeId">The technician holding it, or null.</param>
+/// <param name="RelatedAssetId">The asset it concerns, or null.</param>
+/// <param name="IsOpen">False once resolved, closed, or cancelled.</param>
+/// <param name="CreatedAt">When it was raised.</param>
+/// <param name="DueAt">When resolution is due.</param>
+/// <param name="ResolvedAt">When it was resolved, or null.</param>
+/// <param name="ClosedAt">When it was closed, or null.</param>
+public sealed record TicketSummaryDto(
+    Guid Id,
+    string Number,
+    string Subject,
+    string Status,
+    string PriorityCode,
+    int PriorityRank,
+    Guid RequesterId,
+    Guid? AssigneeId,
+    Guid? RelatedAssetId,
+    bool IsOpen,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset DueAt,
+    DateTimeOffset? ResolvedAt,
+    DateTimeOffset? ClosedAt);
+
 /// <summary>A ticket as the detail endpoint renders it.</summary>
 /// <param name="Id">The ticket's id.</param>
 /// <param name="Number">The human-readable number.</param>
@@ -89,6 +149,7 @@ public sealed record TicketSlaDto(
 /// <param name="HasMoreComments">True when there are more comments the caller may read.</param>
 /// <param name="Attachments">Its attachments, filtered to what the caller may see.</param>
 /// <param name="HasMoreAttachments">True when there are more attachments the caller may see.</param>
+/// <param name="RelatedAsset">The asset it names, read live at the moment of the request.</param>
 public sealed record TicketDetailDto(
     Guid Id,
     string Number,
@@ -123,7 +184,8 @@ public sealed record TicketDetailDto(
     IReadOnlyList<TicketCommentDto> Comments,
     bool HasMoreComments,
     IReadOnlyList<TicketAttachmentDto> Attachments,
-    bool HasMoreAttachments);
+    bool HasMoreAttachments,
+    TicketRelatedAssetDto? RelatedAsset);
 
 /// <summary>One row of the queue, as the list endpoint renders it.</summary>
 /// <param name="Id">The ticket's id.</param>
@@ -392,6 +454,67 @@ internal static class TicketClient
 
         return (
             await ApiClient.ReadAsync<TicketAssignmentDto>(response, cancellationToken),
+            response.Headers.ETag?.ToString() ?? string.Empty);
+    }
+
+    /// <summary>Changes the asset a ticket names, optionally stating an <c>If-Match</c> precondition.</summary>
+    /// <remarks>
+    /// Built by hand rather than through <c>ApiClient.SendAsync</c> for the reason
+    /// <see cref="ChangeStatusAsync"/> is: a test has to be able to attach a deliberately
+    /// stale <c>If-Match</c> without <c>HttpClient</c> validating it away.
+    /// </remarks>
+    /// <param name="client">A technician or admin client.</param>
+    /// <param name="ticketId">The ticket to link.</param>
+    /// <param name="assetId">The asset it concerns, or null to clear the link.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="ifMatch">The entity tag to require, or null to state no precondition.</param>
+    /// <returns>The raw response.</returns>
+    public static async Task<HttpResponseMessage> LinkAssetAsync(
+        HttpClient client,
+        Guid ticketId,
+        Guid? assetId,
+        CancellationToken cancellationToken,
+        string? ifMatch = null)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{Tickets}/{ticketId}/related-asset")
+        {
+            Content = JsonContent.Create(new { assetId }, options: Json),
+        };
+
+        if (ifMatch is not null)
+        {
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        var csrf = await client.GetFromJsonAsync<CsrfDto>(
+            new Uri("/api/v1/auth/csrf", UriKind.Relative),
+            Json,
+            cancellationToken)
+            ?? throw new InvalidOperationException("No antiforgery token was issued.");
+
+        request.Headers.Add(csrf.HeaderName, csrf.Token);
+        return await client.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>Links an asset and returns the result, failing loudly if the call did not succeed.</summary>
+    /// <param name="client">A technician or admin client.</param>
+    /// <param name="ticketId">The ticket to link.</param>
+    /// <param name="assetId">The asset it concerns, or null to clear the link.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The link, and the ETag the response carried.</returns>
+    public static async Task<(TicketAssetLinkDto Link, string ETag)> LinksAssetAsync(
+        HttpClient client,
+        Guid ticketId,
+        Guid? assetId,
+        CancellationToken cancellationToken)
+    {
+        var response = await LinkAssetAsync(client, ticketId, assetId, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (
+            await ApiClient.ReadAsync<TicketAssetLinkDto>(response, cancellationToken),
             response.Headers.ETag?.ToString() ?? string.Empty);
     }
 

@@ -73,6 +73,19 @@ internal static class HelpdeskAudit
     /// <summary>A file was attached to a ticket.</summary>
     public const string TicketAttachmentAdded = "helpdesk.ticket_attachment_added";
 
+    /// <summary>
+    /// The asset a ticket names was set, changed, or cleared.
+    /// </summary>
+    /// <remarks>
+    /// The third of the three, and it joins for the same reason: ARCHITECTURE.md §5 names
+    /// no event for a link — the eleven it lists are fixed, and adding a twelfth is an
+    /// architecture change, not a work package's — nothing consumes one, and a ticket
+    /// modification is mandatory coverage under SPEC.md §15. The diff carries both asset
+    /// ids and both tags, so the trail says which machine without a join into a schema the
+    /// Audit module may not read.
+    /// </remarks>
+    public const string TicketAssetLinked = "helpdesk.ticket_asset_linked";
+
     /// <summary>The entity type of a category entry.</summary>
     public const string CategoryEntityType = "TicketCategory";
 

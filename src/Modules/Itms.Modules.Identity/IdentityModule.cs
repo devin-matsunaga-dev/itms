@@ -8,6 +8,7 @@ using Itms.Modules.Identity.Features.Auth.CurrentUser;
 using Itms.Modules.Identity.Features.Auth.Login;
 using Itms.Modules.Identity.Features.Auth.Logout;
 using Itms.Modules.Identity.Features.Users.SearchUsers;
+using Itms.Modules.Identity.Features.Users.UserPanels;
 using Itms.Modules.Identity.Persistence;
 using Itms.Modules.Identity.Security;
 using Itms.Platform.Data;
@@ -128,6 +129,7 @@ public static class IdentityModule
         // Not under the auth group: these are the user directory, guarded by the
         // Technician policy rather than by "any signed-in account".
         endpoints.MapUserDirectory();
+        endpoints.MapUserPanels();
 
         return endpoints;
     }

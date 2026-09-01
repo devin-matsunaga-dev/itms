@@ -44,12 +44,19 @@ public static class TicketChanges
     /// The names the two priorities carried, required when — and only when — the priority
     /// ids differ.
     /// </param>
+    /// <param name="assetTags">
+    /// The tags the two assets carried, required when — and only when — the related asset
+    /// ids differ.
+    /// </param>
     /// <returns>The entries owed, possibly none.</returns>
-    /// <exception cref="ArgumentException">The priority moved and no names were supplied to describe it.</exception>
+    /// <exception cref="ArgumentException">
+    /// The priority or the related asset moved and no names were supplied to describe it.
+    /// </exception>
     public static IReadOnlyList<TicketChange> Between(
         TicketSnapshot before,
         TicketSnapshot after,
-        TicketPriorityNames? priorityNames = null)
+        TicketPriorityNames? priorityNames = null,
+        TicketAssetTags? assetTags = null)
     {
         var changes = new List<TicketChange>(capacity: 5);
 
@@ -91,6 +98,25 @@ public static class TicketChanges
         if (!string.Equals(before.HoldReason, after.HoldReason, StringComparison.Ordinal))
         {
             changes.Add(new TicketChange(TicketChangeKind.Hold, before.HoldReason, after.HoldReason));
+        }
+
+        // Compared by id, like the assignee and for the same reason: the tag is display
+        // text resolved from another module, and two reads of it are not what decides
+        // whether the ticket's link moved.
+        if (before.RelatedAssetId != after.RelatedAssetId)
+        {
+            if (assetTags is not { } tags)
+            {
+                // The same programming error the priority branch describes: the recorder
+                // resolves these before it asks, so reaching here means a new call site
+                // forgot to. "The asset changed" without saying which asset looks like
+                // coverage and is not.
+                throw new ArgumentException(
+                    "A change of related asset needs the tags of both assets to describe it.",
+                    nameof(assetTags));
+            }
+
+            changes.Add(new TicketChange(TicketChangeKind.Asset, tags.From, tags.To));
         }
 
         return changes;

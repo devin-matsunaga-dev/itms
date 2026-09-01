@@ -1,3 +1,4 @@
+using Itms.Contracts.Lookups;
 using Itms.Modules.Helpdesk.Domain;
 using Itms.Modules.Helpdesk.Persistence;
 using Itms.Platform.Identity;
@@ -36,10 +37,20 @@ namespace Itms.Modules.Helpdesk.Features.TicketHistory;
 /// </remarks>
 /// <param name="database">The caller's helpdesk context, already enlisted in its transaction.</param>
 /// <param name="currentUser">Who is making the request.</param>
-public sealed class TicketHistoryRecorder(HelpdeskDbContext database, ICurrentUser currentUser)
+/// <param name="assets">
+/// Assets' public contract, for the tags a related-asset change is described by. Asked
+/// only when that link actually moved — a status change resolves nothing.
+/// </param>
+public sealed class TicketHistoryRecorder(
+    HelpdeskDbContext database,
+    ICurrentUser currentUser,
+    IAssetLookup assets)
 {
     /// <summary>What a priority name reads as when the row behind it cannot be found.</summary>
     private const string UnknownPriority = "(unknown priority)";
+
+    /// <summary>What an asset tag reads as when the asset behind it cannot be found.</summary>
+    private const string UnknownAsset = "(unknown asset)";
 
     /// <summary>
     /// Adds the history entries owed for the move from <paramref name="before"/> to the
@@ -52,7 +63,7 @@ public sealed class TicketHistoryRecorder(HelpdeskDbContext database, ICurrentUs
     /// <param name="ticket">The ticket, after the change has been applied to it.</param>
     /// <param name="before">The snapshot taken before the change.</param>
     /// <param name="occurredAt">When the change happened (UTC) — the same instant the change wrote.</param>
-    /// <param name="cancellationToken">Cancels the priority-name lookup.</param>
+    /// <param name="cancellationToken">Cancels the priority-name and asset-tag lookups.</param>
     /// <returns>The entries added, in timeline order. Empty when nothing tracked moved.</returns>
     public async Task<IReadOnlyList<TicketHistoryEntry>> RecordAsync(
         Ticket ticket,
@@ -72,7 +83,13 @@ public sealed class TicketHistoryRecorder(HelpdeskDbContext database, ICurrentUs
             ? null
             : await PriorityNamesAsync(before.PriorityId, after.PriorityId, cancellationToken).ConfigureAwait(false);
 
-        var changes = TicketChanges.Between(before, after, priorityNames);
+        // The same rule, one boundary further out: resolved only when the link moved, and
+        // through the contract rather than a query, because the tag is another module's.
+        TicketAssetTags? assetTags = before.RelatedAssetId == after.RelatedAssetId
+            ? null
+            : await AssetTagsAsync(before.RelatedAssetId, after.RelatedAssetId, cancellationToken).ConfigureAwait(false);
+
+        var changes = TicketChanges.Between(before, after, priorityNames, assetTags);
 
         if (changes.Count == 0)
         {
@@ -94,6 +111,42 @@ public sealed class TicketHistoryRecorder(HelpdeskDbContext database, ICurrentUs
         await database.TicketHistory.AddRangeAsync(entries, cancellationToken).ConfigureAwait(false);
 
         return entries;
+    }
+
+    /// <summary>
+    /// Reads the tags both assets carry right now, which is what the entry records as
+    /// their tags at the time.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// One batched call for both sides rather than two, which is what
+    /// <c>IAssetLookup.GetManyAsync</c> is for. A null id contributes nothing to ask about
+    /// and comes back null: linking a ticket that had no asset moves from nothing, and
+    /// unlinking moves to nothing.
+    /// </para>
+    /// <para>
+    /// A tag can genuinely be missing on the <em>from</em> side — an asset soft-deleted
+    /// since it was linked is no longer visible through the contract — so the fallback is
+    /// not dead code. It keeps a change of link from being lost because the history could
+    /// not be labelled.
+    /// </para>
+    /// </remarks>
+    private async Task<TicketAssetTags> AssetTagsAsync(
+        Guid? fromId,
+        Guid? toId,
+        CancellationToken cancellationToken)
+    {
+        Guid[] wanted = [.. new[] { fromId, toId }.OfType<Guid>()];
+
+        IReadOnlyList<AssetSummary> summaries = wanted.Length == 0
+            ? []
+            : await assets.GetManyAsync(wanted, cancellationToken).ConfigureAwait(false);
+
+        return new TicketAssetTags(Tag(fromId), Tag(toId));
+
+        string? Tag(Guid? id) => id is not { } value
+            ? null
+            : summaries.FirstOrDefault(asset => asset.Id == value)?.AssetTag ?? UnknownAsset;
     }
 
     /// <summary>

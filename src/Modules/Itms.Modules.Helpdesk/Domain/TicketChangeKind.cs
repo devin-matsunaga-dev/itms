@@ -7,10 +7,12 @@ namespace Itms.Modules.Helpdesk.Domain;
 /// </summary>
 /// <remarks>
 /// <para>
-/// These are exactly the four changes WP-1.4 requires a history entry for — status,
-/// priority, assignment, and resolution. They are not a general "anything that changed"
-/// list: a subject correction or a description edit is an audit concern, not a line in
-/// the timeline a technician reads to understand what happened to a ticket.
+/// These are the changes WP-1.4 requires a history entry for — status, priority,
+/// assignment, and resolution — plus the two later packages added against the same test:
+/// the hold reason (WP-1.13) and the asset the ticket concerns (WP-2.5). They are not a
+/// general "anything that changed" list: a subject correction or a description edit is an
+/// audit concern, not a line in the timeline a technician reads to understand what
+/// happened to a ticket.
 /// </para>
 /// <para>
 /// Stored as text and serialised as text, following <see cref="TicketStatus"/> and
@@ -43,4 +45,16 @@ public enum TicketChangeKind
     /// sharing an instant renders "on hold, because X" as one event rather than two rows.
     /// </remarks>
     Hold,
+
+    /// <summary>
+    /// The asset the ticket concerns was named, changed, or cleared.
+    /// </summary>
+    /// <remarks>
+    /// Recorded as the asset's <em>tag</em> rather than its id, because the timeline is
+    /// read by people — often at a psql prompt during an incident — and a bare uuid says
+    /// nothing. The tag is resolved through <c>IAssetLookup</c> when the entry is written
+    /// and then never refreshed: the line says which asset the ticket was linked to at the
+    /// time, which is what a history is for.
+    /// </remarks>
+    Asset,
 }

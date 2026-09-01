@@ -19,8 +19,9 @@ namespace Itms.Modules.Helpdesk.Domain;
 /// <see cref="Sla"/>. Nothing outside this class writes them.
 /// </para>
 /// <para>
-/// <b>Why the forward fields are here and empty.</b> <see cref="RelatedAssetId"/>,
-/// <see cref="RelatedAlertId"/>, and
+/// <b>Why the forward fields were here and empty.</b> <see cref="RelatedAssetId"/> was one
+/// of them until WP-2.5, which added <see cref="LinkAsset"/> and needed no migration to do
+/// it — the shape this paragraph predicted. <see cref="RelatedAlertId"/> and
 /// <see cref="DeletedAt"/> are the rest of SPEC.md §2's field set. Their meaning is
 /// already fixed by the spec, so declaring them now costs nothing and lets WP-2.5 and
 /// WP-3.7 add a method rather than a migration each. None of them has a setter yet: the
@@ -187,7 +188,18 @@ public sealed class Ticket
         SlaPausedAt,
         SlaPausedTotal);
 
-    /// <summary>The asset the ticket concerns, or <see langword="null"/>. WP-2.5 links it.</summary>
+    /// <summary>
+    /// The asset the ticket concerns, or <see langword="null"/>. A row in Assets,
+    /// referenced by id only (§3 rule 6); <see cref="LinkAsset"/> is the only thing that
+    /// writes it.
+    /// </summary>
+    /// <remarks>
+    /// <b>No cached tag travels with it</b>, unlike the requester's and the department's
+    /// names. Those are on the queue, where fifty thousand rows cannot each resolve a name;
+    /// the related asset appears on one ticket's detail, which can afford to read it live
+    /// through <c>IAssetLookup</c> and be right rather than cached and stale (WP-2.5, at
+    /// the human's direction).
+    /// </remarks>
     public Guid? RelatedAssetId { get; private set; }
 
     /// <summary>The alert the ticket was raised from, or <see langword="null"/>. WP-3.7 links it, permanently (invariant 8).</summary>
@@ -680,6 +692,64 @@ public sealed class Ticket
 
         AssigneeId = null;
         AssigneeName = null;
+        UpdatedAt = now;
+        UpdatedBy = actor;
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Names the asset this ticket is about, changes it, or clears it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The one writer of <see cref="RelatedAssetId"/>.</b> The column has existed since
+    /// WP-1.2 with no setter, waiting for the package that owns the behaviour — this is it.
+    /// SPEC.md §4's whole point is that a ticket, a person, and a piece of equipment are
+    /// one story, and this is the join.
+    /// </para>
+    /// <para>
+    /// <b>Whether the asset exists is not this method's question.</b> That is a fact about
+    /// another module's rows, so the handler asks <c>IAssetLookup</c> before calling in —
+    /// the same division <see cref="Assign"/> draws for the assignee. What lives here is
+    /// the rule that only a live ticket may be relinked, and the refusal of a no-op that
+    /// would otherwise write a timeline line saying the ticket moved from an asset to the
+    /// same asset.
+    /// </para>
+    /// <para>
+    /// <b>A terminal ticket is refused</b>, matching <see cref="Assign"/>: a closed or
+    /// cancelled ticket is a finished record, and correcting one is not something the
+    /// operational surface should do quietly. A resolved ticket is <em>not</em> terminal
+    /// and can still be linked, which is deliberate — the asset is very often identified
+    /// while the resolution is being written up.
+    /// </para>
+    /// </remarks>
+    /// <param name="assetId">The asset the ticket concerns, or <see langword="null"/> to clear the link.</param>
+    /// <param name="now">The current instant, from <c>IClock</c>.</param>
+    /// <param name="actor">Who is making the change.</param>
+    /// <returns>Success, or a conflict describing why the link cannot be changed.</returns>
+    public Result LinkAsset(Guid? assetId, DateTimeOffset now, Guid? actor)
+    {
+        if (assetId == Guid.Empty)
+        {
+            // An empty guid is a client bug, not a request to unlink: null says that, and
+            // silently treating one as the other would clear a link somebody meant to set.
+            throw new ArgumentException("An asset id cannot be empty. Pass null to clear the link.", nameof(assetId));
+        }
+
+        if (TicketStateMachine.IsTerminal(Status))
+        {
+            return HelpdeskErrors.TicketNotLinkable(Status);
+        }
+
+        if (assetId == RelatedAssetId)
+        {
+            return assetId is null
+                ? HelpdeskErrors.TicketHasNoRelatedAsset()
+                : HelpdeskErrors.AlreadyLinkedToThatAsset();
+        }
+
+        RelatedAssetId = assetId;
         UpdatedAt = now;
         UpdatedBy = actor;
 

@@ -1,8 +1,8 @@
 namespace Itms.Modules.Helpdesk.Domain;
 
 /// <summary>
-/// The five dimensions of a ticket that <see cref="TicketHistoryEntry"/> records, read
-/// off the entity at one instant.
+/// The dimensions of a ticket that <see cref="TicketHistoryEntry"/> records, read off the
+/// entity at one instant.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,6 +27,12 @@ namespace Itms.Modules.Helpdesk.Domain;
 /// <param name="AssigneeId">Who was responsible, or <see langword="null"/> when nobody was.</param>
 /// <param name="AssigneeName">Their display name as the ticket cached it, or <see langword="null"/>.</param>
 /// <param name="ResolutionNotes">What the ticket recorded as its resolution, or <see langword="null"/>.</param>
+/// <param name="RelatedAssetId">
+/// Which asset the ticket named, or <see langword="null"/> when it named none. Held as an
+/// id for the same reason <paramref name="PriorityId"/> is, one boundary further out: the
+/// tag that names it belongs to another module and is resolved by the recorder, only when
+/// the ids actually differ.
+/// </param>
 /// <param name="HoldReason">
 /// What it was waiting on, or <see langword="null"/> when it was not parked. Tracked so a
 /// hold and a resume each write a timeline entry through the same snapshot diff every
@@ -38,9 +44,10 @@ public readonly record struct TicketSnapshot(
     Guid? AssigneeId,
     string? AssigneeName,
     string? ResolutionNotes,
-    string? HoldReason)
+    string? HoldReason,
+    Guid? RelatedAssetId)
 {
-    /// <summary>Reads the five tracked dimensions off a ticket as it stands right now.</summary>
+    /// <summary>Reads the tracked dimensions off a ticket as it stands right now.</summary>
     /// <param name="ticket">The ticket to read.</param>
     /// <returns>The snapshot.</returns>
     public static TicketSnapshot Of(Ticket ticket)
@@ -53,6 +60,7 @@ public readonly record struct TicketSnapshot(
             ticket.AssigneeId,
             ticket.AssigneeName,
             ticket.ResolutionNotes,
-            ticket.HoldReason);
+            ticket.HoldReason,
+            ticket.RelatedAssetId);
     }
 }

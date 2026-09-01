@@ -123,6 +123,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/{id}/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reads the equipment currently issued to somebody.
+         * @description Everything assigned to the user right now, by asset tag. Unpaged: this answers what one person is holding, which is a handful of things rather than a queue. A Technician or an Admin may ask about anybody; anybody else only about themselves.
+         */
+        get: operations["ListUserAssets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reads the tickets somebody raised, newest first.
+         * @description state=Open is what is still being worked and state=Past is what is finished with — resolved, closed, or cancelled. The two are complementary, so the pair is the whole history and nothing appears in both; omitting state returns every ticket. Rows carry the ticket summary rather than the full ticket: follow one to GET /api/v1/tickets/{id} for the detail.
+         */
+        get: operations["ListUserTickets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/departments": {
         parameters: {
             query?: never;
@@ -591,6 +631,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{id}/related-asset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Names the asset a ticket is about, changes it, or clears the link.
+         * @description Send an assetId to link the ticket to a piece of equipment, or null to clear the link. Linking an asset the ticket already names, or clearing a link it does not have, is refused rather than treated as a no-op — either would write a timeline line describing a change that did not happen. A closed or cancelled ticket cannot be relinked. Send the ticket's ETag as If-Match to be refused with 412 if it has moved since you read it.
+         */
+        post: operations["LinkTicketAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticketId}/comments": {
         parameters: {
             query?: never;
@@ -852,6 +912,26 @@ export interface paths {
          * @description Entries sharing an occurredAt came from one operation — issuing equipment out of stock moves the holder and the status — and are meant to be read together, in sequence order.
          */
         get: operations["ListAssetHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/{id}/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reads the tickets raised about an asset, newest first.
+         * @description Every ticket linked to the asset, whatever its status: an asset's support history is the whole story of that machine. Read through the Helpdesk module's public contract, so the rows carry the ticket summary rather than the full ticket — follow a row to GET /api/v1/tickets/{id} for the detail.
+         */
+        get: operations["ListAssetTickets"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1191,6 +1271,36 @@ export interface components {
              * @description When it was last changed (UTC).
              */
             updatedAt: string;
+        };
+        /**
+         * @description The fields another module is allowed to know about an asset. Deliberately flat and
+         *     small: it is a display and reference projection, not the asset aggregate, and
+         *     nothing outside Assets should be able to reason about lifecycle rules from it.
+         */
+        AssetSummary: {
+            /**
+             * Format: uuid
+             * @description The asset's id.
+             */
+            id: string;
+            /** @description The unique, immutable asset tag (invariant 4). */
+            assetTag: string;
+            /** @description The display name, suitable for a ticket or alert header. */
+            name: string;
+            /** @description The asset type, as configured in Assets. */
+            assetType: string;
+            /** @description The lifecycle status, as a string — the enum stays inside Assets. */
+            status: string;
+            /**
+             * Format: uuid
+             * @description The current holder, if any.
+             */
+            assignedToUserId: null | string;
+            /**
+             * Format: uuid
+             * @description Where the asset is, if known.
+             */
+            locationId: null | string;
         };
         /** @description An asset type as the API renders it. */
         AssetTypeResponse: {
@@ -1543,6 +1653,15 @@ export interface components {
         /** Format: binary */
         IFormFile: string;
         IResult: Record<string, never>;
+        /** @description The body of `POST /api/v1/tickets/{id}/related-asset`. */
+        LinkTicketAssetRequest: {
+            /**
+             * Format: uuid
+             * @description The asset the ticket concerns, or `null` to clear the link. A null is a
+             *     deliberate instruction, not an omitted field.
+             */
+            assetId: null | string;
+        };
         /**
          * @description What a node in the location tree represents. The five levels SPEC.md §5 names:
          *     Organization → Site → Building → Floor/Area → Room.
@@ -2019,6 +2138,37 @@ export interface components {
             /** @description True when a further page exists. */
             hasNextPage?: boolean;
         };
+        /**
+         * @description The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as
+         *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
+         *     object so the shape reaches OpenAPI and, from there, the generated client.
+         */
+        PagedResultOfTicketSummary: {
+            /** @description The items on this page. */
+            items: components["schemas"]["TicketSummary"][];
+            /**
+             * Format: int32
+             * @description The total number of matching items across all pages.
+             */
+            total: number;
+            /**
+             * Format: int32
+             * @description The 1-based page number this envelope represents.
+             */
+            page: number;
+            /**
+             * Format: int32
+             * @description The page size that was applied, after clamping.
+             */
+            pageSize: number;
+            /**
+             * Format: int32
+             * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
+             */
+            totalPages?: number;
+            /** @description True when a further page exists. */
+            hasNextPage?: boolean;
+        };
         ProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -2045,6 +2195,24 @@ export interface components {
         SlaState: "Pending" | "Approaching" | "Breached" | "Met" | "Stopped";
         /** @enum {unknown} */
         SortDirection: "Ascending" | "Descending" | null;
+        TicketActivity: number;
+        /** @description What a ticket looks like immediately after the asset it names changed. */
+        TicketAssetLinkResponse: {
+            /**
+             * Format: uuid
+             * @description The ticket.
+             */
+            id: string;
+            /** @description Its human-readable number, so a toast can name it. */
+            number: string;
+            previousAsset: null | components["schemas"]["TicketRelatedAssetResponse"];
+            relatedAsset: null | components["schemas"]["TicketRelatedAssetResponse"];
+            /**
+             * Format: date-time
+             * @description When the link changed, in UTC.
+             */
+            changedAt: string;
+        };
         /** @description What a ticket looks like immediately after its assignee changed. */
         TicketAssignmentResponse: {
             /**
@@ -2157,7 +2325,7 @@ export interface components {
          * @description Which dimension of a ticket a history entry records having moved.
          * @enum {unknown}
          */
-        TicketChangeKind: "Status" | "Priority" | "Assignment" | "Resolution" | "Hold";
+        TicketChangeKind: "Status" | "Priority" | "Assignment" | "Resolution" | "Hold" | "Asset";
         /** @description One line of a ticket's conversation, as the API renders it. */
         TicketCommentResponse: {
             /**
@@ -2299,7 +2467,8 @@ export interface components {
             closedAt: null | string;
             /**
              * Format: uuid
-             * @description The asset it concerns, or `null`. WP-2.5 sets it.
+             * @description The asset it concerns, or `null`. TicketRelatedAssetResponse? TicketDetailResponse.RelatedAsset carries the
+             *     same asset's display text on a read; this is the bare id every write answers with.
              */
             relatedAssetId: null | string;
             /**
@@ -2362,6 +2531,7 @@ export interface components {
              *     IReadOnlyList&lt;TicketAttachmentResponse&gt; TicketDetailResponse.Attachments carries.
              */
             hasMoreAttachments?: boolean;
+            relatedAsset?: null | components["schemas"]["TicketRelatedAssetResponse"];
         };
         /** @description One line of a ticket's timeline, as the API renders it. */
         TicketHistoryEntryResponse: {
@@ -2510,6 +2680,22 @@ export interface components {
              */
             updatedAt: string;
         };
+        /** @description An asset as a ticket names it, resolved through `IAssetLookup`. */
+        TicketRelatedAssetResponse: {
+            /**
+             * Format: uuid
+             * @description The asset's id.
+             */
+            id: string;
+            /** @description The identifier on the physical label. Unique and immutable. */
+            assetTag: string;
+            /** @description Its display name, falling back to the tag when it has none. */
+            name: string;
+            /** @description What kind of thing it is. */
+            assetType: string;
+            /** @description Its lifecycle status, as the stable code a client colours on. */
+            status: string;
+        };
         /**
          * @description A ticket's two SLA clocks as the API renders them: what was promised, when each
          *     deadline falls, and where each clock stands right now.
@@ -2617,6 +2803,72 @@ export interface components {
              *     table being written a second time in TypeScript. Empty from a terminal state.
              */
             allowedNextStatuses: components["schemas"]["TicketStatus"][];
+        };
+        /**
+         * @description The fields another module is allowed to know about a ticket. Flat and small for the
+         *     same reason AssetSummary is: it is a display and reference projection,
+         *     and no module outside Helpdesk should be able to reason about the state machine,
+         *     the SLA arithmetic, or the conversation from it.
+         */
+        TicketSummary: {
+            /**
+             * Format: uuid
+             * @description The ticket's id.
+             */
+            id: string;
+            /** @description The human-readable number, `TKT-####`. What people quote. */
+            number: string;
+            /** @description The one-line summary. */
+            subject: string;
+            /** @description Where it sits in the workflow, as a string — the enum stays inside Helpdesk. */
+            status: string;
+            /** @description The priority's stable key, for colour and for rules. */
+            priorityCode: string;
+            /**
+             * Format: int32
+             * @description Its ordering weight, so a panel can sort without a second call.
+             */
+            priorityRank: number;
+            /**
+             * Format: uuid
+             * @description Who the ticket is for.
+             */
+            requesterId: string;
+            /**
+             * Format: uuid
+             * @description The technician responsible, or `null`.
+             */
+            assigneeId: null | string;
+            /**
+             * Format: uuid
+             * @description The asset it concerns, or `null`.
+             */
+            relatedAssetId: null | string;
+            /**
+             * @description False once the ticket is resolved, closed, or cancelled. The split SPEC.md §4 asks a
+             *     user page for — open tickets above, previous tickets below.
+             */
+            isOpen: boolean;
+            /**
+             * Format: date-time
+             * @description When it was raised (UTC).
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description When resolution is due (UTC), pauses included.
+             */
+            dueAt: string;
+            /**
+             * Format: date-time
+             * @description When it was resolved (UTC), or `null`.
+             */
+            resolvedAt: null | string;
+            /**
+             * Format: date-time
+             * @description When it was closed (UTC), or `null`.
+             */
+            closedAt: null | string;
         };
         /** @description The fields an asset status is edited to. */
         UpdateAssetStatusRequest: {
@@ -2980,6 +3232,90 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListUserAssets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetSummary"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListUserTickets: {
+        parameters: {
+            query?: {
+                state?: components["schemas"]["TicketActivity"];
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfTicketSummary"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4653,6 +4989,86 @@ export interface operations {
             };
         };
     };
+    LinkTicketAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkTicketAssetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketAssetLinkResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListTicketComments: {
         parameters: {
             query?: {
@@ -5654,6 +6070,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PagedResultOfAssetHistoryEntryResponse"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListAssetTickets: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfTicketSummary"];
                 };
             };
             /** @description No session cookie, or the session it named has expired or been revoked. */
