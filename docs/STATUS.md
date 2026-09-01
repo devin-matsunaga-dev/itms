@@ -3,15 +3,17 @@
 > Updated by Claude Code at the end of every session. This is the only place that says where the build is.
 
 **Project:** Unified IT Management System (ITMS)
-**Phase:** 1 — Helpdesk **complete**. Phase 0 and Phase 1 both await their gate walkthroughs and the `v0.1-phase0` / `v0.2-phase1` tags.
-**Current WP:** `WP-2.1 — Asset domain & lifecycle` — **not before the Phase 1 gate**
+**Phase:** 2 — Assets & directory. Phase 0 and Phase 1 are **complete and tagged**.
+**Current WP:** `WP-2.1 — Asset domain & lifecycle`
 **Branch:** `feat/wp-2.1-asset-domain`
 **Last completed:** `WP-1.16 — Queue density` (2026-09-01)
 **Last updated:** 2026-09-01
 
-> **Phase 1 is complete, including the two packages added against the human's mockup** (WP-1.11's table rebuild and WP-1.12's search and counters). Both are in `WORK_PACKAGES.md` now. What remains before Phase 2 is the gate itself: the walkthrough, the root README, and the tag.
+> **Both phase gates were completed and verified by the human on 2026-09-01, and both tags exist:** `v0.1-phase0` at `03a39b2` (WP-0.9, the last Phase 0 package) and `v0.2-phase1` at `8a2b1c9` (WP-1.16). Phase 1 shipped sixteen packages including the two added against the human's mockups — WP-1.11's table rebuild and WP-1.12's search and counters — and both are in `WORK_PACKAGES.md`. **`WP-2.1` is open.**
 
-> **Do not open WP-2.1 before the Phase 1 gate.** Every package in Phase 1 is built and green, and the gate walkthrough — log in → create ticket → assign → resolve, in a browser — is now doable end to end for the first time. It is WP-1.10's manual checklist. The two Phase 0 items owed at its gate (the root README, and the seeder-in-production gap recorded against WP-6.6) are still owed.
+> **Three things passed their gate unclaimed, and are now overdue rather than pending.** The **root README** (owed at the Phase 0 gate; `CONVENTIONS.md` §Documentation requires it), the **`React.lazy` per-route bundle split** (recorded as owed by six packages, and by two of them as something to claim *at* the Phase 1 gate), and the **seeder-in-production gap** recorded against `WP-6.6`. None of the three blocks WP-2.1. Each is described below under *In flight / noticed* — but the first two no longer have a gate to be claimed at, so they now need a work package of their own or a conscious decision to drop them.
+
+> **The seeded SLA targets were not signed off at the gate.** `HelpdeskReferenceDataSeeder`'s Critical 15/120, High 30/480, Medium 60/1440, Low 120/4320 minutes have been binding on every ticket since WP-1.8 and remain, in the words of the WP-1.8 note below, plausible rather than sanctioned. The gate was the moment to confirm them and that did not happen; they are still unagreed.
 
 ---
 
@@ -19,8 +21,8 @@
 
 | Phase | Packages | Done | Tag |
 |---|---|---|---|
-| 0 — Foundation | 0.1 – 0.9 | 9 / 9 | *gate pending* |
-| 1 — Helpdesk | 1.1 – 1.16 | 16 / 16 | *gate pending* |
+| 0 — Foundation | 0.1 – 0.9 | 9 / 9 | `v0.1-phase0` |
+| 1 — Helpdesk | 1.1 – 1.16 | 16 / 16 | `v0.2-phase1` |
 | 2 — Assets & directory | 2.1 – 2.7 | 0 / 7 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
@@ -33,7 +35,7 @@
 
 *(Things spotted during a session that are real but out of that package's scope. Each one either becomes a work package or gets consciously dropped — nothing lives here indefinitely.)*
 
-- **No README yet.** `CONVENTIONS.md` requires one covering prerequisites, `aspire run`, seed data, default login, and how to run tests. Everything it needs now exists — the seeded accounts and their password are in *Environment notes* below — so the README is writeable at the Phase 0 gate and nothing else blocks it.
+- **No README yet, and its gate has passed.** `CONVENTIONS.md` requires one covering prerequisites, `aspire run`, seed data, default login, and how to run tests. Everything it needs exists — the seeded accounts and their password are in *Environment notes* below — and nothing blocks it. It was owed at the Phase 0 gate; that gate was walked and tagged on 2026-09-01 without it. **It has no gate left to be claimed at, so it needs a package of its own or a conscious drop.**
 - **`Itms.ArchitectureTests` references every module project.** That is deliberate — it cannot inspect assemblies it does not reference. WP-0.3 wrote the rules against the source projects only and added `Rules_are_written_against_source_assemblies_only` as the guard; keep it that way.
 - **`dotnet test` reports "Zero tests ran" for every test project — again.** WP-0.9 recorded this as resolved by SDK 10.0.111 and predicted that a return would be an SDK regression rather than a repository one. **At WP-1.3 it is back on the same SDK (10.0.111), and it was confirmed on a clean checkout of `main` before any WP-1.3 code existed** — so it is the environment, not the branch. Every assembly runs correctly when its executable is invoked directly (xUnit v3 under MTP builds one), which is the workaround WP-1.3 used and the one the regression command below now names. Diagnosing it properly is worth a session of its own: the suspects are the `test.runner` block in `global.json`, the MTP/VSTest bridge in the SDK patch, and nothing else in the repository.
 - ~~**The ProblemDetails middleware has no automated test.**~~ **Done at WP-0.9.** `tests/Itms.IntegrationTests/Contract/ProblemDetailsResponseTests.cs` asserts a real 404 from routing, a 401 from the cookie handler, a handler-produced failure carrying `code`, and a validation failure carrying camel-cased per-field errors — all against the booted host.
