@@ -5,6 +5,7 @@ using Itms.Modules.Helpdesk.Features.Tickets.ChangeTicketStatus;
 using Itms.Modules.Helpdesk.Features.Tickets.CreateTicket;
 using Itms.Modules.Helpdesk.Features.Tickets.GetTicket;
 using Itms.Modules.Helpdesk.Features.Tickets.ListTickets;
+using Itms.Modules.Helpdesk.Features.Tickets.TicketCounters;
 using Itms.Platform.Http;
 using Itms.Platform.Identity;
 using Itms.Platform.Paging;
@@ -60,6 +61,26 @@ internal static class TicketEndpoints
 
     private static void MapReads(RouteGroupBuilder group)
     {
+        group
+            .MapGet("/counters", async (
+                [AsParameters] TicketCountersQuery query,
+                TicketCountersHandler handler,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await handler.HandleAsync(query, cancellationToken).ConfigureAwait(false);
+                return result.ToOk();
+            })
+            .WithName("TicketCounters")
+            .WithSummary("Counts the queue: the KPI figures and the saved-view totals.")
+            .WithDescription(
+                "Scope-wide and deliberately unaffected by any filter — a counter that moved with "
+                + "the filters would describe the filter rather than the queue. A User's counts "
+                + "cover only the tickets they raised. Send dueBefore as the end of your own day; "
+                + "the server falls back to the end of its UTC day.")
+            .Produces<TicketCountersResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
         group
             .MapGet("/", async (
                 [AsParameters] ListTicketsQuery query,

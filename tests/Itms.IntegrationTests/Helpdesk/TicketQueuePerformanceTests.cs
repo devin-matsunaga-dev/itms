@@ -75,6 +75,19 @@ public sealed class TicketQueuePerformanceTests(IdentityWebFixture fixture) : IA
             // against a constant, so it is the one worth measuring at volume.
             $"slaState={SlaState.Breached}",
             $"slaState={SlaState.Pending}",
+
+            // WP-1.12's shapes. The search is the one filter no index can serve: an
+            // unanchored ILIKE is a sequential scan by construction, so this is the
+            // measurement that decides whether the queue search survives at volume or
+            // whether it needs pg_trgm pulled forward from WP-4.2. Two terms, because a
+            // term matching many rows and one matching none take different paths.
+            "search=Seeded",
+            "search=nothingmatchesthisatall",
+            "search=TKT-04",
+            "search=Seeded&status=New",
+
+            // The "Due today" list a KPI tile opens.
+            $"dueBefore={Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(1).ToString("O", System.Globalization.CultureInfo.InvariantCulture))}",
         ];
 
         var slow = new List<string>();
@@ -112,6 +125,19 @@ public sealed class TicketQueuePerformanceTests(IdentityWebFixture fixture) : IA
         if (stopwatch.Elapsed >= Budget)
         {
             slow.Add($"the detail took {stopwatch.Elapsed.TotalMilliseconds:F0} ms");
+        }
+
+        // The counters are six counts in one request, each one a filtered COUNT(*) over the
+        // whole scoped table — the most expensive read this module offers, and the one the
+        // queue screen fires on every load.
+        await TicketClient.CountersAsync(admin, Token);
+        var counters = Stopwatch.StartNew();
+        await TicketClient.CountersAsync(admin, Token);
+        counters.Stop();
+
+        if (counters.Elapsed >= Budget)
+        {
+            slow.Add($"the counters took {counters.Elapsed.TotalMilliseconds:F0} ms");
         }
 
         slow.ShouldBeEmpty();

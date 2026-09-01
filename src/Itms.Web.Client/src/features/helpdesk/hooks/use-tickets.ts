@@ -1,6 +1,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type {
   Department,
+  TicketCounters,
   PagedTickets,
   TicketCategory,
   TicketPriority,
@@ -8,6 +9,7 @@ import type {
 } from '@/lib/api/types'
 import {
   fetchAssignableUsers,
+  fetchTicketCounters,
   fetchDepartments,
   fetchTicketCategories,
   fetchTicketPriorities,
@@ -78,5 +80,26 @@ export function useAssignableUsers(enabled: boolean): UseQueryResult<UserSummary
     queryFn: ({ signal }) => fetchAssignableUsers(signal),
     staleTime: referenceDataStaleTime,
     enabled,
+  })
+}
+
+/**
+ * The queue's headline figures.
+ *
+ * Scope-wide and independent of the filters, so the key carries only the day boundary the
+ * request was counted against — a filter change must not refetch them, which is the point
+ * of them being scope-wide in the first place.
+ *
+ * Held for a minute: the numbers move as tickets are raised and resolved, and a KPI that
+ * lags a whole session is worse than one round trip a minute. Every write on the detail
+ * screen already invalidates `ticketKeys.all`, which does not reach these — a counter
+ * catching up a moment later is the right trade against refetching six counts on every
+ * comment.
+ */
+export function useTicketCounters(dayEnd: string): UseQueryResult<TicketCounters> {
+  return useQuery({
+    queryKey: ['helpdesk', 'ticket-counters', dayEnd],
+    queryFn: ({ signal }) => fetchTicketCounters(dayEnd, signal),
+    staleTime: 60_000,
   })
 }

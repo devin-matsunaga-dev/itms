@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Itms.Modules.Directory.Domain;
 using Itms.Modules.Directory.Persistence;
+using Itms.Platform.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Itms.Modules.Directory.Features.Locations;
@@ -72,7 +73,7 @@ internal static class LocationQueries
 
         // Hoisted out of the expression tree: EF parameterises locals cleanly, whereas
         // repeated struct member access inside the tree is translated far less predictably.
-        var subtree = LikePattern.StartingWith(rewrite.OldPath);
+        var subtree = SearchPattern.StartingWith(rewrite.OldPath);
         var newPath = rewrite.NewPath;
         var newFullPath = rewrite.NewFullPath;
         var oldPathLength = rewrite.OldPath.Length;

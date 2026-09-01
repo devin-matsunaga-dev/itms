@@ -10,6 +10,8 @@ import { hasAnyRole, Roles } from '@/lib/roles'
 import type { SortDirection, TicketListItem, TicketSort } from '@/lib/api/types'
 import { useCurrentUser } from '@/features/auth/hooks/use-current-user'
 import { TicketFilters } from '../components/ticket-filters'
+import { TicketKpiRow } from '../components/ticket-kpi-row'
+import { TicketSearch } from '../components/ticket-search'
 import { TicketPagination } from '../components/ticket-pagination'
 import { TicketTable } from '../components/ticket-table'
 import { TicketTableSkeleton } from '../components/ticket-table-skeleton'
@@ -20,9 +22,11 @@ import {
   useAssignableUsers,
   useDepartments,
   useTicketCategories,
+  useTicketCounters,
   useTicketPriorities,
   useTickets,
 } from '../hooks/use-tickets'
+import { endOfLocalDay } from '../lib/ticket-kpis'
 import {
   clearedFilters,
   defaultTicketQuery,
@@ -56,6 +60,12 @@ export function TicketsPage(): React.JSX.Element {
   const worksTheQueue = hasAnyRole(roles, [Roles.admin, Roles.technician])
 
   const tickets = useTickets(query)
+  // Keyed on the calendar day rather than the instant, so the counters' cache key is
+  // stable through a session instead of moving with every 30-second `useNow` tick — and
+  // still turns over at midnight, which is when "due today" means something else.
+  const dayKey = now.toDateString()
+  const dayEnd = useMemo(() => endOfLocalDay(new Date(dayKey)), [dayKey])
+  const counters = useTicketCounters(dayEnd)
   const { preferences, toggle, setDensity } = useTablePreferences()
   const categories = useTicketCategories()
   const priorities = useTicketPriorities()
@@ -156,7 +166,28 @@ export function TicketsPage(): React.JSX.Element {
       />
 
       <div className="flex flex-col gap-5">
-        <TicketViewChips activeViews={activeViews} onSelect={onSelectView} />
+        <TicketKpiRow counters={counters.data ?? null} dayEnd={dayEnd} />
+
+        <TicketViewChips
+          activeViews={activeViews}
+          counts={
+            counters.data === undefined
+              ? null
+              : {
+                  mine: counters.data.mine,
+                  unassigned: counters.data.unassigned,
+                  overdue: counters.data.overdue,
+                }
+          }
+          onSelect={onSelectView}
+        />
+
+        <TicketSearch
+          value={query.search}
+          onChange={(search) => {
+            onFilterChange({ search })
+          }}
+        />
 
         <TicketFilters
           query={query}

@@ -67,6 +67,9 @@ export type TicketChangeKind = Schemas['TicketChangeKind']
 /** The body of `POST /api/v1/tickets`. */
 export type CreateTicketRequest = Schemas['CreateTicketRequest']
 
+/** The queue's headline figures — `GET /api/v1/tickets/counters`. */
+export type TicketCounters = Schemas['TicketCountersResponse']
+
 /** A ticket's two SLA clocks, and where each stands right now. */
 export type TicketSla = Schemas['TicketSlaResponse']
 

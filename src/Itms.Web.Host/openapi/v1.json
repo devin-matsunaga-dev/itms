@@ -1689,6 +1689,61 @@
         ]
       }
     },
+    "/api/v1/tickets/counters": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Counts the queue: the KPI figures and the saved-view totals.",
+        "description": "Scope-wide and deliberately unaffected by any filter — a counter that moved with the filters would describe the filter rather than the queue. A User's counts cover only the tickets they raised. Send dueBefore as the end of your own day; the server falls back to the end of its UTC day.",
+        "operationId": "TicketCounters",
+        "parameters": [
+          {
+            "name": "dueBefore",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketCountersResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
     "/api/v1/tickets": {
       "get": {
         "tags": [
@@ -1776,6 +1831,21 @@
             "in": "query",
             "schema": {
               "$ref": "#/components/schemas/SlaState"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dueBefore",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
             }
           },
           {
@@ -3927,6 +3997,50 @@
           }
         },
         "description": "One line of a ticket's conversation, as the API renders it."
+      },
+      "TicketCountersResponse": {
+        "required": [
+          "all",
+          "open",
+          "unassigned",
+          "overdue",
+          "dueToday",
+          "mine"
+        ],
+        "type": "object",
+        "properties": {
+          "all": {
+            "type": "integer",
+            "description": "Every ticket the caller can see, in any status.",
+            "format": "int32"
+          },
+          "open": {
+            "type": "integer",
+            "description": "Tickets still being worked: New, Assigned, In Progress, or Waiting.",
+            "format": "int32"
+          },
+          "unassigned": {
+            "type": "integer",
+            "description": "Open tickets nobody holds.",
+            "format": "int32"
+          },
+          "overdue": {
+            "type": "integer",
+            "description": "Tickets whose resolution clock has breached.",
+            "format": "int32"
+          },
+          "dueToday": {
+            "type": "integer",
+            "description": "Open tickets due before the instant the caller named as the end of their day.",
+            "format": "int32"
+          },
+          "mine": {
+            "type": "integer",
+            "description": "The caller's own workload — tickets assigned to them if they work the queue, or\ntickets they raised if they do not. The same rule WP-1.9's \"My tickets\" view follows,\nso the chip and its count mean one thing.",
+            "format": "int32"
+          }
+        },
+        "description": "The queue's headline numbers: what the KPI row shows and what the saved views count."
       },
       "TicketDetailResponse": {
         "required": [

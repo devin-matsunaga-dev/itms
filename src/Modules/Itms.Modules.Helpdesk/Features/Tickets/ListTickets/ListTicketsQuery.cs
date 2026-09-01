@@ -101,6 +101,53 @@ public sealed class ListTicketsQuery
     [FromQuery(Name = "slaState")]
     public SlaState? SlaState { get; init; }
 
+    /// <summary>
+    /// Free text matched against the ticket number, the subject, and the requester's
+    /// cached name.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Deliberately narrow. It is a case-insensitive "contains" over three columns of one
+    /// table — not the cross-entity search <c>WP-4.2</c> builds, which spans users, assets,
+    /// hostnames and serials on PostgreSQL full-text plus trigram. Nothing here enables an
+    /// extension or adds an index; a queue search is a filter, and the global search is a
+    /// different feature with a different shape.
+    /// </para>
+    /// <para>
+    /// <b>The description is not searched</b>, at the human's direction: it is an
+    /// eight-thousand-character column and including it would make every keystroke a full
+    /// scan of every ticket body. The requester's name is the <em>cached</em> one on the
+    /// ticket row (§3 rule 6), so a person renamed since they raised a ticket is found by
+    /// the name the ticket carries — the same name the queue is displaying.
+    /// </para>
+    /// <para>
+    /// Applied after <c>TicketScope</c>, never before. A User searching finds only among
+    /// the tickets they raised.
+    /// </para>
+    /// </remarks>
+    [FromQuery(Name = "search")]
+    public string? Search { get; init; }
+
+    /// <summary>
+    /// Only tickets still open whose resolution is due before this instant — the "Due
+    /// today" counter's list.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The caller supplies the instant rather than the server deciding what "today" means,
+    /// because the day boundary somebody means is the one on their own clock and the wire
+    /// is UTC (ARCHITECTURE.md §11). It is the same call WP-1.9 made for the created-date
+    /// range.
+    /// </para>
+    /// <para>
+    /// "Still open" is part of the filter and not a separate one: a ticket resolved
+    /// yesterday is not due today, whatever its deadline column says. Resolved, Closed, and
+    /// Cancelled are all excluded.
+    /// </para>
+    /// </remarks>
+    [FromQuery(Name = "dueBefore")]
+    public DateTimeOffset? DueBefore { get; init; }
+
     /// <summary>What to order by. Defaults to <see cref="TicketSort.CreatedAt"/>.</summary>
     [FromQuery(Name = "sort")]
     public TicketSort? Sort { get; init; }

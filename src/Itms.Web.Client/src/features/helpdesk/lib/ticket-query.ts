@@ -28,6 +28,8 @@ export interface TicketQuery {
   readonly createdFrom: string | null
   readonly createdTo: string | null
   readonly slaState: SlaState | null
+  /** Free text over ticket number, subject, and requester name. Empty means no search. */
+  readonly search: string
   readonly sort: TicketSort
   readonly direction: SortDirection
   readonly page: number
@@ -64,6 +66,7 @@ export const defaultTicketQuery: TicketQuery = {
   createdFrom: null,
   createdTo: null,
   slaState: null,
+  search: '',
   sort: defaultSort,
   direction: defaultDirection,
   page: 1,
@@ -88,6 +91,7 @@ export function parseTicketQuery(params: URLSearchParams): TicketQuery {
     createdFrom: params.get('createdFrom'),
     createdTo: params.get('createdTo'),
     slaState: oneOf(params.get('slaState'), slaStateOrder),
+    search: params.get('search') ?? '',
     sort: oneOf(params.get('sort'), sortOptions) ?? defaultSort,
     direction: oneOf(params.get('direction'), directionOptions) ?? defaultDirection,
     page: positiveInteger(params.get('page')) ?? 1,
@@ -120,6 +124,9 @@ export function serializeTicketQuery(query: TicketQuery): URLSearchParams {
   appendIf(params, 'createdFrom', query.createdFrom)
   appendIf(params, 'createdTo', query.createdTo)
   appendIf(params, 'slaState', query.slaState)
+  if (query.search.trim().length > 0) {
+    params.append('search', query.search.trim())
+  }
 
   params.append('sort', query.sort)
   params.append('direction', query.direction)
@@ -159,7 +166,8 @@ export function hasActiveFilters(query: TicketQuery): boolean {
     query.requesterId !== null ||
     query.createdFrom !== null ||
     query.createdTo !== null ||
-    query.slaState !== null
+    query.slaState !== null ||
+    query.search.trim().length > 0
   )
 }
 

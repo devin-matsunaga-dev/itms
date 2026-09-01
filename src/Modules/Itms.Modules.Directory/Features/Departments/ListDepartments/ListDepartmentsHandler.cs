@@ -1,4 +1,5 @@
 using Itms.Modules.Directory.Persistence;
+using Itms.Platform.Data;
 using Itms.Platform.Paging;
 using Itms.Platform.Results;
 using Microsoft.EntityFrameworkCore;
@@ -30,10 +31,10 @@ internal sealed class ListDepartmentsHandler(DirectoryDbContext database)
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var pattern = LikePattern.Containing(search);
+            var pattern = SearchPattern.Containing(search);
             query = query.Where(department =>
-                EF.Functions.ILike(department.Name, pattern, LikePattern.Escape) ||
-                (department.Code != null && EF.Functions.ILike(department.Code, pattern, LikePattern.Escape)));
+                EF.Functions.ILike(department.Name, pattern, SearchPattern.Escape) ||
+                (department.Code != null && EF.Functions.ILike(department.Code, pattern, SearchPattern.Escape)));
         }
 
         var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);

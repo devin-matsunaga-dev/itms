@@ -1,5 +1,6 @@
 using Itms.Contracts.Lookups;
 using Itms.Modules.Identity.Persistence;
+using Itms.Platform.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Itms.Modules.Identity.Contracts;
@@ -63,16 +64,15 @@ internal sealed class UserLookupService(ItmsIdentityDbContext database) : IUserL
         }
 
         // Escaped, because an unescaped % or _ in a picker's search box would otherwise
-        // quietly turn into a wildcard scan of the whole table.
-        var pattern = $"%{term.Trim().Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("%", "\\%", StringComparison.Ordinal)
-            .Replace("_", "\\_", StringComparison.Ordinal)}%";
+        // quietly turn into a wildcard scan of the whole table. The escaping lives in the
+        // shared kernel (WP-1.12); this was one of the two copies that put it there.
+        var pattern = SearchPattern.Containing(term);
 
         return await database.Users
             .AsNoTracking()
             .Where(user => user.IsActive &&
-                (EF.Functions.ILike(user.DisplayName, pattern, "\\") ||
-                 EF.Functions.ILike(user.Email!, pattern, "\\")))
+                (EF.Functions.ILike(user.DisplayName, pattern, SearchPattern.Escape) ||
+                 EF.Functions.ILike(user.Email!, pattern, SearchPattern.Escape)))
             .OrderBy(user => user.DisplayName)
             .Take(Math.Clamp(limit, 1, MaxSearchResults))
             .Select(Projection())

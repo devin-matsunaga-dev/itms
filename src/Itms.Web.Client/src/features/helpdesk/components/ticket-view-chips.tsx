@@ -4,6 +4,12 @@ import { ticketViews, type TicketViewId } from '../lib/ticket-views'
 interface TicketViewChipsProps {
   /** Which of the three views the current URL already satisfies. */
   activeViews: readonly TicketViewId[]
+  /**
+   * How many tickets each view holds, scope-wide, or null while they load. A chip with no
+   * count reads as a chip; a chip showing zero says the view is genuinely empty, which is
+   * a different and useful thing to know before clicking it.
+   */
+  counts: Partial<Record<TicketViewId, number>> | null
   onSelect: (view: TicketViewId) => void
 }
 
@@ -17,12 +23,14 @@ interface TicketViewChipsProps {
  */
 export function TicketViewChips({
   activeViews,
+  counts,
   onSelect,
 }: TicketViewChipsProps): React.JSX.Element {
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Saved views">
       {ticketViews.map((view) => {
         const active = activeViews.includes(view.id)
+        const count = counts?.[view.id]
 
         return (
           <button
@@ -41,6 +49,16 @@ export function TicketViewChips({
             )}
           >
             {view.label}
+            {count === undefined ? null : (
+              <span
+                className={cn(
+                  'ml-2 inline-flex min-w-5 justify-center rounded-full px-1.5 tabular',
+                  active ? 'bg-white/20 text-white' : 'bg-canvas text-muted-foreground',
+                )}
+              >
+                {count}
+              </span>
+            )}
           </button>
         )
       })}

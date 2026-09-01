@@ -4,12 +4,12 @@
 
 **Project:** Unified IT Management System (ITMS)
 **Phase:** 1 — Helpdesk **complete**. Phase 0 and Phase 1 both await their gate walkthroughs and the `v0.1-phase0` / `v0.2-phase1` tags.
-**Current WP:** `WP-1.12 — Queue search & counters`
-**Branch:** `feat/wp-1.12-queue-search-counters`
-**Last completed:** `WP-1.11 — Ticket queue visual rebuild` (2026-09-01)
+**Current WP:** `WP-2.1 — Asset domain & lifecycle` — **not before the Phase 1 gate**
+**Branch:** `feat/wp-2.1-asset-domain`
+**Last completed:** `WP-1.12 — Queue search & counters` (2026-09-01)
 **Last updated:** 2026-09-01
 
-> **WP-1.11 and WP-1.12 are additions to Phase 1**, agreed after WP-1.10 against a mockup the human supplied. WP-1.11 rebuilt the queue's table treatment; WP-1.12 adds the two things that mockup needs and the API cannot yet answer — free-text queue search, and ticket counters with deltas for the KPI row and the view counts. **Phase 2 does not open until both are done and the Phase 1 gate is walked.**
+> **Phase 1 is complete, including the two packages added against the human's mockup** (WP-1.11's table rebuild and WP-1.12's search and counters). Both are in `WORK_PACKAGES.md` now. What remains before Phase 2 is the gate itself: the walkthrough, the root README, and the tag.
 
 > **Do not open WP-2.1 before the Phase 1 gate.** Every package in Phase 1 is built and green, and the gate walkthrough — log in → create ticket → assign → resolve, in a browser — is now doable end to end for the first time. It is WP-1.10's manual checklist. The two Phase 0 items owed at its gate (the root README, and the seeder-in-production gap recorded against WP-6.6) are still owed.
 
@@ -20,7 +20,7 @@
 | Phase | Packages | Done | Tag |
 |---|---|---|---|
 | 0 — Foundation | 0.1 – 0.9 | 9 / 9 | *gate pending* |
-| 1 — Helpdesk | 1.1 – 1.12 | 11 / 12 | *gate pending* |
+| 1 — Helpdesk | 1.1 – 1.12 | 12 / 12 | *gate pending* |
 | 2 — Assets & directory | 2.1 – 2.7 | 0 / 7 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
@@ -301,14 +301,26 @@
 - **The client is one 734 kB chunk**, up from 715 kB. Five packages have now recorded `React.lazy` per route as owed. Phase 1 is over. This wants claiming rather than carrying into Phase 2, where every screen makes it worse.
 - **Nothing here was seen in a browser.** The queue's new treatment is asserted by 39 Vitest cases and was not rendered once — Docker runs, but the headless Chromium on this machine still cannot start (`libnspr4.so`, needs sudo). The mockup comparison and both colour schemes are the manual checklist.
 
+### Noticed during WP-1.12
+
+- **The KPI cards have no delta line, and the mockup's "↑12% vs last week" cannot be built on this schema.** This was agreed as a requirement and then found to be unanswerable, so it is the one thing WP-1.12 did not deliver. A ticket row holds only its *current* state, and reconstructing "was this open last Tuesday" from it is wrong in two directions: a reopen clears `resolved_at` (WP-1.3), so a ticket resolved ten days ago and reopened three days ago reads as never resolved; and a cancellation records no instant at all, because WP-1.3 deliberately added no `cancelled_at`. Assignment cannot be placed in time from the row either, so "unassigned last week" is equally unanswerable. **The two honest routes are a replay of `ticket_history`'s Status entries** — which does carry every transition with its instant — **or a nightly counters snapshot**, the fifth thing wanting the hosted-service pattern recorded since WP-0.4. `WP-5.1 — Dashboard backend` needs "ticket counters with deltas" in exactly this shape and should build whichever of the two once, for both screens. `KpiCard` has the slot and a comment saying so.
+- **`Itms.Platform.Data.SearchPattern` is the escaping's home now, and Directory's `LikePattern` is gone.** WP-0.6 set the trigger at the third copy and the ticket search was it. Identity's inlined copy in `UserLookupService` is repointed too, so there is exactly one implementation and it finally has direct unit tests — it had none while it lived in Directory, being proved only through the endpoints that used it. **A fourth module wanting a filter uses this; it does not write a fourth copy.**
+- **The queue search is a sequential scan and measurably fine at 50,000 rows.** An unanchored `ILIKE '%term%'` cannot use a b-tree, which is why the volume test now measures four search shapes and the counters alongside the eleven WP-1.5 and WP-1.8 already had. All are inside the 200 ms budget on an analysed table, so **`pg_trgm` was not pulled forward from `WP-4.2`** and no index was added. That is one machine, once; `WP-6.4` still owns the measured review, and the number to watch is the search on a table several times this size.
+- **The integration suite is 439 tests and about 109 seconds.** WP-1.7 warned the margin against `CONVENTIONS.md`'s two-minute budget for the whole `dotnet test` run was thin and WP-1.8 that it was thinner. It is now genuinely tight: roughly half is still WP-1.5's 50,000-ticket volume test, which this package made slightly heavier. **The next package that adds a comparable block of integration tests should expect to spend part of itself on the budget** — the obvious lever is splitting the volume test behind a trait so the ordinary run skips it, which is a `CONVENTIONS.md` conversation rather than a unilateral change.
+- **"Open" is spelled twice, in two languages, on purpose.** `TicketCountersHandler.OpenStatuses` counts four statuses and `ticket-kpis.ts`'s `openStatuses` builds the link to the same four. They cannot share code across the wire, so `TicketCountersTests.Every_counter_equals_the_total_of_the_list_it_links_to` is what keeps them honest — the same shape of guard WP-1.8 used for the SLA rule written twice. **Changing one without the other fails there and nowhere else.**
+- **The search box is the only control on the queue that holds a draft.** Every other filter writes straight through to the URL; a search box changes once per keystroke, so it debounces at 300 ms and the address follows. The cost is that the box and the address can disagree for that long, which is reconciled by a render-time adjustment when the URL moves for another reason. oxlint's `set-state-in-effect` rule caught the first attempt at this and was right to.
+- **The counters are one request holding six `COUNT(*)`s over the whole scoped table**, fired on every queue load and cached for a minute. It is the most expensive read this module offers and it is measured. It is deliberately *not* invalidated by the detail screen's writes — a technician resolving a ticket does not refetch six counts — so a figure can lag a change by up to a minute. That is the right trade at this size and the wrong one if the KPI row ever moves to a dashboard people watch.
+- **The `dueBefore` filter and the "Due today" tile trust the client's day boundary.** The browser sends the last instant of its own local day, because that is what a person means; the server falls back to the end of its UTC day when nothing is sent, which is right for a service account and wrong for a person. A screen must always send it, and the one on this queue does.
+- **Nothing in this package was seen in a browser.** The headless Chromium on this machine still cannot start (`libnspr4.so`, needs sudo). The KPI row, the search box, the chip counts, and both colour schemes are the manual checklist.
+
 ## Known issues
 
 - none
 
 ## Environment notes
 
-- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.11: **684 unit, 52 architecture, 415 integration** (unchanged since WP-1.9 — neither WP-1.10 nor WP-1.11 touched server code) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
-- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 246 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
+- **`dotnet test` does not work on this machine right now — run the three test executables directly.** See the *In flight / noticed* entry at the top: the SDK reports "Zero tests ran" for every assembly, on a clean `main` as well as on a branch. The suites themselves are healthy; `./tests/<Suite>/bin/Debug/net10.0/<Suite>` runs each one. Counts at WP-1.12: **695 unit, 52 architecture, 439 integration** (the integration run is about 109 s, of which the 50,000-ticket volume test is roughly half) (the integration run is about 100 s, of which the 50,000-ticket volume test is roughly half).
+- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 262 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
 - **`aspire run` now also starts `web-client`.** It runs `npm install` first (an Aspire installer resource) and then `npm run dev`, waits for `web-host`, and is published on an external endpoint — the dashboard prints its URL. The Vite dev server proxies `/api` to the host, so the browser sees one origin.
 - **The colour scheme is remembered per browser** under `localStorage["itms.theme"]`, and follows the operating system until the viewer picks a mode. Clearing site data returns it to the system preference. There is no server-side or per-account theme setting, and none is planned.
 - **Node 24 LTS and npm 11 are what the client is built with.** `node -v` should report v24.x; the lockfile is committed and `npm ci` is the reproducible install.

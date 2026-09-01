@@ -173,7 +173,7 @@ internal sealed class MoveLocationHandler(
         var newDepth = parent is null ? 0 : parent.Depth + 1;
         var shift = newDepth - location.Depth;
 
-        var subtree = LikePattern.StartingWith(location.Path);
+        var subtree = SearchPattern.StartingWith(location.Path);
         var deepest = await database.Locations
             .AsNoTracking()
             .Where(descendant => EF.Functions.Like(descendant.Path, subtree))

@@ -387,6 +387,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/counters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Counts the queue: the KPI figures and the saved-view totals.
+         * @description Scope-wide and deliberately unaffected by any filter — a counter that moved with the filters would describe the filter rather than the queue. A User's counts cover only the tickets they raised. Send dueBefore as the end of your own day; the server falls back to the end of its UTC day.
+         */
+        get: operations["TicketCounters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets": {
         parameters: {
             query?: never;
@@ -1251,6 +1271,41 @@ export interface components {
              * @description When it was posted (UTC).
              */
             createdAt: string;
+        };
+        /** @description The queue's headline numbers: what the KPI row shows and what the saved views count. */
+        TicketCountersResponse: {
+            /**
+             * Format: int32
+             * @description Every ticket the caller can see, in any status.
+             */
+            all: number;
+            /**
+             * Format: int32
+             * @description Tickets still being worked: New, Assigned, In Progress, or Waiting.
+             */
+            open: number;
+            /**
+             * Format: int32
+             * @description Open tickets nobody holds.
+             */
+            unassigned: number;
+            /**
+             * Format: int32
+             * @description Tickets whose resolution clock has breached.
+             */
+            overdue: number;
+            /**
+             * Format: int32
+             * @description Open tickets due before the instant the caller named as the end of their day.
+             */
+            dueToday: number;
+            /**
+             * Format: int32
+             * @description The caller's own workload — tickets assigned to them if they work the queue, or
+             *     tickets they raised if they do not. The same rule WP-1.9's "My tickets" view follows,
+             *     so the chip and its count mean one thing.
+             */
+            mine: number;
         };
         /** @description One ticket in full, as the detail screen reads it. */
         TicketDetailResponse: {
@@ -3060,6 +3115,46 @@ export interface operations {
             };
         };
     };
+    TicketCounters: {
+        parameters: {
+            query?: {
+                dueBefore?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketCountersResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListTickets: {
         parameters: {
             query?: {
@@ -3073,6 +3168,8 @@ export interface operations {
                 createdFrom?: string;
                 createdTo?: string;
                 slaState?: components["schemas"]["SlaState"];
+                search?: string;
+                dueBefore?: string;
                 sort?: components["schemas"]["TicketSort"];
                 direction?: components["schemas"]["SortDirection"];
                 page?: number;

@@ -106,8 +106,16 @@ Ticket list per `DESIGN.md`: dense table, URL-synced filters, saved default view
 **Done when:** it matches the reference table treatment; filters survive a page reload and are linkable.
 
 ### WP-1.10 — Helpdesk UI: detail & create `[UI]`
-Ticket detail with header pills, properties panel, comment/note composer with a clear visual distinction, attachment list, history timeline, and the transition buttons — illegal transitions not rendered. Create form with the New Ticket button in the sidebar.
+Ticket detail with header pills, properties panel, comment/note composer with a clear visual distinction, attachment list, history timeline, and the transition buttons — illegal transitions not rendered. Create form, reached from the Tickets page header (WP-0.8 moved creation off the sidebar; `DESIGN.md` §3–§4 are the current word).
 **Done when:** the whole Phase 1 gate walkthrough is doable in the browser without touching the API directly.
+
+### WP-1.11 — Ticket queue visual rebuild `[UI]`
+*Added after WP-1.10, against a mockup the human supplied.* Rebuild the queue's table treatment: a two-line identifying column, priority as a direction arrow in a soft pill, initials tiles for requester and assignee, the SLA as a meter, a collapsed filter bar with a `Filters` popover, and a toolbar carrying the total, sort, refresh, columns and density. Keeps `TKT-`, the seven real statuses, and the combinable view chips.
+**Done when:** it matches the mockup's table treatment, and column and density choices persist per browser without entering the URL.
+
+### WP-1.12 — Queue search & counters `[SENSITIVE]`
+*Added with WP-1.11, for the two things that mockup needs and the API could not answer.* Free-text queue search over ticket number, subject, and requester name, applied **after** `TicketScope`; a scope-wide counters endpoint behind the KPI row and the view counts; a `dueBefore` filter so the "Due today" tile opens the tickets it counted. Hoists the `ILIKE` escaping into `Itms.Platform`.
+**Done when:** a User's search never surfaces a ticket they did not raise, and every counter equals the total of the list its tile links to.
 
 🏁 **Phase 1 gate.** Tag `v0.2-phase1`.
 

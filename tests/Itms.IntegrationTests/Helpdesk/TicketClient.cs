@@ -406,6 +406,28 @@ internal static class TicketClient
             query.Length == 0 ? Tickets : $"{Tickets}?{query}",
             cancellationToken);
 
+    /// <summary>Reads the queue's counters.</summary>
+    /// <param name="client">The signed-in client.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="dueBefore">The caller's own end of day, or null to let the server pick.</param>
+    /// <returns>The counters.</returns>
+    public static async Task<TicketCountersDto> CountersAsync(
+        HttpClient client,
+        CancellationToken cancellationToken,
+        DateTimeOffset? dueBefore = null)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+
+        var path = dueBefore is { } instant
+            ? $"{Tickets}/counters?dueBefore={Uri.EscapeDataString(instant.ToString("O", System.Globalization.CultureInfo.InvariantCulture))}"
+            : $"{Tickets}/counters";
+
+        var response = await client.GetAsync(new Uri(path, UriKind.Relative), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return await ApiClient.ReadAsync<TicketCountersDto>(response, cancellationToken);
+    }
+
     /// <summary>The id of one of the seeded development accounts.</summary>
     /// <param name="fixture">The booted host.</param>
     /// <param name="userName">The account: <c>admin</c>, <c>tech</c>, or <c>user</c>.</param>
@@ -426,6 +448,15 @@ internal static class TicketClient
 
     private sealed record CsrfDto(string HeaderName, string Token);
 }
+
+/// <summary>The queue's counters as the suite reads them off the wire.</summary>
+public sealed record TicketCountersDto(
+    int All,
+    int Open,
+    int Unassigned,
+    int Overdue,
+    int DueToday,
+    int Mine);
 
 /// <summary>An assignment as the suite reads it off the wire.</summary>
 /// <param name="Id">The ticket.</param>

@@ -1,5 +1,6 @@
 using Itms.Modules.Helpdesk.Domain;
 using Itms.Modules.Helpdesk.Persistence;
+using Itms.Platform.Data;
 using Itms.Platform.Identity;
 using Itms.Platform.Paging;
 using Itms.Platform.Results;
@@ -168,11 +169,18 @@ internal sealed class ListTicketsHandler(HelpdeskDbContext database, ICurrentUse
     /// PostgreSQL choose a plan for the parameter it was first given and then keep it for
     /// every other combination.
     /// </remarks>
+    /// <remarks>
+    /// <b>Internal rather than private since WP-1.12</b>, so the counters handler narrows
+    /// the queue with the identical expression rather than a second one written to match.
+    /// A counter that disagreed with the list it links to is the failure that shape exists
+    /// to prevent, and `TicketCountersTests` asserts each count equals the total of the
+    /// list it claims to summarise.
+    /// </remarks>
     /// <param name="tickets">The query, already scoped to what the caller may see.</param>
     /// <param name="query">The filters asked for.</param>
     /// <param name="now">The instant the SLA filter is read against.</param>
     /// <returns>The narrowed query.</returns>
-    private static IQueryable<Ticket> Filter(IQueryable<Ticket> tickets, ListTicketsQuery query, DateTimeOffset now)
+    internal static IQueryable<Ticket> Filter(IQueryable<Ticket> tickets, ListTicketsQuery query, DateTimeOffset now)
     {
         if (query.Status is { Length: > 0 } statuses)
         {
@@ -229,6 +237,29 @@ internal sealed class ListTicketsHandler(HelpdeskDbContext database, ICurrentUse
         if (query.SlaState is { } slaState)
         {
             tickets = tickets.WithSlaState(slaState, now);
+        }
+
+        if (query.DueBefore is { } dueBefore)
+        {
+            // "Still open" is half the filter. A ticket resolved yesterday is not due
+            // today, whatever its deadline column still reads.
+            tickets = tickets.Where(ticket =>
+                ticket.DueAt < dueBefore &&
+                ticket.Status != TicketStatus.Resolved &&
+                ticket.Status != TicketStatus.Closed &&
+                ticket.Status != TicketStatus.Cancelled);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            // The escaping is the shared kernel's (WP-1.12): an unescaped % or _ typed
+            // into the box would otherwise become a wildcard over the whole table.
+            var pattern = SearchPattern.Containing(query.Search);
+
+            tickets = tickets.Where(ticket =>
+                EF.Functions.ILike(ticket.Number, pattern, SearchPattern.Escape) ||
+                EF.Functions.ILike(ticket.Subject, pattern, SearchPattern.Escape) ||
+                EF.Functions.ILike(ticket.RequesterName, pattern, SearchPattern.Escape));
         }
 
         return tickets;

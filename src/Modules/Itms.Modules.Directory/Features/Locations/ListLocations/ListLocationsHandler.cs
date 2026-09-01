@@ -1,5 +1,6 @@
 using Itms.Modules.Directory.Domain;
 using Itms.Modules.Directory.Persistence;
+using Itms.Platform.Data;
 using Itms.Platform.Paging;
 using Itms.Platform.Results;
 using Microsoft.EntityFrameworkCore;
@@ -49,7 +50,7 @@ internal sealed class ListLocationsHandler(DirectoryDbContext database)
             }
 
             // The subtree, in one prefix match rather than a recursive walk.
-            var subtree = LikePattern.StartingWith(rootPath);
+            var subtree = SearchPattern.StartingWith(rootPath);
             query = query.Where(candidate => EF.Functions.Like(candidate.Path, subtree));
         }
 
@@ -65,10 +66,10 @@ internal sealed class ListLocationsHandler(DirectoryDbContext database)
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var pattern = LikePattern.Containing(search);
+            var pattern = SearchPattern.Containing(search);
             query = query.Where(candidate =>
-                EF.Functions.ILike(candidate.Name, pattern, LikePattern.Escape) ||
-                EF.Functions.ILike(candidate.FullPath, pattern, LikePattern.Escape));
+                EF.Functions.ILike(candidate.Name, pattern, SearchPattern.Escape) ||
+                EF.Functions.ILike(candidate.FullPath, pattern, SearchPattern.Escape));
         }
 
         var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);

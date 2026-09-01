@@ -7,6 +7,7 @@ import type {
   TicketAttachment,
   TicketCategory,
   TicketComment,
+  TicketCounters,
   TicketDetail,
   TicketPriority,
   TicketStatus,
@@ -181,4 +182,20 @@ export function attachmentDownloadUrl(ticketId: string, attachmentId: string): s
 /** The precondition header, when a version is in hand. */
 function ifMatch(etag: string | null): { headers?: Record<string, string> } {
   return etag === null ? {} : { headers: { 'If-Match': etag } }
+}
+
+/**
+ * The queue's headline figures.
+ *
+ * Scope-wide and deliberately independent of the current filters (WP-1.12): a counter
+ * that moved when somebody narrowed the queue would be describing their filter rather
+ * than their queue. The caller's own end of day travels with the request, because the day
+ * boundary a person means is the one on their clock while the wire is UTC.
+ */
+export function fetchTicketCounters(
+  dueBefore: string,
+  signal?: AbortSignal,
+): Promise<TicketCounters> {
+  const params = new URLSearchParams({ dueBefore })
+  return apiFetch<TicketCounters>(`/tickets/counters?${params.toString()}`, signal ? { signal } : {})
 }

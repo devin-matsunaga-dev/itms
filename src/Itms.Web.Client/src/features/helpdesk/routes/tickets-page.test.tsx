@@ -11,6 +11,7 @@ import type {
   PagedTickets,
   TicketCategory,
   TicketListItem,
+  TicketCounters,
   TicketPriority,
   UserSummary,
 } from '@/lib/api/types'
@@ -20,6 +21,7 @@ import { renderWithProviders } from '@/test/render'
 const fetchTickets = vi.fn<(query: TicketQuery) => Promise<PagedTickets>>()
 const fetchCurrentUser = vi.fn<() => Promise<AuthenticatedUser | null>>()
 const fetchAssignableUsers = vi.fn<() => Promise<UserSummary[]>>()
+const fetchTicketCounters = vi.fn<() => Promise<TicketCounters>>()
 
 vi.mock('@/features/helpdesk/api/tickets-api', () => ({
   fetchTickets: (query: TicketQuery) => fetchTickets(query),
@@ -27,6 +29,7 @@ vi.mock('@/features/helpdesk/api/tickets-api', () => ({
   fetchTicketPriorities: (): Promise<TicketPriority[]> => Promise.resolve(priorities),
   fetchDepartments: (): Promise<Department[]> => Promise.resolve(departments),
   fetchAssignableUsers: () => fetchAssignableUsers(),
+  fetchTicketCounters: () => fetchTicketCounters(),
 }))
 
 vi.mock('@/features/auth/api/auth-api', () => ({
@@ -179,8 +182,17 @@ beforeEach(() => {
   fetchTickets.mockReset()
   fetchCurrentUser.mockReset()
   fetchAssignableUsers.mockReset()
+  fetchTicketCounters.mockReset()
 
   fetchTickets.mockResolvedValue(page([ticket()]))
+  fetchTicketCounters.mockResolvedValue({
+    all: 32,
+    open: 24,
+    unassigned: 6,
+    overdue: 3,
+    dueToday: 5,
+    mine: 8,
+  })
   fetchCurrentUser.mockResolvedValue(technician)
   fetchAssignableUsers.mockResolvedValue([
     { ...technician, isActive: true, roles: [Roles.technician] } as UserSummary,
@@ -392,9 +404,9 @@ describe('TicketsPage — the built-in views', () => {
     renderQueue()
     const views = await screen.findByRole('group', { name: /saved views/i })
 
-    expect(within(views).getByRole('button', { name: 'My tickets' })).toBeInTheDocument()
-    expect(within(views).getByRole('button', { name: 'Unassigned' })).toBeInTheDocument()
-    expect(within(views).getByRole('button', { name: 'Overdue' })).toBeInTheDocument()
+    expect(within(views).getByRole('button', { name: /my tickets/i })).toBeInTheDocument()
+    expect(within(views).getByRole('button', { name: /^unassigned/i })).toBeInTheDocument()
+    expect(within(views).getByRole('button', { name: /^overdue/i })).toBeInTheDocument()
   })
 
   it('writes a technician’s "My tickets" as an assignee filter', async () => {
@@ -402,7 +414,7 @@ describe('TicketsPage — the built-in views', () => {
     renderQueue()
     await screen.findByText('TKT-0001')
 
-    await person.click(screen.getByRole('button', { name: 'My tickets' }))
+    await person.click(screen.getByRole('button', { name: /my tickets/i }))
 
     await waitFor(() => {
       expect(address()).toContain(`assigneeId=${me}`)
@@ -416,7 +428,7 @@ describe('TicketsPage — the built-in views', () => {
     renderQueue()
     await screen.findByText('TKT-0001')
 
-    await person.click(screen.getByRole('button', { name: 'My tickets' }))
+    await person.click(screen.getByRole('button', { name: /my tickets/i }))
 
     await waitFor(() => {
       expect(address()).toContain(`requesterId=${me}`)
@@ -429,7 +441,7 @@ describe('TicketsPage — the built-in views', () => {
     renderQueue()
     await screen.findByText('TKT-0001')
 
-    await person.click(screen.getByRole('button', { name: 'Unassigned' }))
+    await person.click(screen.getByRole('button', { name: /^unassigned/i }))
 
     await waitFor(() => {
       expect(address()).toContain('unassigned=true')
@@ -441,7 +453,7 @@ describe('TicketsPage — the built-in views', () => {
     renderQueue()
     await screen.findByText('TKT-0001')
 
-    await person.click(screen.getByRole('button', { name: 'Overdue' }))
+    await person.click(screen.getByRole('button', { name: /^overdue/i }))
 
     await waitFor(() => {
       expect(address()).toContain('slaState=Breached')
@@ -452,12 +464,12 @@ describe('TicketsPage — the built-in views', () => {
     renderQueue('/tickets?slaState=Breached&sort=Priority&direction=Ascending&pageSize=25')
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Overdue' })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: /^overdue/i })).toHaveAttribute(
         'aria-pressed',
         'true',
       )
     })
-    expect(screen.getByRole('button', { name: 'Unassigned' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /^unassigned/i })).toHaveAttribute(
       'aria-pressed',
       'false',
     )
@@ -642,5 +654,109 @@ describe('TicketsPage — the filter popover', () => {
     await waitFor(() => {
       expect(address()).toContain('categoryId=cat-network')
     })
+  })
+})
+
+describe('TicketsPage — the headline figures', () => {
+  it('shows the four counters the queue is measured by', async () => {
+    renderQueue()
+
+    // Scoped to each card: a KPI figure and a view chip's count are often the same
+    // number, and asserting on the bare text would match either.
+    for (const [label, figure] of [
+      ['Open', '24'],
+      ['Unassigned', '6'],
+      ['Overdue', '3'],
+      ['Due today', '5'],
+    ] as const) {
+      // Scoped to the KPI row: "Unassigned" and "Overdue" each name a card *and* a view
+      // chip, and a bare text query matches both.
+      const summary = within(await screen.findByRole('group', { name: 'Queue summary' }))
+      const card = summary.getByText(label).closest('a')
+      expect(card).not.toBeNull()
+      // Awaited: the labels render immediately and the figures arrive with the request.
+      expect(await within(card as HTMLElement).findByText(figure)).toBeInTheDocument()
+    }
+  })
+
+  it('makes every figure a link to the list it counted', async () => {
+    renderQueue()
+
+    const summary = within(await screen.findByRole('group', { name: 'Queue summary' }))
+
+    expect(summary.getByText('Overdue').closest('a')).toHaveAttribute(
+      'href',
+      expect.stringContaining('slaState=Breached'),
+    )
+    expect(summary.getByText('Open').closest('a')).toHaveAttribute(
+      'href',
+      expect.stringContaining('status=New'),
+    )
+  })
+
+  it('counts the saved views beside their chips', async () => {
+    renderQueue()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /my tickets/i })).toHaveTextContent('8')
+    })
+  })
+
+  it('does not move the figures when the queue is filtered', async () => {
+    // Scope-wide by decision: a counter that followed the filters would describe the
+    // filter rather than the queue.
+    renderQueue('/tickets?priorityId=pri-high&sort=Priority&direction=Ascending&pageSize=25')
+
+    expect(await screen.findByText('24')).toBeInTheDocument()
+    // One request for the whole screen, and its query string carries no filter at all —
+    // only the day boundary "due today" is measured against.
+    expect(fetchTicketCounters).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('TicketsPage — searching', () => {
+  it('writes the term into the address once typing stops', async () => {
+    const person = userEvent.setup()
+    renderQueue()
+
+    await person.type(await screen.findByLabelText('Search tickets'), 'printer')
+
+    await waitFor(
+      () => {
+        expect(address()).toContain('search=printer')
+      },
+      { timeout: 2000 },
+    )
+    expect(lastQuery().search).toBe('printer')
+  })
+
+  it('reads a term the address already carries', async () => {
+    renderQueue('/tickets?search=printer&sort=Priority&direction=Ascending&pageSize=25')
+
+    expect(await screen.findByLabelText('Search tickets')).toHaveValue('printer')
+    expect(lastQuery().search).toBe('printer')
+  })
+
+  it('follows the URL when it changes for a reason that is not the box', async () => {
+    const person = userEvent.setup()
+    fetchTickets.mockResolvedValue(page([]))
+    renderQueue('/tickets?search=printer&sort=Priority&direction=Ascending&pageSize=25')
+
+    expect(await screen.findByLabelText('Search tickets')).toHaveValue('printer')
+
+    await person.click((await screen.findAllByRole('button', { name: /clear all/i }))[0] as HTMLElement)
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Search tickets')).toHaveValue('')
+    })
+  })
+
+  it('counts the search among the things that are filtering the queue', async () => {
+    fetchTickets.mockResolvedValue(page([]))
+    renderQueue('/tickets?search=nothing&sort=Priority&direction=Ascending&pageSize=25')
+
+    // "No tickets match these filters" rather than "No tickets yet" — a search that found
+    // nothing is a filtered queue, not an empty system.
+    expect(await screen.findByText('No tickets match these filters')).toBeInTheDocument()
   })
 })

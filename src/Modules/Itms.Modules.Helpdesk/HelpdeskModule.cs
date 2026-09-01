@@ -27,6 +27,7 @@ using Itms.Modules.Helpdesk.Features.Tickets.ChangeTicketStatus;
 using Itms.Modules.Helpdesk.Features.Tickets.CreateTicket;
 using Itms.Modules.Helpdesk.Features.Tickets.GetTicket;
 using Itms.Modules.Helpdesk.Features.Tickets.ListTickets;
+using Itms.Modules.Helpdesk.Features.Tickets.TicketCounters;
 using Itms.Modules.Helpdesk.Persistence;
 using Itms.Platform.Data;
 using Microsoft.AspNetCore.Routing;
@@ -93,6 +94,7 @@ public static class HelpdeskModule
 
         services.TryAddScoped<CreateTicketHandler>();
         services.TryAddScoped<ListTicketsHandler>();
+        services.TryAddScoped<TicketCountersHandler>();
         services.TryAddScoped<GetTicketHandler>();
         services.TryAddScoped<ChangeTicketStatusHandler>();
         services.TryAddScoped<AssignTicketHandler>();
