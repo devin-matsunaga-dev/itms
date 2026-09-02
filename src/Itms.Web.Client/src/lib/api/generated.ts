@@ -1027,6 +1027,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reads the monitored-device register, filtered, sorted, and paged.
+         * @description Defaults to every device by asset tag, ascending. search matches the hostname and the asset tag. The SNMP community string is never returned; snmpCredentialSet says whether one is configured.
+         */
+        get: operations["ListDevices"];
+        put?: never;
+        /**
+         * Starts monitoring an asset.
+         * @description A monitored device is always an asset (invariant 6): assetId must name one that already exists, and an asset has at most one device. The device needs a hostname or an IP address. An snmpCommunity supplied here is stored and never returned by any read; change it afterwards with PUT /api/v1/devices/{id}/snmp-credential.
+         */
+        post: operations["RegisterDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reads one monitored device.
+         * @description Carries an ETag naming the device's current version. Send it back as If-Match on a write to be told the device has moved before the change is attempted. The SNMP community string is never returned.
+         */
+        get: operations["GetDevice"];
+        /**
+         * Corrects where a device is reached and how it is polled.
+         * @description A full replacement of the device's addressing and polling settings: a field left out of the body is cleared, not left alone. The asset, the monitoring switch and the SNMP community string are not part of this shape — the asset is fixed (invariant 6) and the other two have routes of their own, so that a form which never received the credential cannot wipe it. Send the device's ETag as If-Match to be refused with 412 if it has moved since you read it.
+         */
+        put: operations["UpdateDevice"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Puts a device under the poller's watch.
+         * @description Already-watched devices are accepted and write nothing. Send the device's ETag as If-Match to be refused with 412 if it has moved since you read it.
+         */
+        post: operations["EnableDeviceMonitoring"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Takes a device off the poller's watch.
+         * @description It keeps its configuration and its history; it is simply no longer checked. Send the device's ETag as If-Match to be refused with 412 if it has moved since you read it.
+         */
+        post: operations["DisableDeviceMonitoring"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{id}/snmp-credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Sets a device's read-only SNMP community string.
+         * @description Write-only: no endpoint in this API ever returns the community string, the audit trail records that it was set and not what it is, and reading the device back answers snmpCredentialSet rather than the value. The read-only community is the only kind this system accepts. Send the device's ETag as If-Match to be refused with 412 if it has moved since you read it.
+         */
+        put: operations["SetDeviceSnmpCredential"];
+        post?: never;
+        /**
+         * Removes a device's read-only SNMP community string.
+         * @description Its own verb rather than an empty string on the write above, so that clearing a credential and a client sending a blank field by mistake cannot be the same request. A device with no credential is accepted and writes nothing.
+         */
+        delete: operations["ClearDeviceSnmpCredential"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1649,6 +1761,58 @@ export interface components {
              */
             totalReferences: number;
         };
+        /** @description A monitored device as the API renders it. */
+        DeviceResponse: {
+            /**
+             * Format: uuid
+             * @description The device's id.
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description The asset this device is (invariant 6).
+             */
+            assetId: string;
+            /** @description That asset's tag. */
+            assetTag: string;
+            /** @description The name the device answers to. */
+            hostname: null | string;
+            /** @description The address it is polled at. */
+            ipAddress: null | string;
+            /** @description Whether the poller picks it up. */
+            monitoringEnabled: boolean;
+            /**
+             * Format: int32
+             * @description How often it is checked.
+             */
+            pollIntervalSeconds: number;
+            /**
+             * Format: int32
+             * @description How many consecutive failures declare it offline.
+             */
+            failureThreshold: number;
+            /** @description Whether the read-only SNMP checks apply. */
+            snmpEnabled: boolean;
+            /**
+             * Format: int32
+             * @description The port those checks use.
+             */
+            snmpPort: number;
+            /** @description Whether a community string is configured. The string itself is never returned. */
+            snmpCredentialSet: boolean;
+            /**
+             * Format: date-time
+             * @description When the device was registered (UTC).
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description When it last changed (UTC).
+             */
+            updatedAt: string;
+        };
+        /** @enum {unknown} */
+        DeviceSort: "AssetTag" | "Hostname" | "CreatedAt" | "UpdatedAt" | null;
         HttpValidationProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -1913,6 +2077,37 @@ export interface components {
         PagedResultOfDepartmentResponse: {
             /** @description The items on this page. */
             items: components["schemas"]["DepartmentResponse"][];
+            /**
+             * Format: int32
+             * @description The total number of matching items across all pages.
+             */
+            total: number;
+            /**
+             * Format: int32
+             * @description The 1-based page number this envelope represents.
+             */
+            page: number;
+            /**
+             * Format: int32
+             * @description The page size that was applied, after clamping.
+             */
+            pageSize: number;
+            /**
+             * Format: int32
+             * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
+             */
+            totalPages?: number;
+            /** @description True when a further page exists. */
+            hasNextPage?: boolean;
+        };
+        /**
+         * @description The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as
+         *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
+         *     object so the shape reaches OpenAPI and, from there, the generated client.
+         */
+        PagedResultOfDeviceResponse: {
+            /** @description The items on this page. */
+            items: components["schemas"]["DeviceResponse"][];
             /**
              * Format: int32
              * @description The total number of matching items across all pages.
@@ -2231,6 +2426,47 @@ export interface components {
             errors?: null | {
                 [key: string]: string[];
             };
+        };
+        /** @description The fields a monitored device is registered from. */
+        RegisterDeviceRequest: {
+            /**
+             * Format: uuid
+             * @description The asset this device is. Required, and must already exist.
+             */
+            assetId: string;
+            /** @description The name the device answers to. Optional, but a device needs this or an address. */
+            hostname: null | string;
+            /** @description The address it is polled at, as text. Optional, but a device needs this or a hostname. */
+            ipAddress: null | string;
+            /**
+             * @description Whether the poller should pick it up. Optional; defaults to true, because registering a
+             *     device is asking for it to be watched.
+             */
+            monitoringEnabled: null | boolean;
+            /**
+             * Format: int32
+             * @description How often to check it. Optional; defaults to 60.
+             */
+            pollIntervalSeconds: null | number;
+            /**
+             * Format: int32
+             * @description How many consecutive failures declare it offline. Optional; defaults to 3.
+             */
+            failureThreshold: null | number;
+            /** @description Whether the read-only SNMP checks apply. Optional; defaults to false. */
+            snmpEnabled: null | boolean;
+            /**
+             * Format: int32
+             * @description The port those checks use. Optional; defaults to 161.
+             */
+            snmpPort: null | number;
+            /** @description The read-only community string. Optional, and never returned by any read. */
+            snmpCommunity: null | string;
+        };
+        /** @description The read-only SNMP community string a device is polled with. */
+        SetSnmpCredentialRequest: {
+            /** @description The read-only community string. Required and non-blank. */
+            community: string;
         };
         /**
          * @description Where one of a ticket's two SLA clocks stands: SPEC.md §2's "approaching (80%
@@ -2995,6 +3231,30 @@ export interface components {
             code: null | string;
             /** @description Free text, or `null` to clear it. */
             description: null | string;
+        };
+        /** @description The fields a monitored device's configuration is corrected from. */
+        UpdateDeviceRequest: {
+            /** @description The name the device answers to. Optional, but a device needs this or an address. */
+            hostname: null | string;
+            /** @description The address it is polled at, as text. Optional, but a device needs this or a hostname. */
+            ipAddress: null | string;
+            /**
+             * Format: int32
+             * @description How often to check it. Optional; defaults to 60.
+             */
+            pollIntervalSeconds: null | number;
+            /**
+             * Format: int32
+             * @description How many consecutive failures declare it offline. Optional; defaults to 3.
+             */
+            failureThreshold: null | number;
+            /** @description Whether the read-only SNMP checks apply. Optional; defaults to false. */
+            snmpEnabled: null | boolean;
+            /**
+             * Format: int32
+             * @description The port those checks use. Optional; defaults to 161.
+             */
+            snmpPort: null | number;
         };
         /** @description The body of `PUT /api/v1/locations/{id}`. */
         UpdateLocationRequest: {
@@ -6595,6 +6855,509 @@ export interface operations {
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListDevices: {
+        parameters: {
+            query?: {
+                monitoringEnabled?: boolean;
+                snmpEnabled?: boolean;
+                search?: string;
+                sort?: components["schemas"]["DeviceSort"];
+                direction?: components["schemas"]["SortDirection"];
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfDeviceResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RegisterDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EnableDeviceMonitoring: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DisableDeviceMonitoring: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SetDeviceSnmpCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSnmpCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ClearDeviceSnmpCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description No session cookie, or the session it named has expired or been revoked. */
             401: {

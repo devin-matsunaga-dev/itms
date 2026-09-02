@@ -157,13 +157,23 @@ public sealed class ListAssetsQuery
     /// the global search is a different feature with a different shape.
     /// </para>
     /// <para>
-    /// <b>Hostname is not searched, because assets do not have one yet.</b> WP-2.3's text
-    /// names it alongside tag and serial, but SPEC.md §3's network fields — hostname, IP,
-    /// the monitoring flag, the SNMP settings — arrive at <c>WP-3.1</c>, which projects a
-    /// monitored device over an asset. Adding a placeholder column here to satisfy the
-    /// wording would be inventing the shape that package has to design. <b>WP-3.1 inherits
-    /// the obligation:</b> the package that gives an asset a hostname adds it to this
+    /// <b>Hostname is not searched, and after WP-3.1 that is settled rather than pending.</b>
+    /// WP-2.3's text names it alongside tag and serial, and WP-2.3 left the obligation to
+    /// <c>WP-3.1</c> on the assumption that the package giving an asset a hostname would add
+    /// it here. <b>WP-3.1 established the hostname in Monitoring instead, on the
+    /// monitored-device row, and it therefore cannot be added here:</b>
+    /// <c>monitoring.devices</c> is another module's table and §3 rule 1 forbids this
+    /// module querying it. The alternative — a cached <c>hostname</c> column on the asset
+    /// row — was rejected at the WP-3.1 scope gate: it would be a second copy of a fact
+    /// this system already owns, with nothing to refresh it, bought for a convenience
     /// search.
+    /// </para>
+    /// <para>
+    /// <b>Searching assets by hostname is a cross-entity question, and <c>WP-4.2</c> owns
+    /// it.</b> That package spans ticket number, user, asset tag and serial, and hostname
+    /// and IP by its own wording, and a search that reaches across modules is exactly what
+    /// it is for. A device's own list searches its hostname today — see
+    /// <c>ListDevicesQuery.Search</c>. Nothing further is owed by this file.
     /// </para>
     /// <para>
     /// The notes column is left out for WP-1.12's reason: it is four thousand characters and

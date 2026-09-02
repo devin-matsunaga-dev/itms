@@ -42,6 +42,10 @@
          indexes rely on, and the reference-data entities are all pure and need no
          database. -->
     <ProjectReference Include="..\..\src\Modules\Itms.Modules.Assets\Itms.Modules.Assets.csproj" />
+    <!-- WP-3.1: the monitored device's reachability rule, its bounds, and the fields an
+         edit deliberately cannot reach are all pure; so is the check result's
+         success-carries-a-latency shape. None of it needs a database. -->
+    <ProjectReference Include="..\..\src\Modules\Itms.Modules.Monitoring\Itms.Modules.Monitoring.csproj" />
     <!-- WP-0.7: the event-to-entry mapping, the diff bounds, and the coverage guard that
          keeps every domain event audited are all pure and need no database. -->
     <ProjectReference Include="..\..\src\Modules\Itms.Modules.Audit\Itms.Modules.Audit.csproj" />

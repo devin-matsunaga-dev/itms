@@ -99,14 +99,14 @@ public sealed class IdentityWebFixture : IAsyncLifetime
         // Every module the host registers, not just Identity: the fixture boots the whole
         // composition root, so a schema left out here would leave one suite's rows behind
         // for the next one. WP-0.6 added "directory"; WP-0.7 added "audit"; WP-1.1 added
-        // "helpdesk"; WP-2.1 added "assets".
+        // "helpdesk"; WP-2.1 added "assets"; WP-3.1 added "monitoring".
         //
         // Respawn truncates, which is why the audit table's append-only trigger does not
         // block the reset: the trigger covers UPDATE and DELETE, and TRUNCATE needs table
         // ownership rather than write access.
         _respawner = await PostgresDatabase.CreateRespawnerAsync(
             _dataSource,
-            ["identity", "messaging", "directory", "helpdesk", "assets", "audit"],
+            ["identity", "messaging", "directory", "helpdesk", "assets", "monitoring", "audit"],
             cancellationToken);
     }
 

@@ -1,3 +1,28 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- The Monitoring module: the monitored-device projection over an asset (invariant 6)
+       and the raw check-result table ARCHITECTURE.md §4 sets the retention and index
+       strategy for. It references the shared framework because it owns endpoints, and
+       Itms.Contracts because it audits through IAuditWriter and reads the asset a device
+       is through IAssetLookup. It references no other module — least of all
+       Itms.Modules.Assets — and the architecture tests assert it. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="FluentValidation" />
+    <!-- Design-time only: `dotnet ef migrations` needs it, the shipped app does not. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Itms.Platform\Itms.Platform.csproj" />
+    <ProjectReference Include="..\..\Itms.Contracts\Itms.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>

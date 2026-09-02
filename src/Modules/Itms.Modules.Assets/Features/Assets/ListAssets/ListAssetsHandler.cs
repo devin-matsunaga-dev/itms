@@ -241,8 +241,10 @@ internal sealed class ListAssetsHandler(AssetsDbContext database, IClock clock)
             // the box would otherwise become a wildcard over the whole table.
             var pattern = SearchPattern.Containing(query.Search);
 
-            // Hostname is absent because the column is — see ListAssetsQuery.Search. WP-3.1
-            // adds it here when it adds it to the model.
+            // Hostname is absent and stays absent. WP-3.1 put it on the monitored-device
+            // row in another module's schema, which §3 rule 1 forbids this query from
+            // reaching; searching assets by hostname is WP-4.2's cross-entity search. See
+            // ListAssetsQuery.Search.
             assets = assets.Where(asset =>
                 EF.Functions.ILike(asset.AssetTag, pattern, SearchPattern.Escape) ||
                 (asset.SerialNumber != null && EF.Functions.ILike(asset.SerialNumber, pattern, SearchPattern.Escape)) ||

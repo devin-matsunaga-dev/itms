@@ -12,6 +12,7 @@ using Itms.Modules.Helpdesk;
 using Itms.Modules.Helpdesk.Seeding;
 using Itms.Modules.Identity;
 using Itms.Modules.Identity.Seeding;
+using Itms.Modules.Monitoring;
 using Itms.Platform;
 using Itms.Platform.Data;
 using Itms.Web.Host.Data;
@@ -58,6 +59,7 @@ builder.Services.AddIdentityModule();
 builder.Services.AddDirectoryModule();
 builder.Services.AddHelpdeskModule();
 builder.Services.AddAssetsModule();
+builder.Services.AddMonitoringModule();
 builder.Services.AddAuditModule();
 
 var app = builder.Build();
@@ -73,6 +75,7 @@ if (app.Environment.IsDevelopment())
     await startupScope.ServiceProvider.MigrateDirectoryAsync();
     await startupScope.ServiceProvider.MigrateHelpdeskAsync();
     await startupScope.ServiceProvider.MigrateAssetsAsync();
+    await startupScope.ServiceProvider.MigrateMonitoringAsync();
     await startupScope.ServiceProvider.MigrateAuditAsync();
     await DevelopmentIdentitySeeder.SeedAsync(startupScope.ServiceProvider);
     await DevelopmentDirectorySeeder.SeedAsync(startupScope.ServiceProvider);
@@ -126,6 +129,7 @@ app.MapIdentityEndpoints();
 app.MapDirectoryEndpoints();
 app.MapHelpdeskEndpoints();
 app.MapAssetsEndpoints();
+app.MapMonitoringEndpoints();
 // Audit maps nothing today; the trail is read by WP-5.9's viewer. The call is here so
 // adding that viewer is an edit inside the module rather than a change to this file.
 app.MapAuditEndpoints();

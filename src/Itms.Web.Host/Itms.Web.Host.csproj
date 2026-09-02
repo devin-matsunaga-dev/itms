@@ -30,6 +30,7 @@
     <ProjectReference Include="..\Modules\Itms.Modules.Directory\Itms.Modules.Directory.csproj" />
     <ProjectReference Include="..\Modules\Itms.Modules.Helpdesk\Itms.Modules.Helpdesk.csproj" />
     <ProjectReference Include="..\Modules\Itms.Modules.Assets\Itms.Modules.Assets.csproj" />
+    <ProjectReference Include="..\Modules\Itms.Modules.Monitoring\Itms.Modules.Monitoring.csproj" />
     <ProjectReference Include="..\Modules\Itms.Modules.Audit\Itms.Modules.Audit.csproj" />
   </ItemGroup>
 

@@ -4920,6 +4920,642 @@
           { }
         ]
       }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Reads the monitored-device register, filtered, sorted, and paged.",
+        "description": "Defaults to every device by asset tag, ascending. search matches the hostname and the asset tag. The SNMP community string is never returned; snmpCredentialSet says whether one is configured.",
+        "operationId": "ListDevices",
+        "parameters": [
+          {
+            "name": "monitoringEnabled",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "snmpEnabled",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/DeviceSort"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SortDirection"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfDeviceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Starts monitoring an asset.",
+        "description": "A monitored device is always an asset (invariant 6): assetId must name one that already exists, and an asset has at most one device. The device needs a hostname or an IP address. An snmpCommunity supplied here is stored and never returned by any read; change it afterwards with PUT /api/v1/devices/{id}/snmp-credential.",
+        "operationId": "RegisterDevice",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/devices/{id}": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Reads one monitored device.",
+        "description": "Carries an ETag naming the device's current version. Send it back as If-Match on a write to be told the device has moved before the change is attempted. The SNMP community string is never returned.",
+        "operationId": "GetDevice",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Corrects where a device is reached and how it is polled.",
+        "description": "A full replacement of the device's addressing and polling settings: a field left out of the body is cleared, not left alone. The asset, the monitoring switch and the SNMP community string are not part of this shape — the asset is fixed (invariant 6) and the other two have routes of their own, so that a form which never received the credential cannot wipe it. Send the device's ETag as If-Match to be refused with 412 if it has moved since you read it.",
+        "operationId": "UpdateDevice",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/devices/{id}/enable": {
+      "post": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Puts a device under the poller's watch.",
+        "description": "Already-watched devices are accepted and write nothing. Send the device's ETag as If-Match to be refused with 412 if it has moved since you read it.",
+        "operationId": "EnableDeviceMonitoring",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/devices/{id}/disable": {
+      "post": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Takes a device off the poller's watch.",
+        "description": "It keeps its configuration and its history; it is simply no longer checked. Send the device's ETag as If-Match to be refused with 412 if it has moved since you read it.",
+        "operationId": "DisableDeviceMonitoring",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
+    },
+    "/api/v1/devices/{id}/snmp-credential": {
+      "put": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Sets a device's read-only SNMP community string.",
+        "description": "Write-only: no endpoint in this API ever returns the community string, the audit trail records that it was set and not what it is, and reading the device back answers snmpCredentialSet rather than the value. The read-only community is the only kind this system accepts. Send the device's ETag as If-Match to be refused with 412 if it has moved since you read it.",
+        "operationId": "SetDeviceSnmpCredential",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSnmpCredentialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Removes a device's read-only SNMP community string.",
+        "description": "Its own verb rather than an empty string on the write above, so that clearing a credential and a client sending a blank field by mistake cannot be the same request. A device with no credential is accepted and writes nothing.",
+        "operationId": "ClearDeviceSnmpCredential",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
+      }
     }
   },
   "components": {
@@ -6178,6 +6814,101 @@
         },
         "description": "What a department still holds."
       },
+      "DeviceResponse": {
+        "required": [
+          "id",
+          "assetId",
+          "assetTag",
+          "hostname",
+          "ipAddress",
+          "monitoringEnabled",
+          "pollIntervalSeconds",
+          "failureThreshold",
+          "snmpEnabled",
+          "snmpPort",
+          "snmpCredentialSet",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The device's id.",
+            "format": "uuid"
+          },
+          "assetId": {
+            "type": "string",
+            "description": "The asset this device is (invariant 6).",
+            "format": "uuid"
+          },
+          "assetTag": {
+            "type": "string",
+            "description": "That asset's tag."
+          },
+          "hostname": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The name the device answers to."
+          },
+          "ipAddress": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The address it is polled at."
+          },
+          "monitoringEnabled": {
+            "type": "boolean",
+            "description": "Whether the poller picks it up."
+          },
+          "pollIntervalSeconds": {
+            "type": "integer",
+            "description": "How often it is checked.",
+            "format": "int32"
+          },
+          "failureThreshold": {
+            "type": "integer",
+            "description": "How many consecutive failures declare it offline.",
+            "format": "int32"
+          },
+          "snmpEnabled": {
+            "type": "boolean",
+            "description": "Whether the read-only SNMP checks apply."
+          },
+          "snmpPort": {
+            "type": "integer",
+            "description": "The port those checks use.",
+            "format": "int32"
+          },
+          "snmpCredentialSet": {
+            "type": "boolean",
+            "description": "Whether a community string is configured. The string itself is never returned."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the device was registered (UTC).",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When it last changed (UTC).",
+            "format": "date-time"
+          }
+        },
+        "description": "A monitored device as the API renders it."
+      },
+      "DeviceSort": {
+        "enum": [
+          "AssetTag",
+          "Hostname",
+          "CreatedAt",
+          "UpdatedAt",
+          null
+        ]
+      },
       "HttpValidationProblemDetails": {
         "type": "object",
         "properties": {
@@ -6602,6 +7333,49 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DepartmentResponse"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
+      },
+      "PagedResultOfDeviceResponse": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeviceResponse"
             },
             "description": "The items on this page."
           },
@@ -7072,6 +7846,100 @@
             "description": "Per-field validation messages, keyed by camel-cased field name. Present only on a validation failure."
           }
         }
+      },
+      "RegisterDeviceRequest": {
+        "required": [
+          "assetId",
+          "hostname",
+          "ipAddress",
+          "monitoringEnabled",
+          "pollIntervalSeconds",
+          "failureThreshold",
+          "snmpEnabled",
+          "snmpPort",
+          "snmpCommunity"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "description": "The asset this device is. Required, and must already exist.",
+            "format": "uuid"
+          },
+          "hostname": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The name the device answers to. Optional, but a device needs this or an address."
+          },
+          "ipAddress": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The address it is polled at, as text. Optional, but a device needs this or a hostname."
+          },
+          "monitoringEnabled": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Whether the poller should pick it up. Optional; defaults to true, because registering a\ndevice is asking for it to be watched."
+          },
+          "pollIntervalSeconds": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "How often to check it. Optional; defaults to 60.",
+            "format": "int32"
+          },
+          "failureThreshold": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "How many consecutive failures declare it offline. Optional; defaults to 3.",
+            "format": "int32"
+          },
+          "snmpEnabled": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Whether the read-only SNMP checks apply. Optional; defaults to false."
+          },
+          "snmpPort": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The port those checks use. Optional; defaults to 161.",
+            "format": "int32"
+          },
+          "snmpCommunity": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The read-only community string. Optional, and never returned by any read."
+          }
+        },
+        "description": "The fields a monitored device is registered from."
+      },
+      "SetSnmpCredentialRequest": {
+        "required": [
+          "community"
+        ],
+        "type": "object",
+        "properties": {
+          "community": {
+            "type": "string",
+            "description": "The read-only community string. Required and non-blank."
+          }
+        },
+        "description": "The read-only SNMP community string a device is polled with."
       },
       "SlaState": {
         "enum": [
@@ -8418,6 +9286,65 @@
         },
         "description": "The body of `PUT /api/v1/departments/{id}`."
       },
+      "UpdateDeviceRequest": {
+        "required": [
+          "hostname",
+          "ipAddress",
+          "pollIntervalSeconds",
+          "failureThreshold",
+          "snmpEnabled",
+          "snmpPort"
+        ],
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The name the device answers to. Optional, but a device needs this or an address."
+          },
+          "ipAddress": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The address it is polled at, as text. Optional, but a device needs this or a hostname."
+          },
+          "pollIntervalSeconds": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "How often to check it. Optional; defaults to 60.",
+            "format": "int32"
+          },
+          "failureThreshold": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "How many consecutive failures declare it offline. Optional; defaults to 3.",
+            "format": "int32"
+          },
+          "snmpEnabled": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Whether the read-only SNMP checks apply. Optional; defaults to false."
+          },
+          "snmpPort": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The port those checks use. Optional; defaults to 161.",
+            "format": "int32"
+          }
+        },
+        "description": "The fields a monitored device's configuration is corrected from."
+      },
       "UpdateLocationRequest": {
         "required": [
           "name",
@@ -8627,6 +9554,9 @@
     },
     {
       "name": "Assets"
+    },
+    {
+      "name": "Monitoring"
     }
   ]
 }
