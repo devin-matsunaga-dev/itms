@@ -4,10 +4,10 @@
 
 **Project:** Unified IT Management System (ITMS)
 **Phase:** 2 — Assets & directory. Phase 0 and Phase 1 are **complete and tagged**.
-**Current WP:** `WP-2.6 — Asset UI [UI]`
-**Branch:** `feat/wp-2.6-asset-ui`
-**Last completed:** `WP-2.5 — Relationships: user ↔ asset ↔ ticket` (2026-09-01)
-**Last updated:** 2026-09-01
+**Current WP:** `WP-2.6b — Asset forms & lifecycle actions [UI]`
+**Branch:** `feat/wp-2.6b-asset-forms-actions`
+**Last completed:** `WP-2.6a — Asset list, detail, timeline` (2026-09-02)
+**Last updated:** 2026-09-02
 
 > **Both phase gates were completed and verified by the human on 2026-09-01, and both tags exist:** `v0.1-phase0` at `03a39b2` (WP-0.9, the last Phase 0 package) and `v0.2-phase1` at `8a2b1c9` (WP-1.16). Phase 1 shipped sixteen packages including the two added against the human's mockups — WP-1.11's table rebuild and WP-1.12's search and counters — and both are in `WORK_PACKAGES.md`. Phase 2 has begun.
 
@@ -25,7 +25,7 @@
 |---|---|---|---|
 | 0 — Foundation | 0.1 – 0.9 | 9 / 9 | `v0.1-phase0` |
 | 1 — Helpdesk | 1.1 – 1.16 | 16 / 16 | `v0.2-phase1` |
-| 2 — Assets & directory | 2.1 – 2.7 | 5 / 7 | — |
+| 2 — Assets & directory | 2.1 – 2.7 (2.6 split into a/b) | 6 / 8 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
 | 5 — Dashboard, reports, admin | 5.1 – 5.9 | 0 / 9 | — |
@@ -519,6 +519,36 @@
 
 - **Nothing here was seen in a browser beyond one label.** WP-2.5 is not `[UI]`. The generated client types for the four new endpoints are committed and compile, and `changeKindLabels` in `ticket-activity.ts` gained `Asset: 'Related asset'` — a one-line consequence of the enum widening, and a type error rather than a blank row if it had been forgotten. The screens that consume all of this are `WP-2.6` and `WP-2.7`. The manual checklist is `curl` against a running host.
 
+### Noticed during WP-2.6a
+
+- **`WP-2.6` was split in two at the scope gate, at the human's direction, and `WP-2.6b` inherits everything the wording promised that this package did not build.** That is: the create and edit forms, all five lifecycle actions with their confirmations, and the two server additions the human approved in the same message — the `PUT /api/v1/assets/{id}` edit write path, and a field on `AssetResponse` naming the legal lifecycle destinations. `WORK_PACKAGES.md` now carries both entries with the approval recorded on 2.6b, so the next session does not have to reconstruct what was granted. **Nothing was dropped in the split**, and the done-criterion about illegal actions being absent rather than disabled travelled with the actions rather than staying with the list.
+
+- **The detail screen deliberately renders no lifecycle actions, and `asset-detail-page.test.tsx` asserts their absence by name.** That is a guard rather than a decoration: a later package that adds a Retire button by restating the lifecycle table in TypeScript would fail that test, which is the outcome `AssetLifecycle.DestinationsFrom`'s own doc comment asks for. The test names retire, repair, assign, transfer, and edit.
+
+- **`fetchAsset` drops the `ETag` the server sends, and `WP-2.6b` has to put it back.** `GET /assets/{id}` answers with a version tag on every read (WP-2.1), and every lifecycle write honours an `If-Match`. Nothing on a read-only screen has a precondition to state, so this package used `apiFetch` and said so in the function's own doc comment. Restoring it is the `apiRequest` swap `fetchTicket` already models — one function, one hook return type, and the detail page's tests.
+
+- **The asset register has no KPI row and no "New asset" button, and both absences are `WP-2.6b`'s or later.** There is no `/assets/counters` endpoint, so a KPI row would be tiles over data that does not exist — WP-1.11's call, and WP-1.12 is the precedent for building the endpoint first. The create action is absent because the route it would open does not exist yet; DESIGN.md §4 owes this screen a primary action in its header and `WP-2.6b` is where that debt is paid. **The empty state offers no action either, for the same reason** — which is the one place this screen departs from DESIGN.md §4's "an empty state offers the same action a second time".
+
+- **A second copy of the paging footer now exists, and the third is the one that should be hoisted.** `asset-pagination.tsx` differs from `ticket-pagination.tsx` in the noun and in nothing else. Two is where a shape is left alone; a third — `WP-2.7`'s user list is the likely one — should hoist it into `src/components/common/` taking the noun as a prop, and fold both existing copies into it. The same reasoning the repository applies to `ReferenceText` and `AssetETag` server-side.
+
+- **`fetchDepartments` now exists twice**, in `features/helpdesk/api/tickets-api.ts` (WP-1.9) and in the new `features/directory/api/directory-api.ts`. The new one is where it belongs — departments are Directory's — and the helpdesk copy was left alone deliberately, because editing a merged package's API module from an asset package is a diff nobody asked to review. **`WP-2.7` owns `features/directory/` and should fold the helpdesk copy into it**; the two hit the same endpoint with the same page size and cannot currently disagree about anything but their cache key, which is identical by inspection.
+
+- **The location filter is a flat searchable combobox over one page of two hundred rooms, and the cascading picker is still `WP-2.7`'s.** WP-2.4 built the roots, ancestor, and `adoptableFor` reads a cascade walks and recorded that the picker itself belongs to WP-2.7; this package needed to name one room and used the same bound and the same trade the department picker has run on since WP-1.9. **An estate with more than two hundred locations silently cannot filter by the ones past the first page** — that is the case the cascading picker exists for, and is the reason not to grow this control instead.
+
+- **The register filters on an exact location and never on a subtree.** WP-2.3 kept the subtree filter out of Assets because it would mean this module reasoning about Directory's materialised path, and WP-2.4 recorded that a subtree *count* is the same question from the other side. So "everything in this building" is not askable from this screen. It is a real operational question and it is nobody's yet.
+
+- **The staleness WP-2.4 recorded is now visible on a screen.** The register's Location column and the detail's Location field both render the asset's cached `location_path`, which nothing refreshes when a room is renamed or moved — while `GET /locations/{id}/usage` counts the same assets from live `location_id` values and is the correct figure. Two screens will disagree after a rename, and the one on this branch is the wrong one. The refresh-consumer package is still unclaimed.
+
+- **`TicketSummary.status` is a string on the wire and the panel has to narrow it before it can colour it.** WP-2.5 kept the `TicketStatus` enum inside Helpdesk rather than putting it in `Itms.Contracts`, which is the right boundary — but it means every consumer that wants the semantic hue does this check. This is the first; `WP-2.7`'s user page is the second, and it should import the same `statusOrder` guard rather than write a third. If a fourth appears, a small exported helper in the helpdesk feature is cheaper than four copies.
+
+- **`AssetChangeKind` has no label for a dimension that does not exist yet, and that is a type error rather than a blank row.** `changeKindLabels` in `asset-activity.ts` is a total `Record<AssetChangeKind, string>`, so a third kind added server-side fails the build here — the same guard `ticket-activity.ts` gained when WP-2.5 widened the ticket enum.
+
+- **A latent ordering bug in the timeline was found by its own test and fixed in this package.** Two history entries sharing an `occurredAt` *and* a `sequence` were grouped in arrival order, because `Array.prototype.sort` is stable — so the group's React key changed between two reads of the same data. The server should never write two lines of one operation at the same sequence, so this was unreachable in practice; the id now breaks the tie regardless. It is the same failure WP-1.4's `sequence` and WP-1.5's id tie-break were both added to prevent.
+
+- **The bundle is now 819 kB, against 781 kB at WP-2.5.** The register and the detail cost about 38 kB between them. That is the fourth Phase 2 package to add weight to an initial bundle nobody is splitting; the `React.lazy` per-route split recorded at the top of this file has now missed its gate and is owed a package of its own. `WP-2.6b` adds two more routes.
+
+- **The backend suite ran in 2m38s here, against the 3m20s recorded at WP-2.5, on an unchanged suite.** This package touched no .NET file and added no test to it, so the difference is machine variance rather than a fix — which is worth writing down precisely because WP-2.4 asked for the next measurement to be of the whole curve. It is still over the two-minute target and the levers are unchanged.
+
 ## Known issues
 
 - none
@@ -526,7 +556,7 @@
 ## Environment notes
 
 - **`dotnet test` works again, and there are now two commands.** The ordinary run is `dotnet test --filter-not-trait "Category=Volume"`; the volume run is `dotnet test --project tests/Itms.IntegrationTests/Itms.IntegrationTests.csproj --filter-trait "Category=Volume"`. `CONVENTIONS.md` §Testing carries both and CI runs both in separate steps. **Counts at WP-2.5: 835 unit, 52 architecture, 622 integration — 1,509 in the ordinary run at about 3m20s, plus 1 volume test at about 16s.** The run is still over the two-minute target; see the note at the top of this file for what the remaining levers are. The WP-1.3 "Zero tests ran" regression did not reproduce anywhere in this package on the same SDK (10.0.111). **One form still fails and is not needed:** `dotnet test --project <csproj> -- <runner args>` reports Zero tests ran, because the `--` pass-through confuses the MTP bridge — use the first-class `--filter-trait` / `--filter-not-trait` options instead. Running the executables directly (`./tests/<Suite>/bin/Debug/net10.0/<Suite>`, with xUnit's own `-trait` / `-trait-`) remains the fallback if it returns.
-- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 279 tests, about four seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
+- **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 362 tests, about seven seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
 - **`aspire run` now also starts `web-client`.** It runs `npm install` first (an Aspire installer resource) and then `npm run dev`, waits for `web-host`, and is published on an external endpoint — the dashboard prints its URL. The Vite dev server proxies `/api` to the host, so the browser sees one origin.
 - **The colour scheme is remembered per browser** under `localStorage["itms.theme"]`, and follows the operating system until the viewer picks a mode. Clearing site data returns it to the system preference. There is no server-side or per-account theme setting, and none is planned.
 - **Node 24 LTS and npm 11 are what the client is built with.** `node -v` should report v24.x; the lockfile is committed and `npm ci` is the reproducible install.

@@ -96,3 +96,39 @@ export type Department = Schemas['DepartmentResponse']
 
 /** A person, as every picker in the system sees them. */
 export type UserSummary = Schemas['UserSummary']
+
+/** One row of the asset register — `GET /api/v1/assets`. */
+export type AssetListItem = Schemas['AssetListItemResponse']
+
+/** The register's page envelope. */
+export type PagedAssets = Schemas['PagedResultOfAssetListItemResponse']
+
+/** One asset in full — `GET /api/v1/assets/{id}`. */
+export type Asset = Schemas['AssetResponse']
+
+/** One line of an asset's timeline — `GET /api/v1/assets/{id}/history`. */
+export type AssetHistoryEntry = Schemas['AssetHistoryEntryResponse']
+
+/** A page of an asset's timeline. */
+export type PagedAssetHistory = Schemas['PagedResultOfAssetHistoryEntryResponse']
+
+/** Which dimension of an asset a history entry records having moved. */
+export type AssetChangeKind = Schemas['AssetChangeKind']
+
+/** A ticket as another module's screen sees it — `GET /api/v1/assets/{id}/tickets`. */
+export type TicketSummary = Schemas['TicketSummary']
+
+/** A page of an asset's support history. */
+export type PagedTicketSummaries = Schemas['PagedResultOfTicketSummary']
+
+/** What kind of thing an asset is, for the register's type filter. */
+export type AssetType = Schemas['AssetTypeResponse']
+
+/** Where an asset is in its life, for the register's status filter. */
+export type AssetStatus = Schemas['AssetStatusResponse']
+
+/** The columns the register may be ordered by. */
+export type AssetSort = NonNullable<Schemas['AssetSort']>
+
+/** A location in the directory tree, for the register's location filter. */
+export type Location = Schemas['LocationResponse']

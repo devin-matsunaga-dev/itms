@@ -160,8 +160,16 @@ Complete department and location management, cascading location picker, moving a
 **Done when:** the architecture test still passes — Helpdesk references no Assets assembly — and the aggregated user page is a single round trip per panel.
 
 ### WP-2.6 — Asset UI `[UI]`
-Asset list, detail with the history timeline, create/edit forms, assign/transfer/retire actions with confirmation.
-**Done when:** status and lifecycle actions use the semantic colors from `DESIGN.md` and illegal actions are absent rather than disabled-in-place.
+
+> **Split into 2.6a and 2.6b at the human's direction (2026-09-02)**, at the WP-2.6 scope gate: list, detail, timeline, two forms, five lifecycle actions and two server additions in one package is the largest surface any package in this build has carried, and the reviewability of two diffs was judged to outweigh keeping one nominal package. The original wording and done-criterion are split across the two below and nothing was dropped.
+
+#### WP-2.6a — Asset list, detail, timeline `[UI]`
+Asset register with URL-synced filtering, sorting and paging; asset detail with the history timeline and the support-history panel from `WP-2.5`.
+**Done when:** status uses the semantic colours from `DESIGN.md`, keyed on the status's immutable code; every filter, the ordering and the page are in the address; and one operation's history lines read as one timeline event.
+
+#### WP-2.6b — Asset forms & lifecycle actions `[UI]`
+Create and edit forms; assign, transfer, return, repair, return-to-service and retire, each with confirmation and each sending the detail's `ETag` as `If-Match`. **Carries two server additions, approved at the WP-2.6 scope gate (2026-09-02):** the `PUT /api/v1/assets/{id}` edit write path, which does not exist — `Asset.Update` holding the tag immutable and re-checking serial-uniqueness-per-manufacturer, a validator, a handler, an endpoint with 412, and one new `assets.asset_updated` audit action through `IAuditWriter` (no migration, no new domain event, no history entry) — and a field on `AssetResponse` naming the legal lifecycle destinations, filled from `AssetLifecycle.DestinationsFrom`, mirroring `TicketDetailResponse.allowedNextStatuses`.
+**Done when:** lifecycle actions read the server's legal-destination list rather than restating the table in TypeScript, and an illegal action is absent rather than disabled-in-place.
 
 ### WP-2.7 — User & directory UI `[UI]`
 User list, user 360 page (profile, assets, open tickets, history), department and location management screens.
