@@ -37,7 +37,6 @@ vi.mock('@/features/helpdesk/api/tickets-api', () => ({
   fetchTickets: vi.fn(),
   fetchTicketCategories: () => Promise.resolve([]),
   fetchTicketPriorities: () => Promise.resolve([]),
-  fetchDepartments: () => Promise.resolve([]),
 }))
 
 const toastError = vi.fn()
@@ -49,6 +48,10 @@ vi.mock('sonner', () => ({
     success: (message: string, options?: unknown) => toastSuccess(message, options),
     info: vi.fn(),
   },
+}))
+
+vi.mock('@/features/directory/api/directory-api', () => ({
+  fetchDepartments: () => Promise.resolve([]),
 }))
 
 vi.mock('@/features/auth/api/auth-api', () => ({

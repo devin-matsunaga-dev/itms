@@ -14,10 +14,9 @@ import type {
   AssetStatus,
   AssetType,
   Department,
-  Location,
   UserSummary,
 } from '@/lib/api/types'
-import { LocationPicker } from './location-picker'
+import { LocationPicker } from '@/features/directory/components/location-picker'
 import {
   activeWarrantyOption,
   advancedFilterCount,
@@ -37,7 +36,6 @@ interface AssetFiltersProps {
   types: readonly AssetType[]
   statuses: readonly AssetStatus[]
   departments: readonly Department[]
-  locations: readonly Location[]
   holders: readonly UserSummary[]
   onChange: (changes: Partial<AssetQuery>) => void
   onClear: () => void
@@ -67,7 +65,6 @@ export function AssetFilters({
   types,
   statuses,
   departments,
-  locations,
   holders,
   onChange,
   onClear,
@@ -198,16 +195,19 @@ export function AssetFilters({
 
             <Field label="Location" htmlFor="filter-asset-location">
               {/*
-                A combobox rather than the selects beside it, because a location list is
-                the one that grows without bound — an estate is sites, buildings, floors,
-                and rooms, and nobody scrolls that. It matches one room exactly and does
-                not descend the tree: WP-2.3 kept the subtree filter out of Assets because
-                it would mean this module reasoning about Directory's path format, and
-                WP-2.4 recorded that a subtree count is `WP-2.7`'s question.
+                The cascading picker rather than the selects beside it, because a location
+                list is the one that grows without bound — an estate is sites, buildings,
+                floors, and rooms, and nobody scrolls that. It walks the tree a level at a
+                time (WP-2.7), which is what replaced the flat page of two hundred this
+                filter ran on from WP-2.6a.
+
+                It still matches one room exactly and does not descend the tree: WP-2.3
+                kept the subtree filter out of Assets because it would mean this module
+                reasoning about Directory's path format, and no package has claimed a
+                subtree filter since.
               */}
               <LocationPicker
                 id="filter-asset-location"
-                locations={locations}
                 value={query.locationId}
                 placeholder="Any location"
                 onValueChange={(locationId) => {

@@ -2,12 +2,11 @@ import { useCallback } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Controller, useForm, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Info, Paperclip } from 'lucide-react'
+import { Paperclip } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -16,16 +15,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Field, FormSection } from '@/components/common/form-section'
 import { ApiError } from '@/lib/api/client'
 import { hasAnyRole, Roles } from '@/lib/roles'
 import type { CreateTicketRequest } from '@/lib/api/types'
 import { useCurrentUser } from '@/features/auth/hooks/use-current-user'
+import { useDepartments } from '@/features/directory/hooks/use-directory'
 import { DepartmentPicker } from '../components/department-picker'
 import { useCreateTicket } from '../hooks/use-ticket'
 import {
   useAssignableUsers,
-  useDepartments,
   useTicketCategories,
   useTicketPriorities,
 } from '../hooks/use-tickets'
@@ -305,85 +304,6 @@ export function NewTicketPage(): React.JSX.Element {
  * The heading is the card's own label — uppercase, tracked, in `primary` — which is what
  * makes two stacked cards read as two parts of one form rather than two unrelated panels.
  */
-function FormSection({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}): React.JSX.Element {
-  return (
-    <section className="rounded-card border border-border bg-surface p-5 shadow-card">
-      <h2 className="text-label font-semibold tracking-[0.06em] text-primary uppercase">
-        {title}
-      </h2>
-      <div className="mt-5 flex flex-col gap-5">{children}</div>
-    </section>
-  )
-}
-
-interface FieldProps {
-  label: string
-  htmlFor: string
-  required?: boolean
-  error?: string
-  /** Explains a field whose behaviour is not obvious, behind an info icon. */
-  hint?: string
-  children: React.ReactNode
-}
-
-/** DESIGN.md §4, Forms: label above, error below, required marked in `danger`. */
-function Field({
-  label,
-  htmlFor,
-  required,
-  error,
-  hint,
-  children,
-}: FieldProps): React.JSX.Element {
-  return (
-    <div className="flex flex-col gap-1.5">
-      {/*
-        The hint's button is a sibling of the label, never inside it: a <label> labels
-        whatever control it wraps, so nesting the button here would make "Requester" the
-        accessible name of an info icon as well as of the field.
-      */}
-      <div className="flex items-center gap-1.5">
-        <Label htmlFor={htmlFor} className="text-field-label font-medium text-heading">
-          {label}
-          {required === true ? (
-            <span className="text-danger" aria-label="required">
-              *
-            </span>
-          ) : null}
-        </Label>
-        {hint === undefined ? null : (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  aria-label={`About the ${label.toLowerCase()} field`}
-                  className="flex rounded-full text-muted-foreground transition-colors hover:text-heading focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                />
-              }
-            >
-              <Info className="size-3.5" aria-hidden="true" />
-            </TooltipTrigger>
-            <TooltipContent>{hint}</TooltipContent>
-          </Tooltip>
-        )}
-      </div>
-      {children}
-      {error === undefined ? null : (
-        <p role="alert" className="text-caption text-danger">
-          {error}
-        </p>
-      )}
-    </div>
-  )
-}
-
 interface FormSelectProps {
   id: string
   placeholder: string

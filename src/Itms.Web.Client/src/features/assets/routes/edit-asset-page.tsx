@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/common/empty-state'
 import { ErrorState } from '@/components/common/error-state'
 import { ApiError } from '@/lib/api/client'
 import type { UpdateAssetRequest } from '@/lib/api/types'
-import { useDepartments, useLocations } from '@/features/directory/hooks/use-directory'
+import { useDepartments } from '@/features/directory/hooks/use-directory'
 import { AssetForm } from '../components/asset-form'
 import { AssetDetailSkeleton } from '../components/asset-detail-skeleton'
 import { useUpdateAsset } from '../hooks/use-asset-write'
@@ -57,7 +57,6 @@ export function EditAssetPage(): React.JSX.Element {
   const types = useAssetTypes()
   const statuses = useAssetStatuses()
   const departments = useDepartments()
-  const locations = useLocations()
 
   const update = useUpdateAsset(assetId)
 
@@ -203,7 +202,6 @@ export function EditAssetPage(): React.JSX.Element {
           types={types.data ?? []}
           statuses={statuses.data ?? []}
           departments={departments.data ?? []}
-          locations={locations.data ?? []}
         />
 
         <div className="flex items-center justify-end gap-3">

@@ -7,45 +7,63 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { pageSizeOptions } from '../lib/ticket-query'
 
-interface TicketPaginationProps {
+interface PaginationProps {
   page: number
   pageSize: number
   total: number
+  /** The page sizes this list offers. The API clamps at 200 regardless. */
+  pageSizeOptions: readonly number[]
+  /**
+   * What the rows are, plural and lower case — "tickets", "assets", "people". It is read
+   * out loud by the live region, so it is the noun a person would use rather than the
+   * entity a developer would.
+   */
+  noun: string
+  /** Distinguishes this footer's page-size control from any other on the page. */
+  idPrefix: string
   onPageChange: (page: number) => void
   onPageSizeChange: (pageSize: number) => void
 }
 
 /**
- * The queue's paging footer.
+ * The paging footer every list screen ends with.
+ *
+ * **Hoisted at WP-2.7, on the third copy.** The ticket queue wrote the first at WP-1.9 and
+ * the asset register the second at WP-2.6a, which recorded that the third — the user
+ * directory — is where it moves into `components/common`. The three differed in exactly two
+ * things, the noun and the page sizes on offer, and both are now props.
  *
  * Both the page and the page size are in the URL, so a link to page three of fifty rows
  * lands on page three of fifty rows. The range is stated in words as well as in numbers,
- * because "1–25 of 214" answers the question the two arrows only imply.
+ * because "1–25 of 512" answers the question the two arrows only imply.
  */
-export function TicketPagination({
+export function Pagination({
   page,
   pageSize,
   total,
+  pageSizeOptions,
+  noun,
+  idPrefix,
   onPageChange,
   onPageSizeChange,
-}: TicketPaginationProps): React.JSX.Element {
+}: PaginationProps): React.JSX.Element {
   const lastPage = Math.max(1, Math.ceil(total / pageSize))
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1
   const last = Math.min(page * pageSize, total)
+  const pageSizeId = `${idPrefix}-page-size`
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <p className="text-caption text-muted-foreground tabular" aria-live="polite">
         {total === 0
-          ? 'No tickets'
-          : `${String(first)}–${String(last)} of ${String(total)} tickets`}
+          ? `No ${noun}`
+          : `${String(first)}–${String(last)} of ${String(total)} ${noun}`}
       </p>
 
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <label htmlFor="page-size" className="text-caption text-muted-foreground">
+          <label htmlFor={pageSizeId} className="text-caption text-muted-foreground">
             Rows
           </label>
           <Select
@@ -57,7 +75,7 @@ export function TicketPagination({
               }
             }}
           >
-            <SelectTrigger id="page-size" size="sm" className="w-20">
+            <SelectTrigger id={pageSizeId} size="sm" className="w-20">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

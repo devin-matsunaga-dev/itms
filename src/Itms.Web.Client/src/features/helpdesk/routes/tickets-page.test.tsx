@@ -27,9 +27,12 @@ vi.mock('@/features/helpdesk/api/tickets-api', () => ({
   fetchTickets: (query: TicketQuery) => fetchTickets(query),
   fetchTicketCategories: (): Promise<TicketCategory[]> => Promise.resolve(categories),
   fetchTicketPriorities: (): Promise<TicketPriority[]> => Promise.resolve(priorities),
-  fetchDepartments: (): Promise<Department[]> => Promise.resolve(departments),
   fetchAssignableUsers: () => fetchAssignableUsers(),
   fetchTicketCounters: () => fetchTicketCounters(),
+}))
+
+vi.mock('@/features/directory/api/directory-api', () => ({
+  fetchDepartments: (): Promise<Department[]> => Promise.resolve(departments),
 }))
 
 vi.mock('@/features/auth/api/auth-api', () => ({

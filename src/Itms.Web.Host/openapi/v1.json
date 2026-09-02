@@ -194,7 +194,8 @@
         "tags": [
           "Users"
         ],
-        "summary": "Finds active users by name or email, for a picker.",
+        "summary": "Lists people, filtered by name, department, location, role, and account status.",
+        "description": "The staff directory and the product's people-picker are the same read. A blank search term lists rather than refuses, because a picker's first state is the list; deactivated accounts are excluded unless includeInactive=true, so nothing offers equipment or a ticket to somebody who can no longer sign in.",
         "operationId": "SearchUsers",
         "parameters": [
           {
@@ -205,7 +206,59 @@
             }
           },
           {
-            "name": "limit",
+            "name": "departmentId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/UserSort"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SortDirection"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
             "in": "query",
             "schema": {
               "type": "integer",
@@ -219,10 +272,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserSummary"
-                  }
+                  "$ref": "#/components/schemas/PagedResultOfUserSummary"
                 }
               }
             }
@@ -6926,6 +6976,49 @@
         },
         "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
       },
+      "PagedResultOfUserSummary": {
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserSummary"
+            },
+            "description": "The items on this page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching items across all pages.",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "description": "The 1-based page number this envelope represents.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The page size that was applied, after clamping.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.",
+            "format": "int32"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "True when a further page exists."
+          }
+        },
+        "description": "The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as\n`{ items, total, page, pageSize }`. It is a type rather than an anonymous\nobject so the shape reaches OpenAPI and, from there, the generated client."
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -8430,6 +8523,14 @@
           }
         },
         "description": "One module's count of references to a directory entry, as the API renders it."
+      },
+      "UserSort": {
+        "enum": [
+          "DisplayName",
+          "Email",
+          "CreatedAt",
+          null
+        ]
       },
       "UserSummary": {
         "required": [

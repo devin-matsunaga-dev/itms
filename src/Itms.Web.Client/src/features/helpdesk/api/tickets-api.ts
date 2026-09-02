@@ -1,8 +1,8 @@
 import { apiFetch, apiRequest } from '@/lib/api/client'
 import type {
   CreateTicketRequest,
-  Department,
   PagedTickets,
+  PagedUsers,
   TicketAssignment,
   TicketAttachment,
   TicketCategory,
@@ -50,23 +50,15 @@ export async function fetchTicketPriorities(signal?: AbortSignal): Promise<Ticke
   return page.items
 }
 
-/** Active departments, for the department filter. */
-export async function fetchDepartments(signal?: AbortSignal): Promise<Department[]> {
-  const page = await apiFetch<{ items: Department[] }>(
-    '/departments?pageSize=200',
-    signal ? { signal } : {},
-  )
-  return page.items
-}
-
 /**
  * People who can hold a ticket, for the assignee filter.
  *
  * The endpoint is Technician-guarded, so this is never called for an end user — their
  * queue is their own tickets and an assignee filter would answer nothing they can ask.
  */
-export function fetchAssignableUsers(signal?: AbortSignal): Promise<UserSummary[]> {
-  return apiFetch<UserSummary[]>('/users?limit=200', signal ? { signal } : {})
+export async function fetchAssignableUsers(signal?: AbortSignal): Promise<UserSummary[]> {
+  const page = await apiFetch<PagedUsers>('/users?pageSize=200', signal ? { signal } : {})
+  return page.items
 }
 
 /** One ticket, with the version tag a later write sends back as its precondition. */

@@ -12,7 +12,10 @@ namespace Itms.Modules.Identity.Contracts;
 /// <remarks>
 /// Every query projects straight to <see cref="UserSummary"/>, which carries no
 /// credential state at all: there is no code path here that could hand a password hash,
-/// a security stamp, or a lockout state to another module even by accident.
+/// a security stamp, or a lockout state to another module even by accident. The
+/// projection itself moved to <see cref="UserSummaryProjection"/> at WP-2.7, when the
+/// paged directory list became its second reader — it is shared rather than copied
+/// precisely so that guarantee is stated in one place.
 /// </remarks>
 /// <param name="database">The identity context.</param>
 internal sealed class UserLookupService(ItmsIdentityDbContext database) : IUserLookup
@@ -24,7 +27,7 @@ internal sealed class UserLookupService(ItmsIdentityDbContext database) : IUserL
         await database.Users
             .AsNoTracking()
             .Where(user => user.Id == userId)
-            .Select(Projection())
+            .Select(UserSummaryProjection.For(database))
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -47,7 +50,7 @@ internal sealed class UserLookupService(ItmsIdentityDbContext database) : IUserL
         return await database.Users
             .AsNoTracking()
             .Where(user => ids.Contains(user.Id))
-            .Select(Projection())
+            .Select(UserSummaryProjection.For(database))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -91,34 +94,8 @@ internal sealed class UserLookupService(ItmsIdentityDbContext database) : IUserL
         return await query
             .OrderBy(user => user.DisplayName)
             .Take(Math.Clamp(limit, 1, MaxSearchResults))
-            .Select(Projection())
+            .Select(UserSummaryProjection.For(database))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
-
-    /// <summary>
-    /// The one shape every read here projects to, so no method can widen what leaves
-    /// Identity by editing its own query.
-    /// </summary>
-    /// <remarks>
-    /// The roles come from a correlated subquery rather than a second round trip: a
-    /// picker reading fifty users would otherwise be fifty-one queries. It is an instance
-    /// method rather than a static one only because it has to close over the context to
-    /// write that subquery.
-    /// </remarks>
-    private System.Linq.Expressions.Expression<Func<Domain.ItmsUser, UserSummary>> Projection() =>
-        user => new UserSummary(
-            user.Id,
-            user.DisplayName,
-            user.Email!,
-            user.DepartmentId,
-            user.LocationId,
-            user.IsActive,
-            database.UserRoles
-                .Where(membership => membership.UserId == user.Id)
-                .Join(database.Roles, membership => membership.RoleId, role => role.Id, (_, role) => role.Name!)
-                // Ordered so the list is stable between reads; nothing depends on which
-                // role comes first, and a set that reshuffles is a diff nobody wanted.
-                .OrderBy(name => name)
-                .ToList());
 }

@@ -144,3 +144,60 @@ export type AssetSort = NonNullable<Schemas['AssetSort']>
 
 /** A location in the directory tree, for the register's location filter. */
 export type Location = Schemas['LocationResponse']
+
+/** A page of the user directory — `GET /api/v1/users` (WP-2.7). */
+export type PagedUsers = Schemas['PagedResultOfUserSummary']
+
+/** The columns the user directory may be ordered by. */
+export type UserSort = NonNullable<Schemas['UserSort']>
+
+/** A page of departments — `GET /api/v1/departments`. */
+export type PagedDepartments = Schemas['PagedResultOfDepartmentResponse']
+
+/** The body of `POST /api/v1/departments`. */
+export type CreateDepartmentRequest = Schemas['CreateDepartmentRequest']
+
+/** The body of `PUT /api/v1/departments/{id}`. */
+export type UpdateDepartmentRequest = Schemas['UpdateDepartmentRequest']
+
+/** What a department still holds, before it is retired — `GET /api/v1/departments/{id}/usage`. */
+export type DepartmentUsage = Schemas['DepartmentUsageResponse']
+
+/** What a location still holds, before it is deleted — `GET /api/v1/locations/{id}/usage`. */
+export type LocationUsage = Schemas['LocationUsageResponse']
+
+/** One module's count within a usage breakdown. */
+export type UsageCount = Schemas['UsageCountResponse']
+
+/** A page of locations. */
+export type PagedLocations = Schemas['PagedResultOfLocationResponse']
+
+/** Which level of the hierarchy a location is. */
+export type LocationKind = NonNullable<Schemas['LocationKind']>
+
+/** The body of `POST /api/v1/locations`. */
+export type CreateLocationRequest = Schemas['CreateLocationRequest']
+
+/** The body of `PUT /api/v1/locations/{id}`. */
+export type UpdateLocationRequest = Schemas['UpdateLocationRequest']
+
+/** The body of `POST /api/v1/locations/{id}/move`. */
+export type MoveLocationRequest = Schemas['MoveLocationRequest']
+
+/** A ticket the user 360 lists — the same summary an asset's support history carries. */
+export type UserTicketPage = Schemas['PagedResultOfTicketSummary']
+
+/**
+ * Whether a user's tickets are the open ones or the finished ones.
+ *
+ * Spelled here rather than taken from the contract, uniquely on this file. `TicketActivity`
+ * carries no `JsonStringEnumConverter`, so the document types it as a bare integer and the
+ * generated type is `number` — which would let any number through and say nothing about
+ * which three the server accepts. The wire value is still the name: ASP.NET Core binds an
+ * enum from a query string by name regardless of how it would be serialised in a body, and
+ * `?state=Open` is the call the endpoint documents.
+ */
+export type TicketActivity = 'All' | 'Open' | 'Past'
+
+/** Equipment a person holds — `GET /api/v1/users/{id}/assets`. */
+export type AssetSummary = Schemas['AssetSummary']

@@ -5,11 +5,11 @@ import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/common/empty-state'
 import { ErrorState } from '@/components/common/error-state'
+import { Pagination } from '@/components/common/pagination'
 import { useNow } from '@/lib/use-now'
 import type { AssetListItem, AssetSort, SortDirection } from '@/lib/api/types'
-import { useDepartments, useLocations } from '@/features/directory/hooks/use-directory'
+import { useDepartments } from '@/features/directory/hooks/use-directory'
 import { AssetFilters } from '../components/asset-filters'
-import { AssetPagination } from '../components/asset-pagination'
 import { AssetSearch } from '../components/asset-search'
 import { AssetTable } from '../components/asset-table'
 import { AssetTableSkeleton } from '../components/asset-table-skeleton'
@@ -24,6 +24,7 @@ import {
 import {
   clearedFilters,
   defaultAssetQuery,
+  pageSizeOptions,
   parseAssetQuery,
   sameAssetQuery,
   serializeAssetQuery,
@@ -66,7 +67,6 @@ export function AssetsPage(): React.JSX.Element {
   const types = useAssetTypes()
   const statuses = useAssetStatuses()
   const departments = useDepartments()
-  const locations = useLocations()
   const holders = useAssetHolders()
 
   const navigate = useCallback(
@@ -150,7 +150,6 @@ export function AssetsPage(): React.JSX.Element {
           types={types.data ?? []}
           statuses={statuses.data ?? []}
           departments={departments.data ?? []}
-          locations={locations.data ?? []}
           holders={holders.data ?? []}
           onChange={onFilterChange}
           onClear={() => {
@@ -224,10 +223,13 @@ export function AssetsPage(): React.JSX.Element {
                 />
               }
             />
-            <AssetPagination
+            <Pagination
               page={query.page}
               pageSize={query.pageSize}
               total={assets.data.total}
+              pageSizeOptions={pageSizeOptions}
+              noun="assets"
+              idPrefix="asset"
               onPageChange={(page) => {
                 navigate({ ...query, page })
               }}

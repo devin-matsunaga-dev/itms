@@ -51,6 +51,12 @@ vi.mock('@/features/assets/api/assets-api', () => ({
 vi.mock('@/features/directory/api/directory-api', () => ({
   fetchDepartments: (): Promise<Department[]> => Promise.resolve([department]),
   fetchLocations: (): Promise<Location[]> => Promise.resolve([location]),
+  // The cascading picker reads the tree a level at a time (WP-2.7). `location` is a room
+  // with no children, so it is offered at the root level and drills nowhere.
+  fetchLocationRoots: (): Promise<Location[]> => Promise.resolve([location]),
+  fetchLocationChildren: (): Promise<Location[]> => Promise.resolve([]),
+  searchLocations: (): Promise<Location[]> => Promise.resolve([location]),
+  fetchLocationAncestors: (): Promise<Location[]> => Promise.resolve([location]),
 }))
 
 function PathProbe(): React.JSX.Element {

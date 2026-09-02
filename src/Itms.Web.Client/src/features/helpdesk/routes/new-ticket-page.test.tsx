@@ -63,7 +63,6 @@ vi.mock('@/features/helpdesk/api/tickets-api', () => ({
   createTicket: (request: CreateTicketRequest) => createTicket(request),
   fetchTicketCategories: (): Promise<TicketCategory[]> => Promise.resolve(categories),
   fetchTicketPriorities: (): Promise<TicketPriority[]> => Promise.resolve(priorities),
-  fetchDepartments: (): Promise<Department[]> => Promise.resolve(departments),
   fetchAssignableUsers: () => fetchAssignableUsers(),
   fetchTicket: vi.fn(),
   fetchTickets: vi.fn(),
@@ -83,6 +82,10 @@ vi.mock('sonner', () => ({
     success: (message: string) => toastSuccess(message),
     info: vi.fn(),
   },
+}))
+
+vi.mock('@/features/directory/api/directory-api', () => ({
+  fetchDepartments: (): Promise<Department[]> => Promise.resolve(departments),
 }))
 
 vi.mock('@/features/auth/api/auth-api', () => ({

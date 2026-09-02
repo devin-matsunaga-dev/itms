@@ -4,22 +4,22 @@ import { Plus, Ticket } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { EmptyState } from '@/components/common/empty-state'
 import { ErrorState } from '@/components/common/error-state'
+import { Pagination } from '@/components/common/pagination'
 import { Button } from '@/components/ui/button'
 import { useNow } from '@/lib/use-now'
 import { hasAnyRole, Roles } from '@/lib/roles'
 import type { SortDirection, TicketListItem, TicketSort } from '@/lib/api/types'
 import { useCurrentUser } from '@/features/auth/hooks/use-current-user'
+import { useDepartments } from '@/features/directory/hooks/use-directory'
 import { TicketFilters } from '../components/ticket-filters'
 import { TicketKpiRow } from '../components/ticket-kpi-row'
 import { TicketSearch } from '../components/ticket-search'
-import { TicketPagination } from '../components/ticket-pagination'
 import { TicketTable } from '../components/ticket-table'
 import { TicketTableSkeleton } from '../components/ticket-table-skeleton'
 import { TicketToolbar } from '../components/ticket-toolbar'
 import { useTablePreferences } from '../hooks/use-table-preferences'
 import {
   useAssignableUsers,
-  useDepartments,
   useTicketCategories,
   useTicketCounters,
   useTicketPriorities,
@@ -29,6 +29,7 @@ import { endOfLocalDay } from '../lib/ticket-kpis'
 import {
   clearedFilters,
   defaultTicketQuery,
+  pageSizeOptions,
   parseTicketQuery,
   sameTicketQuery,
   serializeTicketQuery,
@@ -247,10 +248,13 @@ export function TicketsPage(): React.JSX.Element {
                 />
               }
             />
-            <TicketPagination
+            <Pagination
               page={query.page}
               pageSize={query.pageSize}
               total={tickets.data.total}
+              pageSizeOptions={pageSizeOptions}
+              noun="tickets"
+              idPrefix="ticket"
               onPageChange={(page) => {
                 navigate({ ...query, page })
               }}

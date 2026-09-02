@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api/client'
 import type { CreateAssetRequest } from '@/lib/api/types'
-import { useDepartments, useLocations } from '@/features/directory/hooks/use-directory'
+import { useDepartments } from '@/features/directory/hooks/use-directory'
 import { AssetForm } from '../components/asset-form'
 import { useCreateAsset } from '../hooks/use-asset-write'
 import { useAssetStatuses, useAssetTypes } from '../hooks/use-assets'
@@ -40,7 +40,6 @@ export function NewAssetPage(): React.JSX.Element {
   const types = useAssetTypes()
   const statuses = useAssetStatuses()
   const departments = useDepartments()
-  const locations = useLocations()
 
   const create = useCreateAsset()
 
@@ -125,7 +124,6 @@ export function NewAssetPage(): React.JSX.Element {
           types={types.data ?? []}
           statuses={statuses.data ?? []}
           departments={departments.data ?? []}
-          locations={locations.data ?? []}
         />
 
         <div className="flex items-center justify-end gap-3">

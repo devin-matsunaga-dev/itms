@@ -7,6 +7,7 @@ using Itms.Modules.Identity.Features.Auth.ChangePassword;
 using Itms.Modules.Identity.Features.Auth.CurrentUser;
 using Itms.Modules.Identity.Features.Auth.Login;
 using Itms.Modules.Identity.Features.Auth.Logout;
+using Itms.Modules.Identity.Features.Users.ListUsers;
 using Itms.Modules.Identity.Features.Users.SearchUsers;
 using Itms.Modules.Identity.Features.Users.UserPanels;
 using Itms.Modules.Identity.Persistence;
@@ -94,6 +95,7 @@ public static class IdentityModule
         services.TryAddScoped<LogoutHandler>();
         services.TryAddScoped<CurrentUserHandler>();
         services.TryAddScoped<ChangePasswordHandler>();
+        services.TryAddScoped<ListUsersHandler>();
         services.TryAddScoped<IValidator<LoginRequest>, LoginValidator>();
         services.TryAddScoped<IValidator<ChangePasswordRequest>, ChangePasswordValidator>();
 

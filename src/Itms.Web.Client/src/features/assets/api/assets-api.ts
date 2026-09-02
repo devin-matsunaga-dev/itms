@@ -7,6 +7,7 @@ import type {
   PagedAssetHistory,
   PagedAssets,
   PagedTicketSummaries,
+  PagedUsers,
   UpdateAssetRequest,
   UserSummary,
 } from '@/lib/api/types'
@@ -193,6 +194,7 @@ export async function fetchAssetStatuses(signal?: AbortSignal): Promise<AssetSta
  * `AssetEndpoints` carries about who may *perform* an assignment versus who may receive
  * one.
  */
-export function fetchAssetHolders(signal?: AbortSignal): Promise<UserSummary[]> {
-  return apiFetch<UserSummary[]>('/users?limit=200', signal ? { signal } : {})
+export async function fetchAssetHolders(signal?: AbortSignal): Promise<UserSummary[]> {
+  const page = await apiFetch<PagedUsers>('/users?pageSize=200', signal ? { signal } : {})
+  return page.items
 }

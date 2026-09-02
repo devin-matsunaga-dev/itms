@@ -1,7 +1,5 @@
-import { Info } from 'lucide-react'
 import { Controller, type UseFormReturn } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -10,10 +8,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import type { AssetStatus, AssetType, Department, Location } from '@/lib/api/types'
+import { Field, FormSection } from '@/components/common/form-section'
+import type { AssetStatus, AssetType, Department } from '@/lib/api/types'
 import { DepartmentPicker } from '@/features/helpdesk/components/department-picker'
-import { LocationPicker } from './location-picker'
+import { LocationPicker } from '@/features/directory/components/location-picker'
 import {
   assetTagMaxLength,
   barcodeMaxLength,
@@ -36,7 +34,6 @@ interface AssetFormProps {
   types: readonly AssetType[]
   statuses: readonly AssetStatus[]
   departments: readonly Department[]
-  locations: readonly Location[]
 }
 
 /**
@@ -67,7 +64,6 @@ export function AssetForm({
   types,
   statuses,
   departments,
-  locations,
 }: AssetFormProps): React.JSX.Element {
   const errors = form.formState.errors
   const editing = mode === 'edit'
@@ -230,7 +226,6 @@ export function AssetForm({
               render={({ field }) => (
                 <LocationPicker
                   id="asset-location"
-                  locations={locations}
                   value={field.value === '' ? null : field.value}
                   placeholder="Select or search a room"
                   invalid={errors.locationId !== undefined}
@@ -303,92 +298,6 @@ export function AssetForm({
         </Field>
       </FormSection>
     </>
-  )
-}
-
-/**
- * One section of the form (DESIGN.md §4).
- *
- * A second copy of `new-ticket-page.tsx`'s, deliberately: hoisting it would mean editing a
- * merged package's screen from an asset package, and the repository's rule is that the
- * third copy is the one that moves. Whichever screen writes the third — `WP-2.7`'s
- * directory forms are the likely one — should hoist all three into
- * `src/components/common/`.
- */
-function FormSection({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}): React.JSX.Element {
-  return (
-    <section className="rounded-card border border-border bg-surface p-5 shadow-card">
-      <h2 className="text-label font-semibold tracking-[0.06em] text-primary uppercase">{title}</h2>
-      <div className="mt-5 flex flex-col gap-5">{children}</div>
-    </section>
-  )
-}
-
-interface FieldProps {
-  label: string
-  htmlFor: string
-  required?: boolean
-  error?: string
-  /** Explains a field whose behaviour is not obvious, behind an info icon. */
-  hint?: string
-  children: React.ReactNode
-}
-
-/** DESIGN.md §4, Forms: label above, error below, required marked in `danger`. */
-function Field({
-  label,
-  htmlFor,
-  required,
-  error,
-  hint,
-  children,
-}: FieldProps): React.JSX.Element {
-  return (
-    <div className="flex flex-col gap-1.5">
-      {/*
-        The hint's button is a sibling of the label, never inside it: a <label> labels
-        whatever control it wraps, so nesting the button here would make the field's name
-        the accessible name of the icon too.
-      */}
-      <div className="flex items-center gap-1.5">
-        <Label htmlFor={htmlFor} className="text-field-label font-medium text-heading">
-          {label}
-          {required === true ? (
-            <span className="text-danger" aria-label="required">
-              *
-            </span>
-          ) : null}
-        </Label>
-        {hint === undefined ? null : (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  aria-label={`About the ${label.toLowerCase()} field`}
-                  className="flex rounded-full text-muted-foreground transition-colors hover:text-heading focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                />
-              }
-            >
-              <Info className="size-3.5" aria-hidden="true" />
-            </TooltipTrigger>
-            <TooltipContent>{hint}</TooltipContent>
-          </Tooltip>
-        )}
-      </div>
-      {children}
-      {error === undefined ? null : (
-        <p role="alert" className="text-caption text-danger">
-          {error}
-        </p>
-      )}
-    </div>
   )
 }
 

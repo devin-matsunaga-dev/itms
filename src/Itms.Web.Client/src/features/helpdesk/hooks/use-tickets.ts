@@ -1,6 +1,5 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type {
-  Department,
   TicketCounters,
   PagedTickets,
   TicketCategory,
@@ -10,7 +9,6 @@ import type {
 import {
   fetchAssignableUsers,
   fetchTicketCounters,
-  fetchDepartments,
   fetchTicketCategories,
   fetchTicketPriorities,
   fetchTickets,
@@ -56,14 +54,6 @@ export function useTicketPriorities(): UseQueryResult<TicketPriority[]> {
   return useQuery({
     queryKey: ['helpdesk', 'ticket-priorities'],
     queryFn: ({ signal }) => fetchTicketPriorities(signal),
-    staleTime: referenceDataStaleTime,
-  })
-}
-
-export function useDepartments(): UseQueryResult<Department[]> {
-  return useQuery({
-    queryKey: ['directory', 'departments'],
-    queryFn: ({ signal }) => fetchDepartments(signal),
     staleTime: referenceDataStaleTime,
   })
 }

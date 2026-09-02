@@ -96,7 +96,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Finds active users by name or email, for a picker. */
+        /**
+         * Lists people, filtered by name, department, location, role, and account status.
+         * @description The staff directory and the product's people-picker are the same read. A blank search term lists rather than refuses, because a picker's first state is the list; deactivated accounts are excluded unless includeInactive=true, so nothing offers equipment or a ticket to somebody who can no longer sign in.
+         */
         get: operations["SearchUsers"];
         put?: never;
         post?: never;
@@ -2181,6 +2184,37 @@ export interface components {
             /** @description True when a further page exists. */
             hasNextPage?: boolean;
         };
+        /**
+         * @description The list envelope every paged endpoint returns, fixed by ARCHITECTURE.md §6 as
+         *     `{ items, total, page, pageSize }`. It is a type rather than an anonymous
+         *     object so the shape reaches OpenAPI and, from there, the generated client.
+         */
+        PagedResultOfUserSummary: {
+            /** @description The items on this page. */
+            items: components["schemas"]["UserSummary"][];
+            /**
+             * Format: int32
+             * @description The total number of matching items across all pages.
+             */
+            total: number;
+            /**
+             * Format: int32
+             * @description The 1-based page number this envelope represents.
+             */
+            page: number;
+            /**
+             * Format: int32
+             * @description The page size that was applied, after clamping.
+             */
+            pageSize: number;
+            /**
+             * Format: int32
+             * @description The number of pages the current page size yields for int PagedResult&lt;T&gt;.Total items.
+             */
+            totalPages?: number;
+            /** @description True when a further page exists. */
+            hasNextPage?: boolean;
+        };
         ProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -3013,6 +3047,8 @@ export interface components {
              */
             count: number;
         };
+        /** @enum {unknown} */
+        UserSort: "DisplayName" | "Email" | "CreatedAt" | null;
         /**
          * @description The fields another module is allowed to know about a user. It carries no
          *     credential state of any kind — that never leaves Identity.
@@ -3227,7 +3263,14 @@ export interface operations {
         parameters: {
             query?: {
                 search?: string;
-                limit?: number;
+                departmentId?: string;
+                locationId?: string;
+                role?: string;
+                includeInactive?: boolean;
+                sort?: components["schemas"]["UserSort"];
+                direction?: components["schemas"]["SortDirection"];
+                page?: number;
+                pageSize?: number;
             };
             header?: never;
             path?: never;
@@ -3241,7 +3284,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserSummary"][];
+                    "application/json": components["schemas"]["PagedResultOfUserSummary"];
                 };
             };
             /** @description No session cookie, or the session it named has expired or been revoked. */
