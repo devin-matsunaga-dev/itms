@@ -376,10 +376,13 @@ public sealed class DirectoryUsageTests(IdentityWebFixture fixture) : IAsyncLife
     /// Moves an asset between rooms directly in the table.
     /// </summary>
     /// <remarks>
-    /// No asset edit endpoint exists — STATUS.md records it against Phase 2 as unowned —
-    /// and inventing one here would be building WP-2.6's write path inside a Directory
-    /// test. What is being asserted is Directory's behaviour when the reference goes away,
-    /// so how the reference goes away is not the subject.
+    /// <b>WP-2.6b built the asset edit endpoint this remark used to say did not exist</b>,
+    /// so <c>PUT /api/v1/assets/{id}</c> could now do this for real. It is deliberately not
+    /// swapped here: what is being asserted is Directory's behaviour when a reference goes
+    /// away, so how the reference goes away is not the subject, and rewriting a merged
+    /// package's test from an asset package is a diff nobody asked to review. Whichever
+    /// package next touches this class should make the swap. <see cref="SoftDeleteAssetAsync"/>
+    /// still has no endpoint at all — the asset delete path is unowned.
     /// </remarks>
     private static Task MoveAssetAsync(Guid assetId, Guid locationId) =>
         ExecuteAsync("UPDATE assets.assets SET location_id = @value WHERE id = @id", assetId, locationId);

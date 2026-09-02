@@ -145,6 +145,10 @@ export function asset(overrides: Partial<Asset> = {}): Asset {
     notes: 'Docking station issued with it.',
     createdAt: '2026-08-01T09:00:00Z',
     updatedAt: '2026-08-20T09:00:00Z',
+    // The two derived fields WP-2.6b added. Deployed by default, so the default asset is
+    // one the lifecycle actions have something to offer for.
+    allowedNextStatusCodes: ['in-stock', 'repair', 'retired'],
+    canBeAssigned: true,
     ...overrides,
   }
 }

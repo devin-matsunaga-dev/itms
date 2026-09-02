@@ -1,7 +1,8 @@
 import { useCallback, useMemo } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router'
-import { HardDrive } from 'lucide-react'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
+import { HardDrive, Plus } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
+import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/common/empty-state'
 import { ErrorState } from '@/components/common/error-state'
 import { useNow } from '@/lib/use-now'
@@ -45,10 +46,9 @@ import {
  * silently does nothing is worse than one that is absent, and WP-1.12 is the precedent for
  * building the endpoint first and the tiles after.
  *
- * **No "New asset" action in the header.** DESIGN.md §4 puts a screen's primary action
- * there and this screen owes one; `WP-2.6b` writes the create form it would open, and a
- * button that navigates to a route resolving to the in-shell 404 is the thing WP-1.9
- * declined to ship. The empty state says the same and offers nothing for the same reason.
+ * WP-2.6b paid the DESIGN.md §4 debt WP-2.6a recorded: the "New asset" action is in the
+ * page header, and the empty state offers the same action a second time — which §4 says are
+ * the only two places a create action appears.
  *
  * Every route behind this screen is Technician-or-Admin (SPEC.md §14), which the nav and
  * the router already enforce through one rule in `navigation.ts`. Nothing here is the
@@ -110,6 +110,10 @@ export function AssetsPage(): React.JSX.Element {
     [navigate, query],
   )
 
+  const newAsset = useCallback(() => {
+    void routerNavigate('/assets/new')
+  }, [routerNavigate])
+
   const openAsset = useCallback(
     (asset: AssetListItem) => {
       void routerNavigate(`/assets/${asset.id}`)
@@ -132,6 +136,12 @@ export function AssetsPage(): React.JSX.Element {
       <PageHeader
         title="Assets"
         subtitle="Every piece of equipment on the books, and who holds it."
+        actions={
+          <Button render={<Link to="/assets/new" />}>
+            <Plus className="size-4" aria-hidden="true" />
+            New asset
+          </Button>
+        }
       />
 
       <div className="flex flex-col gap-5">
@@ -177,7 +187,10 @@ export function AssetsPage(): React.JSX.Element {
             }
             action={
               unfiltered
-                ? undefined
+                ? // DESIGN.md §4: an empty state offers the same action a second time. It
+                  // is the register's own action, not a second way of doing something else
+                  // — which is why the filtered empty state offers Clear all instead.
+                  { label: 'Record the first asset', onClick: newAsset }
                 : {
                     label: 'Clear all',
                     onClick: () => {

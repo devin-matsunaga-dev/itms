@@ -76,6 +76,121 @@ public sealed class AssetsAuditTests(IdentityWebFixture fixture) : IAsyncLifetim
         (await ByAction("assets.asset_created")).Count.ShouldBe(before.Count);
     }
 
+    /// <summary>
+    /// WP-2.6b's one new action. An edit raises no domain event — it cannot touch the tag,
+    /// the status, or the holder — so <c>IAuditWriter</c> is the route, and the row arrives
+    /// inside the request like the create's.
+    /// </summary>
+    [Fact]
+    public async Task Correcting_an_asset_is_audited_with_the_fields_that_moved()
+    {
+        var (client, techId) = await SignedInAsync("tech");
+        using var tech = client;
+
+        var typeId = await AssetsClient.AnyTypeIdAsync(tech, Token);
+        var asset = await AssetsClient.CreateAssetAsync(tech, "LAP-0210", typeId, Token);
+
+        var response = await AssetsClient.PutAssetAsync(
+            tech,
+            asset.Id,
+            new { assetTypeId = typeId, name = "Reception desktop", vendor = "Insight" },
+            Token);
+        response.EnsureSuccessStatusCode();
+
+        var row = (await Entries("Asset", asset.Id.ToString()))
+            .Single(entry => string.Equals(entry.Action, "assets.asset_updated", StringComparison.Ordinal));
+
+        row.ActorId.ShouldBe(techId);
+        row.SourceIp.ShouldBe(IdentityWebFixture.RemoteIpAddress);
+        row.Changes["name"].ShouldBe(new(null, "Reception desktop"));
+        row.Changes["vendor"].ShouldBe(new(null, "Insight"));
+    }
+
+    /// <summary>
+    /// ARCHITECTURE.md §8 asks for changed fields only, so a field the edit left where it
+    /// was is not in the diff — otherwise a form that posts all thirteen would make every
+    /// correction look like a rewrite of the row.
+    /// </summary>
+    [Fact]
+    public async Task An_edit_records_only_what_moved_and_records_both_sides()
+    {
+        var (client, _) = await SignedInAsync("tech");
+        using var tech = client;
+
+        var typeId = await AssetsClient.AnyTypeIdAsync(tech, Token);
+        var asset = await AssetsClient.CreateDetailedAsync(
+            tech,
+            new { assetTag = "LAP-0211", assetTypeId = typeId, name = "Reception desktop", vendor = "Insight" },
+            Token);
+
+        (await AssetsClient.PutAssetAsync(
+            tech,
+            asset.Id,
+            new { assetTypeId = typeId, name = "Front desk PC", vendor = "Insight" },
+            Token)).EnsureSuccessStatusCode();
+
+        var row = (await Entries("Asset", asset.Id.ToString()))
+            .Single(entry => string.Equals(entry.Action, "assets.asset_updated", StringComparison.Ordinal));
+
+        row.Changes["name"].ShouldBe(new("Reception desktop", "Front desk PC"));
+        row.Changes.ShouldNotContainKey("vendor");
+        row.Changes.ShouldNotContainKey("assetTypeId");
+    }
+
+    /// <summary>
+    /// An edit that moves nothing writes no row: the entity leaves the asset untouched, so
+    /// an entry would be claiming a change the database cannot show.
+    /// </summary>
+    [Fact]
+    public async Task An_edit_that_moves_nothing_writes_no_audit_row()
+    {
+        var (client, _) = await SignedInAsync("tech");
+        using var tech = client;
+
+        var typeId = await AssetsClient.AnyTypeIdAsync(tech, Token);
+        var asset = await AssetsClient.CreateDetailedAsync(
+            tech,
+            new { assetTag = "LAP-0212", assetTypeId = typeId, name = "Reception desktop" },
+            Token);
+
+        (await AssetsClient.PutAssetAsync(
+            tech,
+            asset.Id,
+            new { assetTypeId = typeId, name = "Reception desktop" },
+            Token)).EnsureSuccessStatusCode();
+
+        (await ByAction("assets.asset_updated"))
+            .ShouldNotContain(entry => string.Equals(entry.EntityId, asset.Id.ToString(), StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A refused edit writes nothing, for the reason a refused create does: the write is
+    /// inside the transaction, so a rollback takes the entry with it.
+    /// </summary>
+    [Fact]
+    public async Task A_refused_edit_writes_no_audit_row()
+    {
+        var (client, _) = await SignedInAsync("tech");
+        using var tech = client;
+
+        var typeId = await AssetsClient.AnyTypeIdAsync(tech, Token);
+        await AssetsClient.CreateDetailedAsync(
+            tech,
+            new { assetTag = "LAP-0213", assetTypeId = typeId, manufacturer = "HP", serialNumber = "CND777" },
+            Token);
+        var asset = await AssetsClient.CreateAssetAsync(tech, "LAP-0214", typeId, Token);
+
+        var response = await AssetsClient.PutAssetAsync(
+            tech,
+            asset.Id,
+            new { assetTypeId = typeId, manufacturer = "HP", serialNumber = "CND777" },
+            Token);
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+
+        (await Entries("Asset", asset.Id.ToString()))
+            .ShouldNotContain(entry => string.Equals(entry.Action, "assets.asset_updated", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task Creating_a_status_records_its_code()
     {

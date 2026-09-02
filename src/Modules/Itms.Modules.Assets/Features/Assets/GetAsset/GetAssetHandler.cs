@@ -75,6 +75,11 @@ internal sealed class GetAssetHandler(AssetsDbContext database)
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return asset is null ? AssetsErrors.AssetNotFound() : asset;
+        // Filled here rather than in the projection: the two lifecycle fields are computed
+        // by AssetLifecycle, which is C# the database cannot run. Every other construction
+        // path goes through AssetResponse.From, which makes the same call itself.
+        return asset is null
+            ? AssetsErrors.AssetNotFound()
+            : asset with { Response = asset.Response.WithLifecycle() };
     }
 }

@@ -106,6 +106,18 @@ export type PagedAssets = Schemas['PagedResultOfAssetListItemResponse']
 /** One asset in full — `GET /api/v1/assets/{id}`. */
 export type Asset = Schemas['AssetResponse']
 
+/** The body of `POST /api/v1/assets`. */
+export type CreateAssetRequest = Schemas['CreateAssetRequest']
+
+/**
+ * The body of `PUT /api/v1/assets/{id}` (WP-2.6b).
+ *
+ * A full replacement of the descriptive half of an asset, which is why it carries no tag,
+ * no status, and no holder: the tag is immutable and the other two move through the
+ * lifecycle routes.
+ */
+export type UpdateAssetRequest = Schemas['UpdateAssetRequest']
+
 /** One line of an asset's timeline — `GET /api/v1/assets/{id}/history`. */
 export type AssetHistoryEntry = Schemas['AssetHistoryEntryResponse']
 

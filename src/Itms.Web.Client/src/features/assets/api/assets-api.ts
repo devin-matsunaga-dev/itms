@@ -1,11 +1,13 @@
-import { apiFetch } from '@/lib/api/client'
+import { apiFetch, apiRequest } from '@/lib/api/client'
 import type {
   Asset,
   AssetStatus,
   AssetType,
+  CreateAssetRequest,
   PagedAssetHistory,
   PagedAssets,
   PagedTicketSummaries,
+  UpdateAssetRequest,
   UserSummary,
 } from '@/lib/api/types'
 import { serializeAssetQuery, type AssetQuery } from '../lib/asset-query'
@@ -26,17 +28,100 @@ export function fetchAssets(query: AssetQuery, signal?: AbortSignal): Promise<Pa
   return apiFetch<PagedAssets>(`/assets?${params.toString()}`, signal ? { signal } : {})
 }
 
+/** One asset, with the version tag every write on its screen sends back as `If-Match`. */
+export interface AssetRead {
+  readonly asset: Asset
+  /** The response's `ETag`, or null if it carried none. Opaque — never parsed. */
+  readonly etag: string | null
+}
+
 /**
  * One asset in full.
  *
- * `GET /assets/{id}` answers with an `ETag` naming the row's version, and this read
- * deliberately drops it: nothing on a read-only screen has a precondition to state.
- * **`WP-2.6b` is where that changes** — its lifecycle calls each honour an `If-Match`, so
- * it swaps this to `apiRequest` and carries the tag through the hook, the way
- * `fetchTicket` already does.
+ * The `ETag` is kept because every write on the detail screen sends it back as `If-Match`:
+ * ARCHITECTURE.md §6 asks for optimistic concurrency on assets as well as tickets, and
+ * WP-2.1 and WP-2.2 built the header surface for exactly this. A caller holding a stale
+ * copy is refused with 412 **before** the change is attempted, instead of losing a race and
+ * finding out through a 409. WP-2.6a dropped the tag deliberately, because a read-only
+ * screen has no precondition to state; WP-2.6b is where that stopped being true.
  */
-export function fetchAsset(id: string, signal?: AbortSignal): Promise<Asset> {
-  return apiFetch<Asset>(`/assets/${id}`, signal ? { signal } : {})
+export async function fetchAsset(id: string, signal?: AbortSignal): Promise<AssetRead> {
+  const result = await apiRequest<Asset>(`/assets/${id}`, signal ? { signal } : {})
+  return { asset: result.data, etag: result.etag }
+}
+
+/**
+ * Records a new asset.
+ *
+ * The reply is the asset itself, so the screen can go straight to its detail page. No
+ * `ETag` is carried through: the detail route reads the asset again and picks up the tag
+ * its own writes will need, which is the call `useCreateTicket` already made.
+ */
+export function createAsset(request: CreateAssetRequest): Promise<Asset> {
+  return apiFetch<Asset>('/assets', { method: 'POST', body: request })
+}
+
+/**
+ * Corrects an asset.
+ *
+ * A full replacement of the descriptive half: the form posts every field it holds, and a
+ * field sent as null is cleared. The tag, the status and the holder are not in the shape at
+ * all — the tag is immutable and the other two move through the lifecycle calls below.
+ */
+export function updateAsset(
+  id: string,
+  request: UpdateAssetRequest,
+  etag: string | null,
+): Promise<Asset> {
+  return apiFetch<Asset>(`/assets/${id}`, { method: 'PUT', body: request, ...ifMatch(etag) })
+}
+
+/**
+ * Issues an asset to somebody, transfers it, or takes it back.
+ *
+ * One route for all three (WP-2.2), the way a ticket's assignment is: a null
+ * `assignedToUserId` is a deliberate instruction to take the asset back, not an omitted
+ * field.
+ */
+export function assignAsset(
+  id: string,
+  assignedToUserId: string | null,
+  note: string | null,
+  etag: string | null,
+): Promise<Asset> {
+  return apiFetch<Asset>(`/assets/${id}/assignments`, {
+    method: 'POST',
+    body: { assignedToUserId, note },
+    ...ifMatch(etag),
+  })
+}
+
+/** The three lifecycle routes that name no other party — repair, return to service, retire. */
+export type AssetLifecycleRoute = 'repairs' | 'returns-to-service' | 'retirements'
+
+/**
+ * Moves an asset through its lifecycle.
+ *
+ * One function for the three routes that differ only in their segment, matching the server,
+ * where `MapLifecycle` maps them from one place for the same reason: written out three
+ * times, the third copy is where the `If-Match` goes missing.
+ */
+export function moveAsset(
+  id: string,
+  route: AssetLifecycleRoute,
+  note: string | null,
+  etag: string | null,
+): Promise<Asset> {
+  return apiFetch<Asset>(`/assets/${id}/${route}`, {
+    method: 'POST',
+    body: { note },
+    ...ifMatch(etag),
+  })
+}
+
+/** The precondition header, when a version is in hand. */
+function ifMatch(etag: string | null): { headers?: Record<string, string> } {
+  return etag === null ? {} : { headers: { 'If-Match': etag } }
 }
 
 /**

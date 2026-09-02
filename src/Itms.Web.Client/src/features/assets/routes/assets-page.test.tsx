@@ -45,8 +45,13 @@ function page(items: PagedAssets['items'], total = items.length): PagedAssets {
 
 /** Reports the address the screen has navigated to, so the URL can be asserted on. */
 function AddressProbe(): React.JSX.Element {
-  const { search } = useLocation()
-  return <output data-testid="address">{search}</output>
+  const { pathname, search } = useLocation()
+  return (
+    <>
+      <output data-testid="address">{search}</output>
+      <output data-testid="path">{pathname}</output>
+    </>
+  )
 }
 
 function renderRegister(route = '/assets') {
@@ -61,9 +66,16 @@ function renderRegister(route = '/assets') {
           </>
         }
       />
+      {/* The create form itself is `new-asset-page.test.tsx`'s; here it only has to be
+          somewhere for the register's two create actions to land. */}
+      <Route path="/assets/new" element={<AddressProbe />} />
     </Routes>,
     { route },
   )
+}
+
+function path(): string {
+  return screen.getByTestId('path').textContent ?? ''
 }
 
 function address(): string {
@@ -196,14 +208,28 @@ describe('AssetsPage', () => {
     })
   })
 
-  it('says the register is empty when nothing has been recorded, and offers no action', async () => {
-    // `WP-2.6b` writes the create form. A button navigating to a route that resolves to
-    // the in-shell 404 is what WP-1.9 declined to ship.
+  /**
+   * DESIGN.md §4: a screen's primary action sits in its page header, and the empty state
+   * offers the same action a second time. Those are the only two places it appears — the
+   * debt WP-2.6a recorded and WP-2.6b paid.
+   */
+  it('offers the create action in the header', async () => {
+    renderRegister()
+
+    const action = await screen.findByRole('link', { name: /new asset/i })
+    expect(action).toHaveAttribute('href', '/assets/new')
+  })
+
+  it('says the register is empty when nothing has been recorded, and offers the create action', async () => {
     fetchAssets.mockResolvedValue(page([]))
     renderRegister()
 
     expect(await screen.findByText('No assets yet')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /record the first asset/i })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /record the first asset/i }))
+    await waitFor(() => {
+      expect(path()).toBe('/assets/new')
+    })
   })
 
   it('distinguishes an empty register from an over-narrowed one, and offers to clear', async () => {

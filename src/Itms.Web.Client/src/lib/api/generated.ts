@@ -892,7 +892,11 @@ export interface paths {
          * @description Carries an ETag naming the asset's current version. Send it back as If-Match on a lifecycle call to be told the asset has moved before the change is attempted.
          */
         get: operations["GetAsset"];
-        put?: never;
+        /**
+         * Corrects an asset's descriptive facts.
+         * @description A full replacement of what the asset is, where it belongs, and what it cost: a field left out of the body is cleared, not left alone. The tag, the status, and the holder are not part of this shape — the tag is immutable (invariant 4) and the other two move through the lifecycle routes, which write history and raise events. Send the asset's ETag as If-Match to be refused with 412 if it has moved since you read it.
+         */
+        put: operations["UpdateAsset"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1238,6 +1242,14 @@ export interface components {
              * @description When it was last changed (UTC).
              */
             updatedAt: string;
+            /**
+             * @description The status codes this asset may legally be moved to next, straight from
+             *     IReadOnlyCollection&lt;string&gt; AssetLifecycle.DestinationsFrom(string from). Empty from a terminal status, and
+             *     empty from a custom status the lifecycle table does not know.
+             */
+            allowedNextStatusCodes?: string[];
+            /** @description Whether this asset may be issued to somebody, transferred, or taken back. */
+            canBeAssigned?: boolean;
         };
         /** @enum {unknown} */
         AssetSort: "AssetTag" | "CreatedAt" | "UpdatedAt" | "WarrantyExpiresAt" | "Status" | null;
@@ -2869,6 +2881,53 @@ export interface components {
              * @description When it was closed (UTC), or `null`.
              */
             closedAt: null | string;
+        };
+        /** @description The fields an existing asset may be corrected to. */
+        UpdateAssetRequest: {
+            /**
+             * Format: uuid
+             * @description What kind of thing it is. Required.
+             */
+            assetTypeId: string;
+            /** @description A human label, or `null`. */
+            name: null | string;
+            /** @description The manufacturer's serial, where it has one. */
+            serialNumber: null | string;
+            /** @description A second scannable identifier, where the organisation uses one. */
+            barcode: null | string;
+            /** @description Who made it. */
+            manufacturer: null | string;
+            /** @description What they call it. */
+            model: null | string;
+            /**
+             * Format: uuid
+             * @description The department that owns it.
+             */
+            departmentId: null | string;
+            /**
+             * Format: uuid
+             * @description Where it is.
+             */
+            locationId: null | string;
+            /**
+             * Format: date
+             * @description When it was bought.
+             */
+            purchaseDate: null | string;
+            /**
+             * Format: date
+             * @description When the warranty runs out.
+             */
+            warrantyExpiresAt: null | string;
+            /** @description Who it was bought from. */
+            vendor: null | string;
+            /**
+             * Format: double
+             * @description What it cost, in the deployment's own currency — there is only one.
+             */
+            cost: null | number;
+            /** @description Anything else worth recording. */
+            notes: null | string;
         };
         /** @description The fields an asset status is edited to. */
         UpdateAssetStatusRequest: {
@@ -6040,6 +6099,84 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAssetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No session cookie, or the session it named has expired or been revoked. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
                 headers: {
                     [name: string]: unknown;
                 };

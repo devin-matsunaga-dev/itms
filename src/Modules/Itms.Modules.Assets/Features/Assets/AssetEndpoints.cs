@@ -9,6 +9,7 @@ using Itms.Modules.Assets.Features.Assets.ListAssetTickets;
 using Itms.Modules.Assets.Features.Assets.RetireAsset;
 using Itms.Modules.Assets.Features.Assets.ReturnAssetToService;
 using Itms.Modules.Assets.Features.Assets.SendAssetForRepair;
+using Itms.Modules.Assets.Features.Assets.UpdateAsset;
 using Itms.Platform.Http;
 using Itms.Platform.Identity;
 using Itms.Platform.Paging;
@@ -44,7 +45,13 @@ namespace Itms.Modules.Assets.Features.Assets;
 /// <c>ITicketLookup</c> because Assets may not touch the helpdesk schema.
 /// </para>
 /// <para>
-/// <b>The four writes are the five lifecycle operations SPEC.md §3 names.</b> Assignment
+/// <b>The edit is the one write that is not a lifecycle operation.</b> WP-2.6b added
+/// <c>PUT</c> so the asset register has a correction path at all: it moves the
+/// descriptive half of an asset and cannot touch the tag, the status, or the holder.
+/// It honours the same <c>If-Match</c> the lifecycle routes do.
+/// </para>
+/// <para>
+/// <b>The four lifecycle writes are the five operations SPEC.md §3 names.</b> Assignment
 /// and transfer share a route because they are the same fact — who holds this — with and
 /// without a from-value. Each answers with the asset and an <c>ETag</c>, and each honours
 /// an <c>If-Match</c>: two technicians looking at the same asset screen must not be able
@@ -193,6 +200,39 @@ internal static class AssetEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group
+            .MapPut("/{id:guid}", async (
+                Guid id,
+                UpdateAssetRequest request,
+                UpdateAssetHandler handler,
+                HttpContext context,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await handler
+                    .HandleAsync(id, request, AssetETag.PreconditionFrom(context.Request), cancellationToken)
+                    .ConfigureAwait(false);
+
+                return WithETag(result, context);
+            })
+            .RequireAuthorization(ItmsPolicies.Technician)
+            .AddEndpointFilter<AntiforgeryFilter>()
+            .WithValidation<UpdateAssetRequest>()
+            .WithName("UpdateAsset")
+            .WithSummary("Corrects an asset's descriptive facts.")
+            .WithDescription(
+                "A full replacement of what the asset is, where it belongs, and what it cost: a "
+                + "field left out of the body is cleared, not left alone. The tag, the status, and "
+                + "the holder are not part of this shape — the tag is immutable (invariant 4) and "
+                + "the other two move through the lifecycle routes, which write history and raise "
+                + "events. Send the asset's ETag as If-Match to be refused with 412 if it has "
+                + "moved since you read it.")
+            .Produces<AssetResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed);
 
         group
             .MapPost("/{id:guid}/assignments", async (

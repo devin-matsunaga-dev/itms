@@ -1,14 +1,6 @@
 import { SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import {
-  Combobox,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-} from '@/components/ui/combobox'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover'
 import {
@@ -25,6 +17,7 @@ import type {
   Location,
   UserSummary,
 } from '@/lib/api/types'
+import { LocationPicker } from './location-picker'
 import {
   activeWarrantyOption,
   advancedFilterCount,
@@ -216,6 +209,7 @@ export function AssetFilters({
                 id="filter-asset-location"
                 locations={locations}
                 value={query.locationId}
+                placeholder="Any location"
                 onValueChange={(locationId) => {
                   onChange({ locationId })
                 }}
@@ -362,52 +356,3 @@ function PanelSelect({
   )
 }
 
-interface LocationPickerProps {
-  id: string
-  locations: readonly Location[]
-  /** The chosen location's id, or null for no filter. */
-  value: string | null
-  onValueChange: (locationId: string | null) => void
-}
-
-/**
- * The location field: type to narrow, or open it and pick.
- *
- * The label is the room's full `path`, not its name — three buildings can each have a
- * "Server Room", and a picker offering that word three times is one nobody can use. The
- * path is also what the register's own Location column renders, so the filter and the rows
- * read the same way.
- *
- * Clearing it is a real answer: the clear button writes null, which is "no filter on the
- * location" and is what removes the parameter from the address.
- */
-function LocationPicker({
-  id,
-  locations,
-  value,
-  onValueChange,
-}: LocationPickerProps): React.JSX.Element {
-  const items = locations.map((location) => ({ value: location.id, label: location.path }))
-
-  return (
-    <Combobox
-      items={items}
-      value={items.find((item) => item.value === value) ?? null}
-      onValueChange={(next: { value: string; label: string } | null) => {
-        onValueChange(next?.value ?? null)
-      }}
-    >
-      <ComboboxInput id={id} showClear placeholder="Any location" />
-      <ComboboxContent>
-        <ComboboxEmpty>No location matches that.</ComboboxEmpty>
-        <ComboboxList>
-          {(item: { value: string; label: string }) => (
-            <ComboboxItem key={item.value} value={item}>
-              {item.label}
-            </ComboboxItem>
-          )}
-        </ComboboxList>
-      </ComboboxContent>
-    </Combobox>
-  )
-}

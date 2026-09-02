@@ -24,6 +24,7 @@ using Itms.Modules.Assets.Features.Assets.ListAssetTickets;
 using Itms.Modules.Assets.Features.Assets.RetireAsset;
 using Itms.Modules.Assets.Features.Assets.ReturnAssetToService;
 using Itms.Modules.Assets.Features.Assets.SendAssetForRepair;
+using Itms.Modules.Assets.Features.Assets.UpdateAsset;
 using Itms.Modules.Assets.Persistence;
 using Itms.Platform.Data;
 using Microsoft.AspNetCore.Routing;
@@ -91,6 +92,7 @@ public static class AssetsModule
         services.TryAddScoped<SetAssetStatusActivationHandler>();
 
         services.TryAddScoped<CreateAssetHandler>();
+        services.TryAddScoped<UpdateAssetHandler>();
         services.TryAddScoped<GetAssetHandler>();
         services.TryAddScoped<ListAssetsHandler>();
         services.TryAddScoped<ListAssetHistoryHandler>();
@@ -112,6 +114,7 @@ public static class AssetsModule
         services.TryAddScoped<IValidator<CreateAssetStatusRequest>, CreateAssetStatusValidator>();
         services.TryAddScoped<IValidator<UpdateAssetStatusRequest>, UpdateAssetStatusValidator>();
         services.TryAddScoped<IValidator<CreateAssetRequest>, CreateAssetValidator>();
+        services.TryAddScoped<IValidator<UpdateAssetRequest>, UpdateAssetValidator>();
         services.TryAddScoped<IValidator<AssignAssetRequest>, AssignAssetValidator>();
         services.TryAddScoped<IValidator<AssetLifecycleRequest>, AssetLifecycleRequestValidator>();
 

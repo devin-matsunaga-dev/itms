@@ -50,6 +50,22 @@ internal static class AssetsAudit
     /// <summary>An asset was recorded.</summary>
     public const string AssetCreated = "assets.asset_created";
 
+    /// <summary>
+    /// An asset's descriptive facts were corrected — what it is, where it belongs, what it
+    /// cost.
+    /// </summary>
+    /// <remarks>
+    /// <b>Not a lifecycle move, and that is why it belongs in this file at all.</b>
+    /// <c>PUT /api/v1/assets/{id}</c> cannot touch the tag, the status, or the holder
+    /// (see <c>AssetEdit</c>), so it raises none of the two events ARCHITECTURE.md §5
+    /// names and there is nothing for the Audit module's consumers to derive an entry
+    /// from. That makes it exactly the "mutation that does not warrant a domain event"
+    /// §8 keeps <c>IAuditWriter</c> for, and it does <em>not</em> re-open the trap the
+    /// paragraph above warns about — the trap is adding a writer beside a publish, and
+    /// this write publishes nothing.
+    /// </remarks>
+    public const string AssetUpdated = "assets.asset_updated";
+
     /// <summary>An asset type was created.</summary>
     public const string AssetTypeCreated = "assets.asset_type_created";
 

@@ -45,7 +45,16 @@ public sealed record AssetStatusDto(
 /// <param name="DepartmentName">That department's cached name.</param>
 /// <param name="LocationId">Where it is.</param>
 /// <param name="LocationPath">That location's cached full path.</param>
+/// <param name="Barcode">A second scannable identifier.</param>
+/// <param name="PurchaseDate">When it was bought.</param>
+/// <param name="WarrantyExpiresAt">When the warranty runs out.</param>
+/// <param name="Vendor">Who it was bought from.</param>
 /// <param name="Cost">What it cost.</param>
+/// <param name="Notes">Anything else worth recording.</param>
+/// <param name="AllowedNextStatusCodes">
+/// The lifecycle destinations legal from where the asset stands (WP-2.6b).
+/// </param>
+/// <param name="CanBeAssigned">Whether the asset may be issued, transferred, or taken back (WP-2.6b).</param>
 public sealed record AssetDto(
     Guid Id,
     string AssetTag,
@@ -64,7 +73,14 @@ public sealed record AssetDto(
     string? DepartmentName,
     Guid? LocationId,
     string? LocationPath,
-    decimal? Cost);
+    string? Barcode,
+    DateOnly? PurchaseDate,
+    DateOnly? WarrantyExpiresAt,
+    string? Vendor,
+    decimal? Cost,
+    string? Notes,
+    IReadOnlyList<string> AllowedNextStatusCodes,
+    bool CanBeAssigned);
 
 /// <summary>One row of the asset list as the suite reads it off the wire.</summary>
 /// <remarks>
@@ -184,6 +200,51 @@ public static class AssetsClient
 
         response.EnsureSuccessStatusCode();
         return await ApiClient.ReadAsync<AssetDto>(response, cancellationToken);
+    }
+
+    /// <summary>
+    /// Corrects an asset, optionally stating an <c>If-Match</c> precondition.
+    /// </summary>
+    /// <remarks>
+    /// Built by hand rather than through <c>ApiClient.SendAsync</c> for the reason
+    /// <see cref="LifecycleAsync"/> is: that helper has nowhere to put a header, and a test
+    /// has to be able to attach a deliberately stale or malformed tag.
+    /// </remarks>
+    /// <param name="client">A technician or admin client.</param>
+    /// <param name="assetId">The asset to correct.</param>
+    /// <param name="body">The request body.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="ifMatch">The entity tag to require, or null to state no precondition.</param>
+    /// <returns>The raw response.</returns>
+    public static async Task<HttpResponseMessage> PutAssetAsync(
+        HttpClient client,
+        Guid assetId,
+        object body,
+        CancellationToken cancellationToken,
+        string? ifMatch = null)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(body);
+
+        var request = new HttpRequestMessage(HttpMethod.Put, $"{Assets}/{assetId}")
+        {
+            Content = JsonContent.Create(body, body.GetType(), options: Json),
+        };
+
+        if (ifMatch is not null)
+        {
+            // Added without validation, so a test can send a deliberately malformed tag.
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        var csrf = await client.GetFromJsonAsync<CsrfDto>(
+            new Uri("/api/v1/auth/csrf", UriKind.Relative),
+            Json,
+            cancellationToken)
+            ?? throw new InvalidOperationException("No antiforgery token was issued.");
+
+        request.Headers.Add(csrf.HeaderName, csrf.Token);
+        return await client.SendAsync(request, cancellationToken);
     }
 
     /// <summary>Creates an asset type and returns it, failing loudly if the call did not succeed.</summary>

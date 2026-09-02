@@ -8,7 +8,9 @@ import { TicketsPage } from '@/features/helpdesk/routes/tickets-page'
 import { NewTicketPage } from '@/features/helpdesk/routes/new-ticket-page'
 import { TicketDetailPage } from '@/features/helpdesk/routes/ticket-detail-page'
 import { AssetsPage } from '@/features/assets/routes/assets-page'
+import { NewAssetPage } from '@/features/assets/routes/new-asset-page'
 import { AssetDetailPage } from '@/features/assets/routes/asset-detail-page'
+import { EditAssetPage } from '@/features/assets/routes/edit-asset-page'
 import { UsersPage } from '@/features/users/routes/users-page'
 import { MonitoringPage } from '@/features/monitoring/routes/monitoring-page'
 import { AlertsPage } from '@/features/alerts/routes/alerts-page'
@@ -39,11 +41,16 @@ export function AppRoutes(): React.JSX.Element {
           <Route path="tickets/new" element={guarded('/tickets', <NewTicketPage />)} />
           <Route path="tickets/:id" element={guarded('/tickets', <TicketDetailPage />)} />
           <Route path="assets" element={guarded('/assets', <AssetsPage />)} />
+          {/* The create form takes the register's nav role rule, like every other asset
+              route — and like `tickets/new`, it sits before the `:id` route so a literal
+              "new" is never read as an asset id. */}
+          <Route path="assets/new" element={guarded('/assets', <NewAssetPage />)} />
           {/* The asset detail takes the register's nav entry role rule — Technician and
               Admin — because every asset route is Technician-or-Admin server-side
               (SPEC.md §14). An end user's "what am I holding" view is WP-2.7's user page,
               which answers a different question through a different route. */}
           <Route path="assets/:id" element={guarded('/assets', <AssetDetailPage />)} />
+          <Route path="assets/:id/edit" element={guarded('/assets', <EditAssetPage />)} />
           <Route path="users" element={guarded('/users', <UsersPage />)} />
           <Route path="monitoring" element={guarded('/monitoring', <MonitoringPage />)} />
           <Route path="alerts" element={guarded('/alerts', <AlertsPage />)} />

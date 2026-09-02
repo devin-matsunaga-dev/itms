@@ -1,6 +1,5 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type {
-  Asset,
   AssetStatus,
   AssetType,
   PagedAssetHistory,
@@ -10,6 +9,7 @@ import type {
 } from '@/lib/api/types'
 import {
   fetchAsset,
+  type AssetRead,
   fetchAssetHistory,
   fetchAssetHolders,
   fetchAssetStatuses,
@@ -41,13 +41,13 @@ export function useAssets(query: AssetQuery): UseQueryResult<PagedAssets> {
 }
 
 /**
- * One asset in full.
+ * One asset in full, with the version tag every write on its screen sends as `If-Match`.
  *
- * `staleTime` is zero, unlike the register's: `WP-2.6b` puts the lifecycle actions on
- * this screen, and a cached copy of the state before an issue or a retirement is the one
- * thing a detail screen must never show.
+ * `staleTime` is zero, unlike the register's: the lifecycle actions live on this screen,
+ * and a cached copy of the state before an issue or a retirement is the one thing a detail
+ * screen must never show.
  */
-export function useAsset(id: string): UseQueryResult<Asset> {
+export function useAsset(id: string): UseQueryResult<AssetRead> {
   return useQuery({
     queryKey: assetKeys.detail(id),
     queryFn: ({ signal }) => fetchAsset(id, signal),

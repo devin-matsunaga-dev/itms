@@ -1,5 +1,7 @@
+import { useCallback } from 'react'
 import { Navigate, useParams } from 'react-router'
 import { History, HardDrive } from 'lucide-react'
+import { toast } from 'sonner'
 import { PageHeader } from '@/components/layout/page-header'
 import { Panel } from '@/components/common/panel'
 import { EmptyState } from '@/components/common/empty-state'
@@ -9,11 +11,19 @@ import { useNow } from '@/lib/use-now'
 import { formatDateTime } from '@/lib/datetime'
 import { AssetDetailHeader } from '../components/asset-detail-header'
 import { AssetDetailSkeleton } from '../components/asset-detail-skeleton'
+import { AssetLifecycleActions } from '../components/asset-lifecycle-actions'
 import { AssetProperties } from '../components/asset-properties'
 import { AssetTicketsPanel } from '../components/asset-tickets-panel'
 import { AssetTimeline } from '../components/asset-timeline'
 import { assetTitle } from '../lib/asset-display'
-import { useAsset, useAssetHistory, useAssetTickets } from '../hooks/use-assets'
+import type { AssetAction } from '../lib/asset-lifecycle'
+import { useAssignAsset, useMoveAsset } from '../hooks/use-asset-write'
+import {
+  useAsset,
+  useAssetHistory,
+  useAssetHolders,
+  useAssetTickets,
+} from '../hooks/use-assets'
 
 /**
  * One asset, in full (WP-2.6a).
@@ -26,16 +36,28 @@ import { useAsset, useAssetHistory, useAssetTickets } from '../hooks/use-assets'
  * means the timeline failing does not take the asset down with it — each panel says what
  * it could not load and the rest of the screen still reads.
  *
- * ## What is not here yet
+ * ## Concurrency
  *
- * **No lifecycle actions and no edit.** `WP-2.6b` owns assign, transfer, repair, return to
- * service, and retire, along with the create and edit forms — and, with them, the server
- * additions those need: the `PUT /assets/{id}` write path, which does not exist yet, and
- * the legal-destination list that lets an illegal action be *absent* rather than disabled
- * in place. That list is `AssetLifecycle.DestinationsFrom` server-side, and its own doc
- * comment asks the UI to read it rather than restate the table in TypeScript. Until it is
- * over the wire there is nothing here that could render those buttons honestly, so this
- * screen renders none.
+ * Every write here sends the `ETag` the detail was read at as `If-Match` (WP-2.6b).
+ * ARCHITECTURE.md §6 asks for optimistic concurrency on assets as well as tickets, and
+ * WP-2.1 and WP-2.2 built the header surface for this screen specifically. With the
+ * precondition, a stale copy is refused with **412 before the move is attempted**; without
+ * it the second technician would find out from a 409 after losing a race. Both carry
+ * `assets.asset_conflict`, and both are handled the same way — say the asset moved, and
+ * reload it.
+ *
+ * ## Why every write refetches
+ *
+ * A lifecycle response is the asset as it now stands, but the timeline beside it has also
+ * changed — issuing equipment out of stock writes two history lines — and the response
+ * carries no new `ETag` for the *read*, which the next write needs. One invalidation
+ * answers both. `use-asset-write.ts` holds it.
+ *
+ * ## What decides which actions appear
+ *
+ * The server does. `allowedNextStatusCodes` and `canBeAssigned` come off the asset, and
+ * `asset-lifecycle.ts` turns them into buttons — so an illegal action is absent rather than
+ * disabled, and `AssetLifecycle`'s table is never written a second time in TypeScript.
  */
 export function AssetDetailPage(): React.JSX.Element {
   const { id } = useParams<{ id: string }>()
@@ -45,6 +67,55 @@ export function AssetDetailPage(): React.JSX.Element {
   const detail = useAsset(assetId)
   const history = useAssetHistory(assetId)
   const tickets = useAssetTickets(assetId)
+  const holders = useAssetHolders()
+
+  const assign = useAssignAsset(assetId)
+  const move = useMoveAsset(assetId)
+  const busy = assign.isPending || move.isPending
+
+  const etag = detail.data?.etag ?? null
+
+  /**
+   * A stale write and an ordinary failure read differently to the person in front of them:
+   * one means "somebody else got there first, look again", the other means "that did not
+   * happen". The screen has already been told to refetch by the mutation's `onSettled`, so
+   * the message is all that is left to get right.
+   */
+  const reportFailure = useCallback((error: unknown, whatFailed: string) => {
+    if (error instanceof ApiError && (error.status === 412 || error.status === 409)) {
+      toast.error('This asset changed while you were reading it.', {
+        description: 'It has been reloaded. Check what happened and try again.',
+      })
+      return
+    }
+
+    toast.error(whatFailed, {
+      description: error instanceof Error ? error.message : undefined,
+    })
+  }, [])
+
+  const onAct = useCallback(
+    (action: AssetAction, holderId: string | null, note: string | null) => {
+      const done = {
+        onSuccess: (result: { assetTag: string }) => {
+          toast.success(`${result.assetTag} ${action.outcome}.`)
+        },
+        onError: (error: unknown) => {
+          reportFailure(error, `The asset could not be ${action.outcome}.`)
+        },
+      }
+
+      // The three assignment acts share a route and are told apart by what they send: a
+      // person for an issue or a transfer, and null for a return (WP-2.2).
+      if (action.route === null) {
+        assign.mutate({ assignedToUserId: holderId, note, etag }, done)
+        return
+      }
+
+      move.mutate({ route: action.route, note, etag }, done)
+    },
+    [assign, etag, move, reportFailure],
+  )
 
   if (id === undefined) {
     return <Navigate to="/assets" replace />
@@ -86,7 +157,7 @@ export function AssetDetailPage(): React.JSX.Element {
     )
   }
 
-  const asset = detail.data
+  const asset = detail.data.asset
 
   return (
     <>
@@ -94,6 +165,14 @@ export function AssetDetailPage(): React.JSX.Element {
         title={assetTitle(asset)}
         subtitle={`${asset.assetTag} · ${asset.assetTypeName} · Recorded ${formatDateTime(asset.createdAt)}`}
         back={backToAssets}
+        actions={
+          <AssetLifecycleActions
+            asset={asset}
+            holders={holders.data ?? []}
+            busy={busy}
+            onAct={onAct}
+          />
+        }
       />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">

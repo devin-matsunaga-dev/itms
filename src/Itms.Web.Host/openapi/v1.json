@@ -4226,6 +4226,103 @@
         "security": [
           { }
         ]
+      },
+      "put": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Corrects an asset's descriptive facts.",
+        "description": "A full replacement of what the asset is, where it belongs, and what it cost: a field left out of the body is cleared, not left alone. The tag, the status, and the holder are not part of this shape — the tag is immutable (invariant 4) and the other two move through the lifecycle routes, which write history and raise events. Send the asset's ETag as If-Match to be refused with 412 if it has moved since you read it.",
+        "operationId": "UpdateAsset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or the session it named has expired or been revoked."
+          }
+        },
+        "security": [
+          { }
+        ]
       }
     },
     "/api/v1/assets/{id}/history": {
@@ -5228,6 +5325,17 @@
             "type": "string",
             "description": "When it was last changed (UTC).",
             "format": "date-time"
+          },
+          "allowedNextStatusCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The status codes this asset may legally be moved to next, straight from\nIReadOnlyCollection&lt;string&gt; AssetLifecycle.DestinationsFrom(string from). Empty from a terminal status, and\nempty from a custom status the lifecycle table does not know."
+          },
+          "canBeAssigned": {
+            "type": "boolean",
+            "description": "Whether this asset may be issued to somebody, transferred, or taken back."
           }
         },
         "description": "An asset as the API renders it."
@@ -8018,6 +8126,121 @@
           }
         },
         "description": "The fields another module is allowed to know about a ticket. Flat and small for the\nsame reason AssetSummary is: it is a display and reference projection,\nand no module outside Helpdesk should be able to reason about the state machine,\nthe SLA arithmetic, or the conversation from it."
+      },
+      "UpdateAssetRequest": {
+        "required": [
+          "assetTypeId",
+          "name",
+          "serialNumber",
+          "barcode",
+          "manufacturer",
+          "model",
+          "departmentId",
+          "locationId",
+          "purchaseDate",
+          "warrantyExpiresAt",
+          "vendor",
+          "cost",
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "assetTypeId": {
+            "type": "string",
+            "description": "What kind of thing it is. Required.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "A human label, or `null`."
+          },
+          "serialNumber": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The manufacturer's serial, where it has one."
+          },
+          "barcode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "A second scannable identifier, where the organisation uses one."
+          },
+          "manufacturer": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who made it."
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What they call it."
+          },
+          "departmentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The department that owns it.",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Where it is.",
+            "format": "uuid"
+          },
+          "purchaseDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was bought.",
+            "format": "date"
+          },
+          "warrantyExpiresAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the warranty runs out.",
+            "format": "date"
+          },
+          "vendor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who it was bought from."
+          },
+          "cost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "What it cost, in the deployment's own currency — there is only one.",
+            "format": "double"
+          },
+          "notes": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Anything else worth recording."
+          }
+        },
+        "description": "The fields an existing asset may be corrected to."
       },
       "UpdateAssetStatusRequest": {
         "required": [

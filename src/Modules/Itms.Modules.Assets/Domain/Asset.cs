@@ -248,6 +248,80 @@ public sealed class Asset
     }
 
     /// <summary>
+    /// Corrects the descriptive facts about an asset: what it is, where it belongs, and
+    /// what it cost.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The tag is not a parameter, and that is the enforcement of invariant 4.</b>
+    /// <see cref="AssetEdit"/> has no field for it, so there is nothing here to ignore and
+    /// no way for a caller to be surprised — an asset tag cannot be changed because no code
+    /// path exists that would change it. The same goes for the status and the holder: a
+    /// lifecycle move has to write a history entry and publish an event, and this method
+    /// does neither.
+    /// </para>
+    /// <para>
+    /// <b>An edit that moves nothing writes nothing.</b> The normalised state is compared
+    /// with what the asset already carries and the audit columns are stamped only when they
+    /// actually differ, so a form re-submitted unchanged leaves <c>xmin</c> alone — which
+    /// means it does not silently invalidate the <c>ETag</c> every other reader of this
+    /// asset is holding. The caller gets the applied state back and can diff it against
+    /// what it captured beforehand to record only the fields that moved (ARCHITECTURE.md
+    /// §8).
+    /// </para>
+    /// </remarks>
+    /// <param name="edit">The facts as they should now read.</param>
+    /// <param name="now">The current instant, from <c>IClock</c>.</param>
+    /// <param name="actor">Who is correcting it, or <see langword="null"/> for the system.</param>
+    /// <returns>The state actually applied, normalised — the "after" half of a diff.</returns>
+    public AssetEdit Update(AssetEdit edit, DateTimeOffset now, Guid? actor)
+    {
+        ArgumentNullException.ThrowIfNull(edit);
+
+        var normalized = edit with
+        {
+            Name = ReferenceText.Optional(edit.Name, NameMaxLength, nameof(edit)),
+            SerialNumber = ReferenceText.Optional(edit.SerialNumber, SerialNumberMaxLength, nameof(edit)),
+            Barcode = ReferenceText.Optional(edit.Barcode, BarcodeMaxLength, nameof(edit)),
+            Manufacturer = ReferenceText.Optional(edit.Manufacturer, ManufacturerMaxLength, nameof(edit)),
+            Model = ReferenceText.Optional(edit.Model, ModelMaxLength, nameof(edit)),
+            DepartmentName = ReferenceText.Optional(edit.DepartmentName, DepartmentNameMaxLength, nameof(edit)),
+            LocationPath = ReferenceText.Optional(edit.LocationPath, LocationPathMaxLength, nameof(edit)),
+            Vendor = ReferenceText.Optional(edit.Vendor, VendorMaxLength, nameof(edit)),
+            Notes = ReferenceText.Optional(edit.Notes, NotesMaxLength, nameof(edit)),
+        };
+
+        // Record equality, so this is every field of the descriptive half at once. A field
+        // added to AssetEdit therefore joins the comparison without being named here.
+        if (AssetEdit.Of(this) == normalized)
+        {
+            return normalized;
+        }
+
+        AssetTypeId = normalized.AssetTypeId;
+        Name = normalized.Name;
+        SerialNumber = normalized.SerialNumber;
+        NormalizedSerialNumber = normalized.SerialNumber?.ToUpperInvariant();
+        Barcode = normalized.Barcode;
+        Manufacturer = normalized.Manufacturer;
+        NormalizedManufacturer = normalized.Manufacturer?.ToUpperInvariant();
+        Model = normalized.Model;
+        DepartmentId = normalized.DepartmentId;
+        DepartmentName = normalized.DepartmentName;
+        LocationId = normalized.LocationId;
+        LocationPath = normalized.LocationPath;
+        PurchaseDate = normalized.PurchaseDate;
+        WarrantyExpiresAt = normalized.WarrantyExpiresAt;
+        Vendor = normalized.Vendor;
+        Cost = normalized.Cost;
+        Notes = normalized.Notes;
+        UpdatedAt = now;
+        UpdatedBy = actor;
+
+        return normalized;
+    }
+
+    /// <summary>
     /// Issues the asset to somebody, or hands it from whoever holds it to somebody else.
     /// </summary>
     /// <remarks>

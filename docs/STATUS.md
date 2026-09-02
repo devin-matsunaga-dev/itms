@@ -4,9 +4,9 @@
 
 **Project:** Unified IT Management System (ITMS)
 **Phase:** 2 — Assets & directory. Phase 0 and Phase 1 are **complete and tagged**.
-**Current WP:** `WP-2.6b — Asset forms & lifecycle actions [UI]`
-**Branch:** `feat/wp-2.6b-asset-forms-actions`
-**Last completed:** `WP-2.6a — Asset list, detail, timeline` (2026-09-02)
+**Current WP:** `WP-2.7 — User & directory UI [UI]`
+**Branch:** `feat/wp-2.7-user-directory-ui`
+**Last completed:** `WP-2.6b — Asset forms & lifecycle actions` (2026-09-02)
 **Last updated:** 2026-09-02
 
 > **Both phase gates were completed and verified by the human on 2026-09-01, and both tags exist:** `v0.1-phase0` at `03a39b2` (WP-0.9, the last Phase 0 package) and `v0.2-phase1` at `8a2b1c9` (WP-1.16). Phase 1 shipped sixteen packages including the two added against the human's mockups — WP-1.11's table rebuild and WP-1.12's search and counters — and both are in `WORK_PACKAGES.md`. Phase 2 has begun.
@@ -14,6 +14,8 @@
 > **Three things passed their gate unclaimed, and are now overdue rather than pending.** The **root README** (owed at the Phase 0 gate; `CONVENTIONS.md` §Documentation requires it), the **`React.lazy` per-route bundle split** (recorded as owed by six packages, and by two of them as something to claim *at* the Phase 1 gate), and the **seeder-in-production gap** recorded against `WP-6.6`. None of the three blocks Phase 2. Each is described below under *In flight / noticed* — but the first two no longer have a gate to be claimed at, so they now need a work package of their own or a conscious decision to drop them.
 
 > **The volume-test split was made at WP-2.3, and it did not fix the budget — because the volume test was never the cost.** STATUS.md had claimed since WP-1.12 that "roughly half" the integration runtime was WP-1.5's 50,000-ticket test. **That was wrong, and WP-2.3 measured it: the volume test takes about 12 seconds, and excluding it moves the whole run by about 4 seconds** (assemblies run in parallel, so its cost overlaps other work). The ordinary run is now **1,509 tests at about 3m20s** at WP-2.5 — up from 1,465 at 3m06s at WP-2.4, 1,416 at 2m22s at WP-2.3, and 1,361 at 2m18s at WP-2.2. **WP-2.5's own 44 tests cost about 14 seconds of that, which is the first package in three whose marginal cost roughly matches its test count** — the curve is not being driven by the newest suite. It has crossed three minutes, which is half again over `CONVENTIONS.md`'s two-minute target. The split is still correct and is now permanent: `CONVENTIONS.md` §Testing names both commands and CI runs both in separate steps, so the volume suite is off the inner loop without being abandoned. **But the lever this file has named for four packages has now been pulled and the budget is still blown, so the next attempt needs a different target.** The real cost is the ~593 ordinary integration tests, each resetting a real PostgreSQL through Respawn between tests; the levers left are the reset itself (truncate fewer tables, or reset per class rather than per test), running the integration collections in parallel across more than one database, and accepting a higher number. **That is a decision, not a session's judgement, and it should be taken before Phase 3 — WP-3.3's ingestion and WP-3.4's rollups are both database-heavy.** WP-2.4's own 28 integration tests cost about 24 seconds run alone, container and host startup included, so they are not the 44-second jump on their own — see *Noticed during WP-2.4*.
+
+> **`dotnet test` reports "Zero tests ran" again, and it is the environment.** It returned during WP-2.6b on SDK 10.0.111 — the same regression WP-1.3 recorded and WP-2.3 could not reproduce — and it was **confirmed on a clean checkout of `main` before any WP-2.6b code was built**, so it is not the branch. Every assembly runs correctly when its executable is invoked directly, which is what this package's suites were run with; the exact commands are in *Environment notes*. **This is now the second return, which makes the "diagnose it properly in a session of its own" note below overdue rather than optional** — the suspects are unchanged: the `test.runner` block in `global.json`, and the MTP/VSTest bridge in the SDK patch.
 
 > **The seeded SLA targets were not signed off at the gate.** `HelpdeskReferenceDataSeeder`'s Critical 15/120, High 30/480, Medium 60/1440, Low 120/4320 minutes have been binding on every ticket since WP-1.8 and remain, in the words of the WP-1.8 note below, plausible rather than sanctioned. The gate was the moment to confirm them and that did not happen; they are still unagreed.
 
@@ -25,7 +27,7 @@
 |---|---|---|---|
 | 0 — Foundation | 0.1 – 0.9 | 9 / 9 | `v0.1-phase0` |
 | 1 — Helpdesk | 1.1 – 1.16 | 16 / 16 | `v0.2-phase1` |
-| 2 — Assets & directory | 2.1 – 2.7 (2.6 split into a/b) | 6 / 8 | — |
+| 2 — Assets & directory | 2.1 – 2.7 (2.6 split into a/b) | 7 / 8 | — |
 | 3 — Monitoring & alerts | 3.1 – 3.8 | 0 / 8 | — |
 | 4 — Knowledge, search, notifications | 4.1 – 4.5 | 0 / 5 | — |
 | 5 — Dashboard, reports, admin | 5.1 – 5.9 | 0 / 9 | — |
@@ -549,13 +551,59 @@
 
 - **The backend suite ran in 2m38s here, against the 3m20s recorded at WP-2.5, on an unchanged suite.** This package touched no .NET file and added no test to it, so the difference is machine variance rather than a fix — which is worth writing down precisely because WP-2.4 asked for the next measurement to be of the whole curve. It is still over the two-minute target and the levers are unchanged.
 
+### Noticed during WP-2.6b
+
+- **An edit is audited and does not appear on the asset's own timeline, which is the gap this package was told to leave open.** `PUT /api/v1/assets/{id}` writes one `assets.asset_updated` row through `IAuditWriter` and no `AssetHistoryEntry` — invariant 5 names the five *moves* that owe a history entry and a correction is not one of them, and ARCHITECTURE.md §5 has no `AssetUpdated` event for a consumer to derive one from. **The consequence is a real UX deficiency: a technician looking at "what happened to this machine" sees every assignment and lifecycle move and never sees that somebody fixed its serial number**, and the trail that does record it is the admin audit view, which is a different screen for a different question. At the human's direction (2026-09-02) the specified behaviour was built as written and the gap recorded here rather than closed. Closing it later means either a third `AssetChangeKind` or a `Correction` line synthesised on the client — and the client cannot synthesise one, because the asset carries no record of having been edited beyond `updatedAt`. **A package that wants it will need a server change.**
+
+- **`canBeAssigned` is a second derived field on `AssetResponse`, and it exists because `allowedNextStatusCodes` cannot answer for assignment.** The destination list is empty from a terminal status *and* from a custom status an administrator added, and those two cases differ: `Asset.AssignTo` refuses only the terminal three, deliberately, so that adding a status does not make the equipment in it unissuable. It was approved at this package's scope gate on the condition that it stay **strictly computed** — it is `!AssetLifecycle.IsTerminal(code)`, evaluated on every read, with no column, no setter, and no way for a handler to set it by hand. `AssetLifecycleDestinationsTests.A_custom_status_offers_no_destinations_but_the_asset_is_still_assignable` is the test that fails if a later package tries to infer one field from the other.
+
+- **Both derived fields are filled by one call, `AssetResponse.WithLifecycle()`, and a fifth construction path would have to remember it.** The two `From` overloads make the call themselves, so the create and all four lifecycle responses are covered; `GetAssetHandler` projects in the query — `AssetLifecycle` is C# the database cannot run — and calls it after materialising. A new handler that builds an `AssetResponse` some third way would silently answer an empty destination list, and the screen would render no actions rather than the wrong ones. **That fails quietly**, which is the same shape as the `AddMessaging(...)` trap: prefer `AssetResponse.From`.
+
+- **The edit form is the only thing in the system that refreshes an asset's cached `department_name` and `location_path`.** `UpdateAssetHandler` resolves both through `IDepartmentLookup` and `ILocationLookup` on every save, so saving an asset's form brings its two cached strings back into agreement with Directory after a rename or a move. **That is a side effect, not the fix** — the staleness WP-2.3 recorded and WP-2.4 and WP-2.6a re-recorded is still there for every asset nobody edits, and the refresh-consumer package is still unclaimed. It does mean the workaround for a renamed room is now "open the asset and save it", which is worth knowing and is not a substitute.
+
+- **An edit that moves nothing writes nothing — no `UPDATE`, no audit row, no new `ETag`.** `Asset.Update` compares the normalised state against `AssetEdit.Of(this)` using record equality and returns early, so a form re-submitted unchanged leaves `xmin` alone. That matters beyond tidiness: bumping the version would refuse every *other* reader's precondition with a 412 for a change that never happened. The comparison is by record value, so **a field added to `AssetEdit` joins it automatically** — which is the property to preserve if the shape grows.
+
+- **`PUT` is a full replacement and a field omitted from the body is cleared, not left alone.** That is the honest reading of a PUT and it is what the edit form sends — it holds every field and posts all of them, so "the operator emptied the vendor box" and "the client forgot vendor" are the same request. **A caller that wants to change one field must send the other twelve**, and `WP-5.7`'s CSV import, if it ever updates rather than inserts, will have to read the asset first or want a PATCH. Nothing has asked for one.
+
+- **A retired asset type may be kept but not moved into, and the create and the edit differ on this deliberately.** `CreateAssetHandler` refuses a retired type outright; `UpdateAssetHandler` refuses it only when it is a *change*, because otherwise retiring a type would freeze every asset already classified as one. The same asymmetry does not apply to departments — a retired department is accepted by both, since retiring one does not move the equipment sitting in it.
+
+- **The detail screen now makes four reads, not three.** `useAssetHolders` joined the asset, the history, and the tickets, because the assign and transfer dialogs need a person picker. It is unconditional — it runs even for a retired asset that offers neither action — and it shares its cache entry and its ten-minute `staleTime` with the register's holder filter, so in practice it is free after the first visit. Gating it on `canBeAssigned` would save one request on the terminal case only, and was judged not worth the conditional.
+
+- **`LocationPicker` moved out of `asset-filters.tsx` into its own file rather than becoming a second copy.** WP-2.6a held it privately; the two forms needed the same control, and the register's own note said the cascading picker is `WP-2.7`'s. It now takes its placeholder as a prop and has one call site per screen — **so `WP-2.7` replaces one file rather than three.** The flat two-hundred-room bound is unchanged and is still the reason the cascade exists.
+
+- **`FormSection` and `Field` are now at two copies**, in `new-ticket-page.tsx` and `asset-form.tsx`. Hoisting would have meant editing a merged package's screen from an asset package, which is the call this repository has made three times now. **`WP-2.7`'s directory forms are the third copy and should hoist all three into `src/components/common/`** — along with the paging footer WP-2.6a recorded, which is the same trigger on the same package.
+
+- **The cost field is text, not a number input, and `assetToForm` deliberately does not pad it.** A number input would let the browser decide what "1,499.5" means; the column is `numeric(12,2)` in a single unnamed currency (`Asset.Cost`). And a stored 1499.5 is rendered as `1499.5` rather than `1499.50`, because padding it would make an untouched form submit a different string than it received — which the server would still see as no change, but which would read as an edit to anyone comparing the two.
+
+- **`ReferenceText` and `AssetETag` are still at two copies each**, a fourth package running. This package's `Asset.Update` uses `ReferenceText` and its endpoint uses `AssetETag`, but neither wrote a new copy, so WP-2.1's third-copy hoist trigger is still untripped.
+
+- **The bundle is now 840 kB, against 819 kB at WP-2.6a.** The two form routes and the lifecycle actions cost about 21 kB. That is the fifth Phase 2 package to add weight to an initial bundle nobody is splitting; the `React.lazy` per-route split recorded at the top of this file has now missed its gate and gained two more routes to split.
+
+- **The ordinary run is 1,546 tests at about 2m45s** — 846 unit, 52 architecture, 648 integration — against 1,509 at 3m20s at WP-2.5 and the same suite at 2m38s at WP-2.6a. This package's 37 backend tests cost roughly what their count suggests, and the run is still over `CONVENTIONS.md`'s two-minute target with the levers unchanged. **It was measured with the direct executables**, because `dotnet test` is reporting Zero tests ran again — see the header note and *Environment notes*.
+
+- **Asset delete and ticket delete are still unowned.** WP-2.3 recorded three unowned Phase 2 write paths; this package was granted the first — asset edit — and built it. The other two remain, and `DirectoryUsageTests`' two direct-SQL helpers still stand in for a delete that does not exist. **One of the two can now be replaced**: `DirectoryUsageTests.MoveAssetAsync` moves an asset between rooms with raw SQL, and `PUT /api/v1/assets/{id}` is now the real call — its remark has been corrected to say so, and the swap was left to whichever package next touches that class rather than rewriting a merged package's test from an asset package. `SoftDeleteAssetAsync` still has no endpoint at all.
+
+- **Nothing about the asset register's KPI row changed.** There is still no `/assets/counters` endpoint, so the dense KPI variant DESIGN.md §4 describes is still absent — WP-2.6a's call, unchanged, and not this package's to take.
+
 ## Known issues
 
 - none
 
 ## Environment notes
 
-- **`dotnet test` works again, and there are now two commands.** The ordinary run is `dotnet test --filter-not-trait "Category=Volume"`; the volume run is `dotnet test --project tests/Itms.IntegrationTests/Itms.IntegrationTests.csproj --filter-trait "Category=Volume"`. `CONVENTIONS.md` §Testing carries both and CI runs both in separate steps. **Counts at WP-2.5: 835 unit, 52 architecture, 622 integration — 1,509 in the ordinary run at about 3m20s, plus 1 volume test at about 16s.** The run is still over the two-minute target; see the note at the top of this file for what the remaining levers are. The WP-1.3 "Zero tests ran" regression did not reproduce anywhere in this package on the same SDK (10.0.111). **One form still fails and is not needed:** `dotnet test --project <csproj> -- <runner args>` reports Zero tests ran, because the `--` pass-through confuses the MTP bridge — use the first-class `--filter-trait` / `--filter-not-trait` options instead. Running the executables directly (`./tests/<Suite>/bin/Debug/net10.0/<Suite>`, with xUnit's own `-trait` / `-trait-`) remains the fallback if it returns.
+- **`dotnet test` is reporting "Zero tests ran" again, and the fallback is the direct executables.** It returned during WP-2.6b on the same SDK (10.0.111) and was **confirmed on a clean checkout of `main`**, so it is the environment rather than any branch. Every form fails — plain `dotnet test`, and with `--filter-not-trait` — and every assembly runs correctly when its executable is invoked directly. **The two commands to run while it is broken:**
+
+  ```bash
+  # ordinary — what to run every package
+  ./tests/Itms.UnitTests/bin/Debug/net10.0/Itms.UnitTests
+  ./tests/Itms.ArchitectureTests/bin/Debug/net10.0/Itms.ArchitectureTests
+  ./tests/Itms.IntegrationTests/bin/Debug/net10.0/Itms.IntegrationTests -trait- "Category=Volume"
+
+  # volume
+  ./tests/Itms.IntegrationTests/bin/Debug/net10.0/Itms.IntegrationTests -trait "Category=Volume"
+  ```
+
+  `dotnet build` first — the executables do not rebuild themselves. When the SDK form works, `CONVENTIONS.md` §Testing's two commands are the ones to use and are what CI runs: `dotnet test --filter-not-trait "Category=Volume"` and `dotnet test --project tests/Itms.IntegrationTests/Itms.IntegrationTests.csproj --filter-trait "Category=Volume"`. **Counts at WP-2.6b: 846 unit, 52 architecture, 648 integration — 1,546 in the ordinary run at about 2m45s, plus 1 volume test at about 10s.** The run is still over the two-minute target; see the note at the top of this file for the remaining levers.
 - **The frontend suite is `npm test --prefix src/Itms.Web.Client`** (Vitest, 362 tests, about seven seconds). `npm run build` type-checks with `tsc -b` before it bundles, so a type error fails the build rather than the browser. `npm run lint` is oxlint.
 - **`aspire run` now also starts `web-client`.** It runs `npm install` first (an Aspire installer resource) and then `npm run dev`, waits for `web-host`, and is published on an external endpoint — the dashboard prints its URL. The Vite dev server proxies `/api` to the host, so the browser sees one origin.
 - **The colour scheme is remembered per browser** under `localStorage["itms.theme"]`, and follows the operating system until the viewer picks a mode. Clearing site data returns it to the system preference. There is no server-side or per-account theme setting, and none is planned.

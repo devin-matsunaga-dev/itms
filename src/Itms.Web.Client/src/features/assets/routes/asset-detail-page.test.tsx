@@ -5,28 +5,59 @@ import { Route, Routes } from 'react-router'
 import { AssetDetailPage } from '@/features/assets/routes/asset-detail-page'
 import { ApiError } from '@/lib/api/client'
 import { formatDate } from '@/lib/datetime'
-import type { Asset, PagedAssetHistory, PagedTicketSummaries } from '@/lib/api/types'
+import type {
+  Asset,
+  PagedAssetHistory,
+  PagedTicketSummaries,
+  UserSummary,
+} from '@/lib/api/types'
+import type { AssetRead } from '@/features/assets/api/assets-api'
 import {
   asset,
   assetId,
+  holder,
   historyEntry,
   ticketSummary,
 } from '@/features/assets/test/asset-fixtures'
 import { renderWithProviders } from '@/test/render'
 
-const fetchAsset = vi.fn<() => Promise<Asset>>()
+const toastError = vi.fn()
+const toastSuccess = vi.fn()
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: (message: string, options?: unknown) => toastError(message, options),
+    success: (message: string, options?: unknown) => toastSuccess(message, options),
+  },
+}))
+
+const fetchAsset = vi.fn<() => Promise<AssetRead>>()
 const fetchAssetHistory = vi.fn<() => Promise<PagedAssetHistory>>()
 const fetchAssetTickets = vi.fn<() => Promise<PagedTicketSummaries>>()
+const assignAsset = vi.fn<(...args: unknown[]) => Promise<Asset>>()
+const moveAsset = vi.fn<(...args: unknown[]) => Promise<Asset>>()
 
 vi.mock('@/features/assets/api/assets-api', () => ({
   fetchAsset: () => fetchAsset(),
   fetchAssetHistory: () => fetchAssetHistory(),
   fetchAssetTickets: () => fetchAssetTickets(),
+  fetchAssetHolders: (): Promise<UserSummary[]> => Promise.resolve([holder, otherPerson]),
+  assignAsset: (...args: unknown[]) => assignAsset(...args),
+  moveAsset: (...args: unknown[]) => moveAsset(...args),
   fetchAssets: vi.fn(),
   fetchAssetTypes: vi.fn(),
   fetchAssetStatuses: vi.fn(),
-  fetchAssetHolders: vi.fn(),
+  createAsset: vi.fn(),
+  updateAsset: vi.fn(),
 }))
+
+/** Somebody a transfer can go to who is not already holding the asset. */
+const otherPerson: UserSummary = { ...holder, id: 'user-2', displayName: 'Mark Reyes' }
+
+/** The read as the API layer answers it: the asset, and the tag its writes send back. */
+function read(overrides: Partial<Asset> = {}, etag = '"41"'): AssetRead {
+  return { asset: asset(overrides), etag }
+}
 
 function historyPage(items: PagedAssetHistory['items'], total = items.length): PagedAssetHistory {
   return { items, total, page: 1, pageSize: 50, totalPages: 1, hasNextPage: false }
@@ -52,8 +83,14 @@ beforeEach(() => {
   fetchAsset.mockReset()
   fetchAssetHistory.mockReset()
   fetchAssetTickets.mockReset()
+  assignAsset.mockReset()
+  moveAsset.mockReset()
+  assignAsset.mockResolvedValue(asset())
+  moveAsset.mockResolvedValue(asset())
+  toastError.mockReset()
+  toastSuccess.mockReset()
 
-  fetchAsset.mockResolvedValue(asset())
+  fetchAsset.mockResolvedValue(read())
   fetchAssetHistory.mockResolvedValue(historyPage([]))
   fetchAssetTickets.mockResolvedValue(ticketsPage([]))
 })
@@ -179,7 +216,14 @@ describe('AssetDetailPage', () => {
 
   it('says an asset in a terminal status has reached the end of its life', async () => {
     fetchAsset.mockResolvedValue(
-      asset({ assetStatusCode: 'retired', assetStatusName: 'Retired', assignedToUserName: null }),
+      read({
+        assetStatusCode: 'retired',
+        assetStatusName: 'Retired',
+        assignedToUserId: null,
+        assignedToUserName: null,
+        allowedNextStatusCodes: [],
+        canBeAssigned: false,
+      }),
     )
     renderDetail()
 
@@ -189,17 +233,157 @@ describe('AssetDetailPage', () => {
     expect(screen.getByText('Nobody')).toBeInTheDocument()
   })
 
-  it('renders no lifecycle actions, because the server does not yet say which are legal', async () => {
-    // `WP-2.6b` adds the legal-destination list to `AssetResponse` and the buttons that
-    // read it. Until then there is nothing here that could render them honestly, and
-    // WP-2.6's own criterion is that an illegal action is absent rather than disabled.
+  /**
+   * WP-2.6b's criterion, on the screen. The buttons come from the server's
+   * `allowedNextStatusCodes` and `canBeAssigned` — the fixture is a deployed asset that
+   * somebody holds — and an action the server would refuse is not rendered at all.
+   */
+  it('renders the lifecycle actions the server says are legal, and no others', async () => {
     renderDetail()
 
     await screen.findByRole('heading', { name: 'Jane’s laptop' })
 
-    for (const action of [/retire/i, /send for repair/i, /assign/i, /transfer/i, /edit/i]) {
+    for (const legal of [/^transfer$/i, /^return$/i, /send for repair/i, /^retire$/i]) {
+      expect(screen.getByRole('button', { name: legal })).toBeInTheDocument()
+    }
+
+    // Not legal from `deployed`, and so absent rather than greyed out: an asset that is
+    // already deployed is not issued out of stock, and is not coming back from repair.
+    expect(screen.queryByRole('button', { name: /^assign$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /return to service/i })).not.toBeInTheDocument()
+  })
+
+  it('renders no lifecycle actions at all for an asset that has reached the end of its life', async () => {
+    fetchAsset.mockResolvedValue(
+      read({
+        assetStatusCode: 'retired',
+        assetStatusName: 'Retired',
+        assignedToUserId: null,
+        assignedToUserName: null,
+        allowedNextStatusCodes: [],
+        canBeAssigned: false,
+      }),
+    )
+    renderDetail()
+
+    await screen.findByRole('heading', { name: 'Jane’s laptop' })
+
+    for (const action of [/^retire$/i, /send for repair/i, /^assign$/i, /^transfer$/i, /^return$/i]) {
       expect(screen.queryByRole('button', { name: action })).not.toBeInTheDocument()
     }
+
+    // Correcting a mistyped serial on a retired asset is a thing somebody has to do, and
+    // the server accepts it — so the edit link stays.
+    expect(screen.getByRole('link', { name: /edit/i })).toBeInTheDocument()
+  })
+
+  /**
+   * The precondition ARCHITECTURE.md §6 asks for. The tag the detail was read at goes back
+   * with every write, so a stale copy is refused with 412 before the move is attempted
+   * rather than losing a race.
+   */
+  it('sends the tag it read the asset at with a lifecycle write', async () => {
+    renderDetail()
+
+    await userEvent.click(await screen.findByRole('button', { name: /send for repair/i }))
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: /send for repair/i }),
+    )
+
+    await waitFor(() => {
+      expect(moveAsset).toHaveBeenCalledWith(assetId, 'repairs', null, '"41"')
+    })
+  })
+
+  it('carries the note somebody typed onto the move', async () => {
+    renderDetail()
+
+    await userEvent.click(await screen.findByRole('button', { name: /^retire$/i }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText('Note'), 'Water damage, written off')
+    await userEvent.click(within(dialog).getByRole('button', { name: /^retire$/i }))
+
+    await waitFor(() => {
+      expect(moveAsset).toHaveBeenCalledWith(
+        assetId,
+        'retirements',
+        'Water damage, written off',
+        '"41"',
+      )
+    })
+  })
+
+  /**
+   * The three assignment acts share one route and are told apart by what they send: a
+   * person for an issue or a transfer, and null for a return (WP-2.2).
+   */
+  it('sends a return down the assignment route with nobody named', async () => {
+    renderDetail()
+
+    await userEvent.click(await screen.findByRole('button', { name: /^return$/i }))
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: /^return$/i }),
+    )
+
+    await waitFor(() => {
+      expect(assignAsset).toHaveBeenCalledWith(assetId, null, null, '"41"')
+    })
+  })
+
+  /** A transfer cannot be confirmed until somebody is named, rather than failing on submit. */
+  it('will not confirm a transfer until a person is chosen', async () => {
+    renderDetail()
+
+    await userEvent.click(await screen.findByRole('button', { name: /^transfer$/i }))
+    const dialog = screen.getByRole('dialog')
+
+    expect(within(dialog).getByRole('button', { name: /^transfer$/i })).toBeDisabled()
+
+    // The person already holding it is not offered: issuing an asset to its own holder is
+    // refused with `assets.already_assigned_to_that_user`.
+    await userEvent.click(within(dialog).getByLabelText(/^Transfer to/))
+    expect(screen.queryByRole('option', { name: 'Jane Doe' })).not.toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('option', { name: 'Mark Reyes' }))
+
+    await userEvent.click(within(dialog).getByRole('button', { name: /^transfer$/i }))
+
+    await waitFor(() => {
+      expect(assignAsset).toHaveBeenCalledWith(assetId, 'user-2', null, '"41"')
+    })
+  })
+
+  /**
+   * A stale write and an ordinary failure read differently to the person in front of them.
+   * Both 412 and 409 mean somebody else got there first.
+   */
+  it('says the asset moved when a write is refused with a precondition failure', async () => {
+    moveAsset.mockRejectedValue(new ApiError(412, null, 'stale'))
+    renderDetail()
+
+    await userEvent.click(await screen.findByRole('button', { name: /send for repair/i }))
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: /send for repair/i }),
+    )
+
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalledWith(
+        'This asset changed while you were reading it.',
+        expect.objectContaining({
+          description: 'It has been reloaded. Check what happened and try again.',
+        }),
+      )
+    })
+  })
+
+  it('offers the edit form for the asset on screen', async () => {
+    renderDetail()
+
+    await screen.findByRole('heading', { name: 'Jane’s laptop' })
+
+    expect(screen.getByRole('link', { name: /edit/i })).toHaveAttribute(
+      'href',
+      `/assets/${assetId}/edit`,
+    )
   })
 
   it('says what the server said when the asset is not there', async () => {
@@ -219,7 +403,7 @@ describe('AssetDetailPage', () => {
     const alert = await screen.findByRole('alert')
     expect(within(alert).getByText('The asset could not be loaded.')).toBeInTheDocument()
 
-    fetchAsset.mockResolvedValue(asset())
+    fetchAsset.mockResolvedValue(read())
     await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
 
     await waitFor(() => {

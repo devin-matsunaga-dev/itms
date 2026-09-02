@@ -65,6 +65,75 @@ public sealed record AssetResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt)
 {
+    /// <summary>
+    /// The status codes this asset may legally be moved to next, straight from
+    /// <see cref="AssetLifecycle.DestinationsFrom"/>. Empty from a terminal status, and
+    /// empty from a custom status the lifecycle table does not know.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This exists so a client never restates the lifecycle table in its own language.</b>
+    /// It is the asset's mirror of <c>TicketDetailResponse.AllowedNextStatuses</c>, and
+    /// <see cref="AssetLifecycle.DestinationsFrom"/>'s own doc comment asks for it by name:
+    /// WP-2.6b renders the lifecycle actions and an illegal one has to be <em>absent</em>
+    /// rather than disabled, which is only true for as long as the buttons are told rather
+    /// than deciding.
+    /// </para>
+    /// <para>
+    /// Codes rather than ids, and codes rather than names. A status is a configurable row
+    /// an administrator may rename, and the code is the immutable thing WP-2.1 added
+    /// precisely so something stable could be reasoned about — the lifecycle table is keyed
+    /// on it and so is DESIGN.md's colour map.
+    /// </para>
+    /// <para>
+    /// Computed on every read, never stored. Set after projection, like its ticket
+    /// counterpart, because it is derived from the status and not a column.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyCollection<string> AllowedNextStatusCodes { get; init; } = [];
+
+    /// <summary>
+    /// Whether this asset may be issued to somebody, transferred, or taken back.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Assignment is a different fact from a lifecycle move, so it needs its own
+    /// answer.</b> <see cref="AllowedNextStatusCodes"/> cannot carry it:
+    /// <see cref="AssetLifecycle.DestinationsFrom"/> is empty both for a terminal status
+    /// <em>and</em> for a custom status an administrator added, and those two cases differ —
+    /// <see cref="Asset.AssignTo"/> refuses only the terminal three, deliberately, so that
+    /// adding a status does not quietly make the equipment in it unissuable.
+    /// </para>
+    /// <para>
+    /// <b>Strictly derived, never stored and never set by hand.</b> It is
+    /// <c>!AssetLifecycle.IsTerminal(code)</c> — the same call the entity makes — evaluated
+    /// on every read from the status the asset carries at that moment. There is no setter a
+    /// handler could reach for and no column it could drift from; it is a convenience
+    /// projection of a rule that lives in one place. The client's buttons are not the
+    /// enforcement either: <see cref="Asset.AssignTo"/> refuses a terminal asset with
+    /// <c>assets.asset_not_assignable</c> whatever a caller sends.
+    /// </para>
+    /// </remarks>
+    public bool CanBeAssigned { get; init; }
+
+    /// <summary>
+    /// Fills the two derived lifecycle fields from the status this response already
+    /// carries.
+    /// </summary>
+    /// <remarks>
+    /// One call, made by both <c>From</c> overloads and by the read that projects in the
+    /// query, so no construction path can produce a response whose buttons would be wrong.
+    /// It takes no argument on purpose: the code it reasons about is the one on the
+    /// response, which is the one the client will be looking at.
+    /// </remarks>
+    /// <returns>The same response with the derived fields set.</returns>
+    internal AssetResponse WithLifecycle() =>
+        this with
+        {
+            AllowedNextStatusCodes = [.. AssetLifecycle.DestinationsFrom(AssetStatusCode)],
+            CanBeAssigned = !AssetLifecycle.IsTerminal(AssetStatusCode),
+        };
+
     /// <summary>Renders entities the handler already has in memory.</summary>
     /// <param name="asset">The asset to render.</param>
     /// <param name="type">Its type, already loaded.</param>
@@ -121,6 +190,7 @@ public sealed record AssetResponse(
             asset.Cost,
             asset.Notes,
             asset.CreatedAt,
-            asset.UpdatedAt);
+            asset.UpdatedAt)
+            .WithLifecycle();
     }
 }
